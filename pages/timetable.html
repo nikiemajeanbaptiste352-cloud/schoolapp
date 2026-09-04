@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emploi du temps — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%93%85%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="timetable" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>📅 Emploi du temps</h2>
+                        <div class="subtitle">Grille hebdomadaire des cours par classe.</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="field" style="margin:0;min-width:240px">
+                            <select class="select" id="selClasse"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Légende -->
+                <div class="card card-pad mb-16" id="legend" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"></div>
+
+                <!-- Grille -->
+                <div class="schedule-scroll">
+                    <table class="schedule" id="grille"></table>
+                </div>
+
+                <p class="text-xs text-muted mt-8">ℹ️ Les cases « — » correspondent aux pauses ou aux activités libres (mercredi et samedi après-midi).</p>
+            </main>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="timetable.js"></script>
+</body>
+
+</html>

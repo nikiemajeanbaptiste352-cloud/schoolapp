@@ -1,0 +1,1 @@
+# Backend SchoolManager — services métier

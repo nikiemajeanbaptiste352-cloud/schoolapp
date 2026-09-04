@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paramètres — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%E2%9A%99%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="settings" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>⚙️ Paramètres</h2>
+                        <div class="subtitle">Informations de l'établissement et préférences.</div>
+                    </div>
+                </div>
+
+                <div class="cards-grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:start;gap:18px">
+                    <div>
+                        <!-- Établissement -->
+                        <div class="card card-pad settings-sec">
+                            <h3 class="mb-8">🏫 Établissement</h3>
+                            <p class="text-sm text-muted mb-8">Coordonnées de votre établissement (configurées dans la base).</p>
+                            <div id="ecoleRows"></div>
+                        </div>
+
+                        <!-- Année scolaire -->
+                        <div class="card card-pad settings-sec">
+                            <h3 class="mb-8">🗓️ Année scolaire</h3>
+                            <div id="anneeRows"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <!-- Session -->
+                        <div class="card card-pad settings-sec">
+                            <h3 class="mb-8">👤 Session en cours</h3>
+                            <div id="sessionRows"></div>
+                            <a class="btn btn-outline mt-16" id="btnLogout">🚪 Se déconnecter</a>
+                        </div>
+
+                        <!-- Données -->
+                        <div class="card card-pad settings-sec">
+                            <h3 class="mb-8">💾 Données de l'établissement</h3>
+                            <p class="text-sm text-muted">Les pages affichent les données réelles de la base (backend). Les modifications faites dans l'interface sont pour l'instant conservées en mémoire et perdues au rechargement — la persistance des écritures est une prochaine étape.</p>
+                        </div>
+
+                        <!-- À propos -->
+                        <div class="card card-pad settings-sec">
+                            <h3 class="mb-8">ℹ️ À propos</h3>
+                            <div class="flex" style="gap:12px;align-items:center">
+                                <img src="../assets/logo.svg" alt="Logo" style="width:52px;height:52px;border-radius:12px">
+                                <div>
+                                    <div class="fw-700">SchoolManager</div>
+                                    <div class="text-sm text-muted" id="aboutVersion">Version 1.0.0</div>
+                                    <div class="text-sm text-muted">Application web de gestion scolaire connectée à l'API SchoolManager.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="settings.js"></script>
+</body>
+
+</html>

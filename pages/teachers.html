@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enseignants — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%8F%AB%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="teachers" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>👨‍🏫 Enseignants</h2>
+                        <div class="subtitle">Gérez le corps professoral de l'établissement.</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="search-box">
+                            <span class="ico">🔍</span>
+                            <input type="text" class="input" id="searchInput" placeholder="Rechercher un enseignant…">
+                        </div>
+                        <button class="btn btn-primary" data-open="modalProf">➕ Ajouter un enseignant</button>
+                    </div>
+                </div>
+
+                <!-- Compteurs -->
+                <div class="cards-grid mb-16" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))" id="miniCounts"></div>
+
+                <!-- Tableau -->
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Enseignant</th>
+                                <th>Matière</th>
+                                <th>Classes</th>
+                                <th>Téléphone</th>
+                                <th>Statut</th>
+                                <th style="text-align:center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                    <div class="table-footer">
+                        <span id="countLabel"></span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale Ajouter / Modifier -->
+    <div class="modal-overlay" id="modalProf">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="modalTitle">➕ Ajouter un enseignant</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="fId">
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Nom <span class="req">*</span></label>
+                        <input class="input" id="fNom" placeholder="Ex. Ouédraogo">
+                        <div class="field-error" id="errNom">Le nom est obligatoire.</div>
+                    </div>
+                    <div class="field">
+                        <label>Prénom <span class="req">*</span></label>
+                        <input class="input" id="fPrenom" placeholder="Ex. Jean">
+                        <div class="field-error" id="errPrenom">Le prénom est obligatoire.</div>
+                    </div>
+                    <div class="field">
+                        <label>Sexe</label>
+                        <select class="select" id="fSexe">
+                            <option value="M">Masculin</option>
+                            <option value="F">Féminin</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Statut</label>
+                        <select class="select" id="fStatut">
+                            <option value="Actif">Actif</option>
+                            <option value="Inactif">Inactif</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Téléphone</label>
+                        <input class="input" id="fTel" placeholder="Ex. 70 12 34 56">
+                    </div>
+                    <div class="field">
+                        <label>Email</label>
+                        <input class="input" type="email" id="fEmail" placeholder="prenom.nom@lesavoir.edu">
+                    </div>
+                    <div class="field span-2">
+                        <label>Matière enseignée <span class="req">*</span></label>
+                        <select class="select" id="fMatiere"></select>
+                        <div class="field-error" id="errMatiere">La matière est obligatoire.</div>
+                    </div>
+                    <div class="field span-2">
+                        <label>Classes assignées</label>
+                        <div class="chips-group" id="chipsClasses"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnSaveProf">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de suppression -->
+    <div class="modal-overlay" id="modalDel">
+        <div class="modal modal-sm">
+            <div class="modal-body" style="padding:28px">
+                <div class="confirm-ico">🗑️</div>
+                <div class="confirm-title">Supprimer cet enseignant ?</div>
+                <div class="confirm-text" id="delText">Cette action est irréversible.</div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-danger-soft" id="btnConfirmDel">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="teachers.js"></script>
+</body>
+
+</html>

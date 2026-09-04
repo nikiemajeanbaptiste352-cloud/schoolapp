@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paiements — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="payments" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>💰 Paiements</h2>
+                        <div class="subtitle">Suivez les frais de scolarité et encaissez les versements.</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="search-box">
+                            <span class="ico">🔍</span>
+                            <input type="text" class="input" id="searchInput" placeholder="Rechercher un élève…">
+                        </div>
+                        <button class="btn btn-primary" data-open="modalPay">💵 Encaisser un paiement</button>
+                    </div>
+                </div>
+
+                <!-- Totaux -->
+                <div class="cards-grid mb-16" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))" id="summaryCards"></div>
+
+                <!-- Tableau -->
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                            <tr>
+                                <th>Élève</th>
+                                <th>Motif</th>
+                                <th style="text-align:right">Total</th>
+                                <th style="text-align:right">Payé</th>
+                                <th style="text-align:right">Reste</th>
+                                <th style="min-width:140px">Avancement</th>
+                                <th>Statut</th>
+                                <th>Dernier versement</th>
+                                <th style="text-align:center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                    <div class="table-footer">
+                        <span id="countLabel"></span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale Encaisser -->
+    <div class="modal-overlay" id="modalPay">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>💵 Encaisser un paiement</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field span-2">
+                        <label>Élève <span class="req">*</span></label>
+                        <select class="select" id="fEleve"></select>
+                        <div class="field-error" id="errEleve">Sélectionnez un élève.</div>
+                    </div>
+                    <div class="field">
+                        <label>Montant (FCFA) <span class="req">*</span></label>
+                        <input class="input" type="number" min="1000" step="500" id="fMontant" placeholder="Ex. 50000">
+                        <div class="field-error" id="errMontant">Montant invalide.</div>
+                    </div>
+                    <div class="field">
+                        <label>Mode de paiement</label>
+                        <select class="select" id="fMode">
+                            <option>Espèces</option>
+                            <option>Mobile Money</option>
+                            <option>Chèque</option>
+                        </select>
+                    </div>
+                    <div class="field span-2">
+                        <label>Date</label>
+                        <input class="input" type="date" id="fDate">
+                    </div>
+                    <div class="field span-2">
+                        <div class="alert alert-info" id="payInfo">💡 Renseignez le montant perçu pour l'élève sélectionné.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnSavePay">💾 Enregistrer le versement</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="payments.js"></script>
+</body>
+
+</html>

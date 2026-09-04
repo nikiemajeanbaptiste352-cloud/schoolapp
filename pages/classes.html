@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classes — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%8F%AB%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="classes" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>🏫 Classes</h2>
+                        <div class="subtitle">Consultez les classes de la 6ᵉ à la Terminale.</div>
+                    </div>
+                    <div class="header-actions">
+                        <span class="badge badge-info" id="countBadge"></span>
+                    </div>
+                </div>
+
+                <!-- Compteurs -->
+                <div class="cards-grid mb-16" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))" id="miniCounts"></div>
+
+                <!-- Grille des classes -->
+                <div class="cards-grid" id="classesGrid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale détail classe -->
+    <div class="modal-overlay" id="modalClasse">
+        <div class="modal modal-lg">
+            <div class="modal-head">
+                <h3 id="modalTitle">🏫 Classe</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="classes.js"></script>
+</body>
+
+</html>

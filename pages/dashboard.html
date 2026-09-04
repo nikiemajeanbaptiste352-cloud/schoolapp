@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%8F%AB%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="dashboard" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <!-- Bandeau de bienvenue -->
+                <div class="banner-demo hero-banner">
+                    <div>
+                        <h2 id="heroTitle">Bonjour 👋</h2>
+                        <p id="heroSub">Voici un aperçu de l'activité de votre établissement aujourd'hui.</p>
+                    </div>
+                    <div class="hero-actions">
+                        <span class="badge hero-year" id="heroYear">📅 Année 2026-2027</span>
+                    </div>
+                </div>
+
+                <!-- Cartes statistiques -->
+                <div class="cards-grid stats-grid" id="statsCards"></div>
+
+                <!-- Contenu : répartition, paiements, annonces -->
+                <div class="dashboard-grid mt-16">
+                    <div class="col-left">
+                        <div class="card mb-16">
+                            <div class="card-head">
+                                <h3>🏫 Répartition des élèves par classe</h3>
+                                <a href="classes.html" class="text-sm fw-600">Tout voir →</a>
+                            </div>
+                            <div class="card-pad" id="classBars"></div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-head">
+                                <h3>💳 Derniers paiements</h3>
+                                <a href="payments.html" class="text-sm fw-600">Gérer →</a>
+                            </div>
+                            <div class="list-group" id="recentPayments"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-right">
+                        <div class="card mb-16">
+                            <div class="card-head">
+                                <h3>📢 Dernières annonces</h3>
+                                <a href="announcements.html" class="text-sm fw-600">Voir →</a>
+                            </div>
+                            <div class="list-group" id="recentAnnounces"></div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-head"><h3>⚡ Accès rapides</h3></div>
+                            <div class="card-pad quick-grid">
+                                <a class="quick-btn" href="students.html"><span>👨‍🎓</span>Élèves</a>
+                                <a class="quick-btn" href="grades.html"><span>📝</span>Notes</a>
+                                <a class="quick-btn" href="report-cards.html"><span>📊</span>Bulletins</a>
+                                <a class="quick-btn" href="payments.html"><span>💰</span>Paiements</a>
+                                <a class="quick-btn" href="timetable.html"><span>📅</span>Emploi du temps</a>
+                                <a class="quick-btn" href="announcements.html"><span>📢</span>Annonces</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="dashboard.js"></script>
+</body>
+
+</html>

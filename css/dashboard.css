@@ -1,0 +1,68 @@
+/* ============================================================
+   SchoolManager — Styles du tableau de bord
+   ============================================================ */
+
+.hero-banner {
+  background: linear-gradient(120deg, #0b1c3a 0%, #1d4ed8 130%);
+  position: relative;
+  overflow: hidden;
+}
+.hero-banner::after {
+  content: "";
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.28), transparent 65%);
+  right: -60px;
+  top: -120px;
+}
+.hero-banner > * { position: relative; z-index: 1; }
+.hero-banner p { max-width: 620px; }
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero-year {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: 13.5px;
+  padding: 7px 14px;
+}
+
+.stats-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.stats-grid .stat-card { cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.stats-grid .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+.list-group { padding: 4px 0; }
+.announce-mini { display: flex; flex-direction: column; gap: 4px; }
+.announce-mini .am-t { font-weight: 600; font-size: 14px; line-height: 1.35; }
+.announce-mini .am-d { font-size: 12px; color: var(--text-muted); display: flex; gap: 10px; }
+
+.pay-mini { flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pay-mini .pm-solde { text-align: right; }
+.pay-mini .pm-solde .v { font-weight: 700; font-size: 14px; }
+
+.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.quick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.quick-btn span { font-size: 22px; }
+.quick-btn:hover { background: var(--primary-050); border-color: var(--primary-200); color: var(--info-text); transform: translateY(-2px); }

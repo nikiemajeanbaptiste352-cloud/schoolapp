@@ -1,0 +1,59 @@
+# ===== Python / Backend FastAPI =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.tox/
+.venv/
+venv/
+env/
+ENV/
+
+# ===== Environnements & secrets =====
+.env
+.env.*
+!.env.example
+
+# ===== Bases de données locales (données réelles de l'établissement) =====
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/data/
+
+# ===== Node / npm (si un jour utilisé) =====
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ===== IDE / Éditeurs =====
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.continue/
+
+# ===== OS =====
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# ===== Logs & fichiers temporaires =====
+logs/
+*.log
+tmp/
+temp/
+*.tmp
