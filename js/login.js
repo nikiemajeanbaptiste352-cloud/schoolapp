@@ -51,6 +51,35 @@
     });
   }
 
+  /* ---------- Bascule Connexion ↔ Inscription ---------- */
+  var vueConnexion = document.getElementById("vueConnexion");
+  var vueInscription = document.getElementById("vueInscription");
+  var linkInscription = document.getElementById("linkInscription");
+  var linkRetourConnexion = document.getElementById("linkRetourConnexion");
+
+  function montrerConnexion() {
+    if (vueConnexion) vueConnexion.style.display = "";
+    if (vueInscription) vueInscription.style.display = "none";
+  }
+  function montrerInscription() {
+    if (vueConnexion) vueConnexion.style.display = "none";
+    if (vueInscription) vueInscription.style.display = "";
+    var nom = document.getElementById("nomParent");
+    if (nom) nom.focus();
+  }
+  if (linkInscription) {
+    linkInscription.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerInscription();
+    });
+  }
+  if (linkRetourConnexion) {
+    linkRetourConnexion.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerConnexion();
+    });
+  }
+
   /* ---------- Validation ---------- */
   var form = document.getElementById("loginForm");
   var inputEmail = document.getElementById("email");
@@ -151,4 +180,100 @@
     // connexionApi() affichera l'erreur réseau. Aucune donnée fictive.
     connexionApi();
   });
+
+  /* ---------- Inscription (compte Parent, API uniquement) ---------- */
+  var formInscription = document.getElementById("inscriptionForm");
+  if (formInscription) {
+    var nomParent = document.getElementById("nomParent");
+    var emailParent = document.getElementById("emailParent");
+    var mdpParent = document.getElementById("mdpParent");
+    var mdpParent2 = document.getElementById("mdpParent2");
+    var errNomParent = document.getElementById("errNomParent");
+    var errEmailParent = document.getElementById("errEmailParent");
+    var errMdpParent = document.getElementById("errMdpParent");
+    var errMdpParent2 = document.getElementById("errMdpParent2");
+    var errInscription = document.getElementById("errInscription");
+    var btnInscription = document.getElementById("btnInscription");
+
+    function okInscription(input, errEl) {
+      input.classList.remove("invalid");
+      if (errEl) errEl.classList.remove("show");
+    }
+    function invalideInscription(input, errEl, message) {
+      input.classList.add("invalid");
+      if (errEl) {
+        errEl.textContent = message || errEl.textContent;
+        errEl.classList.add("show");
+      }
+    }
+
+    nomParent.addEventListener("input", function () { okInscription(nomParent, errNomParent); });
+    emailParent.addEventListener("input", function () { okInscription(emailParent, errEmailParent); });
+    mdpParent.addEventListener("input", function () { okInscription(mdpParent, errMdpParent); });
+    mdpParent2.addEventListener("input", function () { okInscription(mdpParent2, errMdpParent2); });
+
+    function inscriptionApi() {
+      btnInscription.disabled = true;
+      btnInscription.textContent = "Création du compte…";
+      if (errInscription) { errInscription.classList.remove("show"); }
+
+      window.API.inscription(
+        nomParent.value.trim(),
+        emailParent.value.trim(),
+        mdpParent.value
+      ).then(function (data) {
+        // L'API renvoie un jeton → l'utilisateur est connecté.
+        var user = data.user || {};
+        sessionStorage.setItem("sm_session", JSON.stringify({
+          role: user.role || "Parent",
+          email: user.email || emailParent.value.trim(),
+          nom: user.nom || ""
+        }));
+        window.location.href = "pages/dashboard.html";
+      }).catch(function (err) {
+        btnInscription.disabled = false;
+        btnInscription.textContent = "Créer mon compte →";
+        var msg = "Inscription impossible.";
+        if (err && err.reseau) {
+          msg = "Serveur injoignable : démarrez le backend puis réessayez.";
+        } else if (err && err.detail) {
+          msg = err.detail;
+        }
+        if (errInscription) {
+          errInscription.textContent = msg;
+          errInscription.classList.add("show");
+        } else {
+          alert(msg);
+        }
+      });
+    }
+
+    formInscription.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var nom = nomParent.value.trim();
+      var email = emailParent.value.trim();
+      var mdp = mdpParent.value;
+      var mdp2 = mdpParent2.value;
+      var valide = true;
+
+      if (!nom) { invalideInscription(nomParent, errNomParent, "Veuillez saisir votre nom complet."); valide = false; }
+      else { okInscription(nomParent, errNomParent); }
+
+      if (!email) { invalideInscription(emailParent, errEmailParent, "Veuillez saisir votre adresse email."); valide = false; }
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        invalideInscription(emailParent, errEmailParent, "Format d'email invalide (ex. nom@exemple.com).");
+        valide = false;
+      } else { okInscription(emailParent, errEmailParent); }
+
+      if (mdp.length < 6) { invalideInscription(mdpParent, errMdpParent, "Le mot de passe doit contenir au moins 6 caractères."); valide = false; }
+      else { okInscription(mdpParent, errMdpParent); }
+
+      if (!mdp2) { invalideInscription(mdpParent2, errMdpParent2, "Veuillez confirmer votre mot de passe."); valide = false; }
+      else if (mdp2 !== mdp) { invalideInscription(mdpParent2, errMdpParent2, "Les deux mots de passe ne correspondent pas."); valide = false; }
+      else { okInscription(mdpParent2, errMdpParent2); }
+
+      if (!valide) return;
+      inscriptionApi();
+    });
+  }
 })();

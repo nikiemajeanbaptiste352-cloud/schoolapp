@@ -186,6 +186,23 @@
         });
     },
 
+    // Inscription publique (compte Parent uniquement) : POST /auth/inscription.
+    // Renvoie un jeton comme la connexion → l'utilisateur est connecté aussitôt.
+    inscription: function (nom, email, motDePasse) {
+      return post("/auth/inscription", { nom: nom, email: email, password: motDePasse }, { jeton: false })
+        .then(function (data) {
+          if (data && data.access_token) {
+            memoriserJeton(data.access_token);
+            memoriserUtilisateur(data.user || null);
+          }
+          return data;
+        });
+    },
+
+    // Gestion des comptes (administrateur uniquement).
+    comptes: function () { return get("/auth/comptes"); },
+    creerCompte: function (corps) { return post("/auth/comptes", corps); },
+
     deconnexion: function () {
       effacerJeton();
       memoriserUtilisateur(null);

@@ -39,6 +39,44 @@
                             <h3 class="mb-8">🗓️ Année scolaire</h3>
                             <div id="anneeRows"></div>
                         </div>
+
+                        <!-- Comptes utilisateurs (réservé à l'administrateur) -->
+                        <div class="card card-pad settings-sec" id="comptesCard" style="display:none">
+                            <h3 class="mb-8">👥 Comptes utilisateurs</h3>
+                            <p class="text-sm text-muted mb-8">Créez les comptes des enseignants, parents et élèves. L'inscription publique ne crée que des comptes Parent.</p>
+
+                            <div id="comptesList"></div>
+
+                            <h4 class="mt-16 mb-8">➕ Créer un compte</h4>
+                            <form id="formCompte" novalidate>
+                                <div class="field mb-16">
+                                    <label for="cpNom">Nom complet <span class="req">*</span></label>
+                                    <input class="input" type="text" id="cpNom" placeholder="Ex. Awa Diallo" autocomplete="off">
+                                    <div class="field-error" id="errCpNom">Veuillez saisir le nom complet.</div>
+                                </div>
+                                <div class="field mb-16">
+                                    <label for="cpEmail">Adresse email <span class="req">*</span></label>
+                                    <input class="input" type="email" id="cpEmail" placeholder="prenom.nom@exemple.com" autocomplete="off">
+                                    <div class="field-error" id="errCpEmail">Veuillez saisir une adresse email valide.</div>
+                                </div>
+                                <div class="field mb-16">
+                                    <label for="cpRole">Rôle <span class="req">*</span></label>
+                                    <select class="input" id="cpRole">
+                                        <option value="Professeur">👨‍🏫 Professeur</option>
+                                        <option value="Élève">👨‍🎓 Élève</option>
+                                        <option value="Parent">👨‍👩‍👧 Parent</option>
+                                        <option value="Administrateur">🛡️ Administrateur</option>
+                                    </select>
+                                </div>
+                                <div class="field mb-16">
+                                    <label for="cpMdp">Mot de passe provisoire <span class="req">*</span></label>
+                                    <input class="input" type="text" id="cpMdp" placeholder="6 caractères minimum" autocomplete="off">
+                                    <div class="field-error" id="errCpMdp">Le mot de passe doit contenir au moins 6 caractères.</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="btnCreerCompte">Créer le compte</button>
+                                <div class="field-error" id="errCompte" style="margin-top:10px"></div>
+                            </form>
+                        </div>
                     </div>
 
                     <div>

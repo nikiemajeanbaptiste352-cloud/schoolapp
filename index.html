@@ -41,9 +41,11 @@
             </div>
         </div>
 
-        <!-- Partie droite : formulaire -->
+        <!-- Partie droite : formulaires -->
         <div class="login-right">
-            <div class="login-card">
+
+            <!-- Connexion -->
+            <div class="login-card" id="vueConnexion">
                 <h2 class="lc-title">Bon retour 👋</h2>
                 <p class="lc-sub">Connectez-vous pour accéder à votre espace.</p>
 
@@ -68,6 +70,53 @@
                     <div class="alert alert-info" id="serveurInfo" style="font-size:13px;padding:10px 14px">
                         Vérification du serveur…
                     </div>
+
+                    <div class="or">ou</div>
+                    <p style="text-align:center;font-size:13.5px;margin:0">
+                        Vous êtes parent d'un élève ?
+                        <a href="#" id="linkInscription">Créer un compte Parent</a>
+                    </p>
+                </form>
+            </div>
+
+            <!-- Inscription (compte Parent) -->
+            <div class="login-card" id="vueInscription" style="display:none">
+                <h2 class="lc-title">Créer un compte Parent 👨‍👩‍👧</h2>
+                <p class="lc-sub">Suivez la scolarité de votre enfant (notes, bulletins, paiements, annonces).</p>
+
+                <form id="inscriptionForm" novalidate>
+                    <div class="field mb-16">
+                        <label for="nomParent">Nom complet <span class="req">*</span></label>
+                        <input class="input" type="text" id="nomParent" placeholder="Ex. Marie Ouédraogo" autocomplete="name">
+                        <div class="field-error" id="errNomParent">Veuillez saisir votre nom complet.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="emailParent">Adresse email <span class="req">*</span></label>
+                        <input class="input" type="email" id="emailParent" placeholder="prenom.nom@exemple.com" autocomplete="email">
+                        <div class="field-error" id="errEmailParent">Veuillez saisir une adresse email valide.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="mdpParent">Mot de passe <span class="req">*</span></label>
+                        <input class="input" type="password" id="mdpParent" placeholder="6 caractères minimum" autocomplete="new-password">
+                        <div class="field-error" id="errMdpParent">Le mot de passe doit contenir au moins 6 caractères.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="mdpParent2">Confirmer le mot de passe <span class="req">*</span></label>
+                        <input class="input" type="password" id="mdpParent2" placeholder="••••••••" autocomplete="new-password">
+                        <div class="field-error" id="errMdpParent2">Les deux mots de passe ne correspondent pas.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block" id="btnInscription">Créer mon compte →</button>
+                    <div class="field-error" id="errInscription" style="margin-top:10px"></div>
+
+                    <div class="or">ou</div>
+                    <p style="text-align:center;font-size:13.5px;margin:0">
+                        Déjà un compte ?
+                        <a href="#" id="linkRetourConnexion">Se connecter</a>
+                    </p>
                 </form>
             </div>
         </div>

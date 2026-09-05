@@ -17,6 +17,23 @@ class LoginIn(BaseModel):
     password: str
 
 
+class InscriptionIn(BaseModel):
+    """Inscription publique — ne crée que des comptes Parent."""
+
+    nom: str
+    email: str
+    password: str
+
+
+class CompteIn(BaseModel):
+    """Création d'un compte par un administrateur (rôle au choix)."""
+
+    nom: str
+    email: str
+    password: str
+    role: str
+
+
 class UserOut(BaseModel):
     """Profil utilisateur exposé (jamais de password_hash)."""
 
