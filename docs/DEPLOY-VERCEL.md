@@ -23,8 +23,20 @@ https://<projet>.vercel.app
   (dont `psycopg[binary]` pour PostgreSQL).
 - `backend/app/config.py` → si `DATABASE_URL` est définie, le backend utilise
   PostgreSQL ; sinon repli SQLite local (dev + tests inchangés).
-- `.vercelignore` (racine) → exclut du téléversement les secrets (`.env*`),
-  données locales, tests et `.venv` (aucun `vercel.json` requis).
+- ⚠️ **Ne PAS créer de fichier `.vercelignore`** : sa présence fait sortir les
+  fichiers statiques (`index.html`, `css/`, `js/`, `pages/`) du filesystem de
+  la fonction Python → la route `/` répond **500** (`FUNCTION_INVOCATION_FAILED`).
+  Sans `.vercelignore`, Vercel embarque tout le projet dans la fonction et tout
+  fonctionne (aucun `vercel.json` requis).
+- **Protection des secrets** : les vrais secrets (DATABASE_URL, SECRET_KEY) ne
+  vivent que dans les variables d'environnement Vercel. `backend/.env` n'est
+  **jamais** versionné (`.gitignore`), et il ne contient **aucun secret** :
+  c'est un stub pour le dev local (voir « 2 bis »). ⚠️ Constaté sur le terrain :
+  sans `.vercelignore`, le CLI Vercel embarque `backend/.env` dans le bundle
+  même s'il est ignoré par git — d'où l'exigence du stub sans secret.
+- `backend/app/main.py` (`FrontStatic`) refuse de servir `backend/`, `data/`,
+  `tests/`, `docs/` et les fichiers cachés (`.env*`…) : même si un tel fichier
+  se retrouvait dans le bundle, il ne serait pas accessible par HTTP.
 - ⚠️ Le projet Vercel doit avoir le **Framework Preset = Python** (Settings →
   General du projet, ou API `PATCH /v9/projects/{id}` `{"framework":"python"}`).
   Sans cela, Vercel déploie le dossier en **statique** : le front s'affiche mais
@@ -62,6 +74,29 @@ Sortie attendue : liste des tables, puis
 
 > Le script est sûr : il ne supprime rien (idempotent). Le déploiement Vercel
 > ré-exécutera aussi ces étapes à froid, sans effet si l'admin existe déjà.
+
+## 2 bis. Fichier `.env` local SANS secret
+
+Pour le développement local, `backend/.env` peut exister, mais il ne doit
+**jamais** contenir la `DATABASE_URL` de production ni un `SECRET_KEY` réel :
+sans `.vercelignore`, ce fichier est embarqué dans le bundle Vercel (même s'il
+est ignoré par git). Le garder en **stub sans secret** :
+
+```
+SECRET_KEY=dev-secret-key-a-changer-en-production
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+HOST=127.0.0.1
+PORT=8000
+DB_NAME=school.db
+```
+
+Sans `DATABASE_URL`, le backend local retombe sur SQLite (`school.db`). Pour
+tester localement contre Supabase, passer l'URL **en variable d'environnement
+de session** (`$env:DATABASE_URL="postgresql://..."`) sans l'écrire dans un
+fichier du projet. Si le mot de passe Supabase a déjà fuité (chat, ancien
+`.env`), le **réinitialiser** (Supabase → Project Settings → Database →
+Reset database password) puis mettre à jour la variable `DATABASE_URL` de
+Vercel.
 
 ## 3. Déployer sur Vercel
 
