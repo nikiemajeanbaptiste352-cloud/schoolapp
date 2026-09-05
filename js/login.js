@@ -51,21 +51,36 @@
     });
   }
 
-  /* ---------- Bascule Connexion ↔ Inscription ---------- */
+  /* ---------- Bascule Connexion ↔ Inscription ↔ Code email ---------- */
   var vueConnexion = document.getElementById("vueConnexion");
   var vueInscription = document.getElementById("vueInscription");
+  var vueCode = document.getElementById("vueCode");
   var linkInscription = document.getElementById("linkInscription");
   var linkRetourConnexion = document.getElementById("linkRetourConnexion");
+  var linkCode = document.getElementById("linkCode");
+  var linkRetourCode = document.getElementById("linkRetourCode");
 
-  function montrerConnexion() {
-    if (vueConnexion) vueConnexion.style.display = "";
+  function cacherVues() {
+    if (vueConnexion) vueConnexion.style.display = "none";
     if (vueInscription) vueInscription.style.display = "none";
+    if (vueCode) vueCode.style.display = "none";
+  }
+  function montrerConnexion() {
+    cacherVues();
+    if (vueConnexion) vueConnexion.style.display = "";
   }
   function montrerInscription() {
-    if (vueConnexion) vueConnexion.style.display = "none";
+    cacherVues();
     if (vueInscription) vueInscription.style.display = "";
     var nom = document.getElementById("nomParent");
     if (nom) nom.focus();
+  }
+  function montrerCode() {
+    cacherVues();
+    if (vueCode) vueCode.style.display = "";
+    reinitialiserVueCode(true);
+    var email = document.getElementById("emailCode");
+    if (email) email.focus();
   }
   if (linkInscription) {
     linkInscription.addEventListener("click", function (e) {
@@ -79,6 +94,41 @@
       montrerConnexion();
     });
   }
+  if (linkCode) {
+    linkCode.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerCode();
+    });
+  }
+  if (linkRetourCode) {
+    linkRetourCode.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerConnexion();
+    });
+  }
+
+  /* ---------- Méthodes optionnelles (Google / code email) ----------
+     La page interroge /auth/options pour n'afficher que les méthodes
+     réellement configurées sur le serveur. */
+  var zoneGoogle = document.getElementById("zoneGoogle");
+  var btnGoogle = document.getElementById("btnGoogle");
+  var zoneCode = document.getElementById("zoneCode");
+
+  if (btnGoogle && window.API && window.API.urlConnexionGoogle) {
+    btnGoogle.addEventListener("click", function () {
+      btnGoogle.disabled = true;
+      btnGoogle.textContent = "Redirection vers Google…";
+      window.location.href = window.API.urlConnexionGoogle();
+    });
+  }
+  function appliquerOptionsAuth() {
+    if (!window.API || !window.API.optionsAuth) return;
+    window.API.optionsAuth().then(function (o) {
+      if (o && zoneGoogle && o.google) zoneGoogle.style.display = "";
+      if (o && zoneCode && o.code_email) zoneCode.style.display = "";
+    }).catch(function () { /* silencieux : méthodes laissées masquées */ });
+  }
+  appliquerOptionsAuth();
 
   /* ---------- Validation ---------- */
   var form = document.getElementById("loginForm");
@@ -274,6 +324,174 @@
 
       if (!valide) return;
       inscriptionApi();
+    });
+  }
+
+  /* ---------- Connexion par code email (sans mot de passe) ---------- */
+  var formCode = document.getElementById("codeForm");
+  var nomCode = document.getElementById("nomCode");
+  var emailCode = document.getElementById("emailCode");
+  var errEmailCode = document.getElementById("errEmailCode");
+  var btnDemanderCode = document.getElementById("btnDemanderCode");
+  var errCodeDemande = document.getElementById("errCodeDemande");
+  var zoneSaisieCode = document.getElementById("zoneSaisieCode");
+  var infoCodeEnvoye = document.getElementById("infoCodeEnvoye");
+  var saisieCode = document.getElementById("saisieCode");
+  var errSaisieCode = document.getElementById("errSaisieCode");
+  var btnValiderCode = document.getElementById("btnValiderCode");
+  var linkRenvoiCode = document.getElementById("linkRenvoiCode");
+  var errCodeGlobal = document.getElementById("errCodeGlobal");
+  var emailEnCours = "";
+  var nomEnCours = "";
+
+  function masquerErreursCode() {
+    var els = [errEmailCode, errCodeDemande, errSaisieCode, errCodeGlobal];
+    for (var i = 0; i < els.length; i++) {
+      if (els[i]) els[i].classList.remove("show");
+    }
+    if (emailCode) emailCode.classList.remove("invalid");
+    if (saisieCode) saisieCode.classList.remove("invalid");
+  }
+  function erreurChampCode(input, errEl, message) {
+    if (input) input.classList.add("invalid");
+    if (errEl) {
+      errEl.textContent = message || errEl.textContent;
+      errEl.classList.add("show");
+    }
+  }
+  function reinitialiserVueCode(tout) {
+    emailEnCours = "";
+    nomEnCours = "";
+    masquerErreursCode();
+    if (zoneSaisieCode) zoneSaisieCode.style.display = "none";
+    if (saisieCode) saisieCode.value = "";
+    if (btnDemanderCode) {
+      btnDemanderCode.disabled = false;
+      btnDemanderCode.textContent = "Recevoir le code par email →";
+    }
+    if (btnValiderCode) {
+      btnValiderCode.disabled = false;
+      btnValiderCode.textContent = "Valider et me connecter →";
+    }
+    if (emailCode) emailCode.disabled = false;
+    if (nomCode) nomCode.disabled = false;
+    if (tout) {
+      if (emailCode) emailCode.value = "";
+      if (nomCode) nomCode.value = "";
+    }
+  }
+
+  if (emailCode) {
+    emailCode.addEventListener("input", function () {
+      emailCode.classList.remove("invalid");
+      if (errEmailCode) errEmailCode.classList.remove("show");
+    });
+  }
+  if (saisieCode) {
+    saisieCode.addEventListener("input", function () {
+      saisieCode.classList.remove("invalid");
+      if (errSaisieCode) errSaisieCode.classList.remove("show");
+    });
+  }
+
+  function demanderCodeApi() {
+    if (!btnDemanderCode || !emailCode) return;
+    var email = emailCode.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      erreurChampCode(emailCode, errEmailCode, "Veuillez saisir une adresse email valide.");
+      emailCode.focus();
+      return;
+    }
+    nomEnCours = (nomCode && nomCode.value.trim()) || "";
+    btnDemanderCode.disabled = true;
+    btnDemanderCode.textContent = "Envoi du code…";
+    masquerErreursCode();
+
+    window.API.demanderCode(email, nomEnCours).then(function (data) {
+      emailEnCours = email;
+      btnDemanderCode.disabled = false;
+      btnDemanderCode.textContent = "Recevoir le code par email →";
+      // L'email reste verrouillé pendant la saisie du code.
+      emailCode.disabled = true;
+      if (nomCode) nomCode.disabled = true;
+      if (zoneSaisieCode) zoneSaisieCode.style.display = "";
+      if (infoCodeEnvoye) {
+        infoCodeEnvoye.innerHTML =
+          "<strong>Code envoyé à " + emailCode.value.replace(/</g, "&lt;") +
+          ".</strong> Vérifiez votre boîte mail (dont les courriers " +
+          "indésirables) — il est valable 10 minutes.";
+      }
+      if (saisieCode) saisieCode.focus();
+    }).catch(function (err) {
+      btnDemanderCode.disabled = false;
+      btnDemanderCode.textContent = "Recevoir le code par email →";
+      var msg = (err && err.detail) || "Envoi impossible.";
+      if (err && err.reseau) msg = "Serveur injoignable : démarrez le backend puis réessayez.";
+      erreurChampCode(null, errCodeDemande, msg);
+    });
+  }
+
+  function validerCodeApi() {
+    if (!btnValiderCode) return;
+    var code = (saisieCode && saisieCode.value.trim()) || "";
+    if (!/^\d{6}$/.test(code)) {
+      erreurChampCode(saisieCode, errSaisieCode, "Saisissez le code à 6 chiffres reçu par email.");
+      if (saisieCode) saisieCode.focus();
+      return;
+    }
+    btnValiderCode.disabled = true;
+    btnValiderCode.textContent = "Connexion…";
+    masquerErreursCode();
+
+    window.API.validerCode(emailEnCours, code, nomEnCours).then(function (data) {
+      var user = data.user || {};
+      sessionStorage.setItem("sm_session", JSON.stringify({
+        role: user.role || "Parent",
+        email: user.email || emailEnCours,
+        nom: user.nom || ""
+      }));
+      window.location.href = "pages/dashboard.html";
+    }).catch(function (err) {
+      btnValiderCode.disabled = false;
+      btnValiderCode.textContent = "Valider et me connecter →";
+      var msg = (err && err.detail) || "Connexion impossible.";
+      if (err && err.reseau) msg = "Serveur injoignable : démarrez le backend puis réessayez.";
+      if (err && err.statut === 401) {
+        erreurChampCode(saisieCode, errSaisieCode, msg);
+      } else {
+        erreurChampCode(null, errCodeGlobal, msg);
+      }
+    });
+  }
+
+  if (formCode) {
+    formCode.addEventListener("submit", function (e) {
+      e.preventDefault();
+      demanderCodeApi();
+    });
+  }
+  if (btnValiderCode) {
+    btnValiderCode.addEventListener("click", function () {
+      validerCodeApi();
+    });
+  }
+  if (saisieCode) {
+    saisieCode.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        validerCodeApi();
+      }
+    });
+  }
+  if (linkRenvoiCode) {
+    linkRenvoiCode.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (emailEnCours) {
+        if (emailCode) emailCode.value = emailEnCours;
+        if (nomCode) nomCode.value = nomEnCours;
+        masquerErreursCode();
+        demanderCodeApi();
+      }
     });
   }
 })();

@@ -34,6 +34,21 @@ class CompteIn(BaseModel):
     role: str
 
 
+class CodeDemandeIn(BaseModel):
+    """Demande d'envoi d'un code de connexion par email."""
+
+    email: str
+    nom: str | None = None  # utilisé uniquement à la première création
+
+
+class CodeValidationIn(BaseModel):
+    """Validation d'un code reçu par email → connexion."""
+
+    email: str
+    code: str
+    nom: str | None = None
+
+
 class UserOut(BaseModel):
     """Profil utilisateur exposé (jamais de password_hash)."""
 

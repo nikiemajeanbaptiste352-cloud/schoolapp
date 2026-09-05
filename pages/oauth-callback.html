@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion Google — SchoolManager</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px;
+        }
+        .oauth-box { max-width: 460px; width: 100%; }
+        .oauth-box h2 { margin-top: 0; }
+        .etat-ok { color: var(--success-text, #166534); font-weight: 700; }
+        .etat-err { color: var(--danger-text, #991b1b); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <!-- Page de retour après « Se connecter avec Google » : le backend
+         redirige ici avec le jeton dans le fragment d'URL (#token=…).
+         On stocke la session puis on bascule vers le tableau de bord. -->
+    <div class="login-card oauth-box">
+        <h2 class="lc-title" id="titre">Connexion en cours…</h2>
+        <p class="lc-sub" id="message">Vérification de votre compte Google…</p>
+        <p class="lc-sub" style="font-size:13px" id="detail"></p>
+        <p style="text-align:center;margin-top:18px">
+            <a href="../index.html" id="retour">← Retour à la page de connexion</a>
+        </p>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            var titre = document.getElementById("titre");
+            var message = document.getElementById("message");
+            var detail = document.getElementById("detail");
+
+            function afficher(etat, t, m, d) {
+                titre.textContent = t;
+                message.textContent = m;
+                message.className = "lc-sub etat-" + etat;
+                if (d) { detail.textContent = d; detail.style.display = ""; }
+                else { detail.style.display = "none"; }
+            }
+
+            function connecter(token, email, role, nom) {
+                try {
+                    sessionStorage.setItem("sm_token", token);
+                    sessionStorage.setItem("sm_user", JSON.stringify({
+                        email: email || "",
+                        role: role || "Parent",
+                        nom: nom || ""
+                    }));
+                    sessionStorage.setItem("sm_session", JSON.stringify({
+                        role: role || "Parent",
+                        email: email || "",
+                        nom: nom || ""
+                    }));
+                } catch (e) { /* stockage indisponible */ }
+                window.location.replace("dashboard.html");
+            }
+
+            // Fragment d'URL : #token=…&email=…&role=…&nom=…  OU  #erreur=…
+            var fragment = window.location.hash ? window.location.hash.substring(1) : "";
+            var p = new URLSearchParams(fragment);
+            var token = p.get("token");
+            var erreur = p.get("erreur") || "";
+
+            if (token) {
+                connecter(token, p.get("email"), p.get("role"), p.get("nom"));
+                return;
+            }
+
+            var libelles = {
+                acces_refuse: {
+                    t: "Accès refusé sur Google",
+                    m: "Vous n'avez pas autorisé la connexion avec Google.",
+                    d: "Vous pouvez réessayer, ou utiliser votre email et votre mot de passe."
+                },
+                email_non_verifie: {
+                    t: "Email non vérifié",
+                    m: "Google n'a pas confirmé votre adresse email.",
+                    d: "Vérifiez votre adresse Gmail puis réessayez."
+                },
+                compte_desactive: {
+                    t: "Compte désactivé",
+                    m: "Ce compte a été désactivé sur SchoolManager.",
+                    d: "Contactez l'administration de l'établissement."
+                }
+            };
+            var l = libelles[erreur] || {
+                t: "Connexion impossible",
+                m: "Une erreur est survenue pendant la connexion avec Google.",
+                d: "Fermez cette page puis réessayez depuis la page de connexion."
+            };
+            afficher("err", l.t, l.m, l.d);
+        })();
+    </script>
+</body>
+</html>

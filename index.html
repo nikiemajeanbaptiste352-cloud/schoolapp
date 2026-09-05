@@ -8,6 +8,31 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%8F%AB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/responsive.css">
+    <style>
+        /* Bouton « Se connecter avec Google » (blanc, cohérent avec la charte) */
+        .btn-google {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            background: #ffffff;
+            color: #3c4043;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14.5px;
+            padding: 11px 14px;
+            cursor: pointer;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
+        }
+        .btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 4px rgba(60, 64, 67, 0.2); }
+        .btn-google svg { flex-shrink: 0; }
+        .btn-google:disabled { opacity: 0.65; cursor: default; }
+        .lien-connexion { text-align: center; font-size: 13.5px; margin: 8px 0 0; }
+        .lien-connexion a { font-weight: 600; }
+    </style>
 </head>
 
 <body class="login-body" data-auth="false">
@@ -49,6 +74,19 @@
                 <h2 class="lc-title">Bon retour 👋</h2>
                 <p class="lc-sub">Connectez-vous pour accéder à votre espace.</p>
 
+                <div id="zoneGoogle" style="display:none">
+                    <button type="button" class="btn-google" id="btnGoogle">
+                        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                            <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.5 6.1 29.5 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/>
+                            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.5 6.1 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+                            <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+                            <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.2 5.2C37 40.2 44 35 44 24c0-1.3-.1-2.6-.4-3.9z"/>
+                        </svg>
+                        Se connecter avec Google
+                    </button>
+                    <div class="or">ou</div>
+                </div>
+
                 <form id="loginForm" novalidate>
                     <div class="field mb-16">
                         <label for="email">Adresse email <span class="req">*</span></label>
@@ -75,6 +113,9 @@
                     <p style="text-align:center;font-size:13.5px;margin:0">
                         Vous êtes parent d'un élève ?
                         <a href="#" id="linkInscription">Créer un compte Parent</a>
+                    </p>
+                    <p class="lien-connexion" id="zoneCode" style="display:none">
+                        <a href="#" id="linkCode">Connexion par code email (sans mot de passe)</a>
                     </p>
                 </form>
             </div>
@@ -116,6 +157,51 @@
                     <p style="text-align:center;font-size:13.5px;margin:0">
                         Déjà un compte ?
                         <a href="#" id="linkRetourConnexion">Se connecter</a>
+                    </p>
+                </form>
+            </div>
+
+            <!-- Connexion par code email (sans mot de passe) -->
+            <div class="login-card" id="vueCode" style="display:none">
+                <h2 class="lc-title">Connexion par code 🔐</h2>
+                <p class="lc-sub">Recevez un code à 6 chiffres par email, sans mot de passe.</p>
+
+                <form id="codeForm" novalidate>
+                    <div class="field mb-16">
+                        <label for="nomCode">Nom complet</label>
+                        <input class="input" type="text" id="nomCode" placeholder="Ex. Marie Ouédraogo (premier accès)" autocomplete="name">
+                        <div class="mt-8" style="font-size:12.5px;color:#8892a6">Requis uniquement si c'est votre première connexion.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="emailCode">Adresse email <span class="req">*</span></label>
+                        <input class="input" type="email" id="emailCode" placeholder="prenom.nom@exemple.com" autocomplete="email">
+                        <div class="field-error" id="errEmailCode">Veuillez saisir une adresse email valide.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block" id="btnDemanderCode">Recevoir le code par email →</button>
+                    <div class="field-error" id="errCodeDemande" style="margin-top:10px"></div>
+
+                    <div id="zoneSaisieCode" style="display:none;margin-top:6px">
+                        <div class="alert alert-info" id="infoCodeEnvoye" style="font-size:13px;padding:10px 14px"></div>
+
+                        <div class="field mb-16">
+                            <label for="saisieCode">Code reçu <span class="req">*</span></label>
+                            <input class="input" type="text" id="saisieCode" placeholder="6 chiffres" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="letter-spacing:6px;font-size:18px;text-align:center">
+                            <div class="field-error" id="errSaisieCode">Code invalide.</div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary btn-block" id="btnValiderCode">Valider et me connecter →</button>
+                        <p style="text-align:center;font-size:13px;margin:10px 0 0">
+                            <a href="#" id="linkRenvoiCode">Renvoyer le code</a>
+                        </p>
+                    </div>
+
+                    <div class="field-error" id="errCodeGlobal" style="margin-top:10px"></div>
+
+                    <div class="or">ou</div>
+                    <p style="text-align:center;font-size:13.5px;margin:0">
+                        <a href="#" id="linkRetourCode">← Retour à la connexion</a>
                     </p>
                 </form>
             </div>

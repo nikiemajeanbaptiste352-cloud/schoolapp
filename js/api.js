@@ -199,6 +199,33 @@
         });
     },
 
+    /* --- Connexion par code email (sans mot de passe) --- */
+    // Méthodes de connexion actives (google / code_email) : GET /auth/options.
+    optionsAuth: function () {
+      return get("/auth/options", { jeton: false });
+    },
+    // Demande l'envoi d'un code à 6 chiffres : POST /auth/code/demander.
+    demanderCode: function (email, nom) {
+      return post("/auth/code/demander", { email: email, nom: nom || null }, { jeton: false });
+    },
+    // Valide le code reçu et connecte (crée un compte Parent si besoin).
+    validerCode: function (email, code, nom) {
+      return post("/auth/code/valider", { email: email, code: code, nom: nom || null }, { jeton: false })
+        .then(function (data) {
+          if (data && data.access_token) {
+            memoriserJeton(data.access_token);
+            memoriserUtilisateur(data.user || null);
+          }
+          return data;
+        });
+    },
+
+    /* --- Connexion Google (OAuth) --- */
+    // URL de démarrage (redirection plein écran vers Google puis retour).
+    urlConnexionGoogle: function () {
+      return BASE + "/auth/google";
+    },
+
     // Gestion des comptes (administrateur uniquement).
     comptes: function () { return get("/auth/comptes"); },
     creerCompte: function (corps) { return post("/auth/comptes", corps); },

@@ -44,6 +44,40 @@ class Settings(BaseSettings):
     # est créé s'il n'existe encore aucun utilisateur.
     seed_demo: bool = False
 
+    # --- Connexion par code envoyé par email (sans mot de passe) -----------
+    # Expéditeur visible : simple email OU « Nom <email> » (ex. Gmail).
+    email_from: str = ""
+    code_expire_minutes: int = 10
+    code_longueur: int = 6
+    # Fournisseur SMTP (ex. Gmail : smtp.gmail.com + mot de passe d'application)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    # OU fournisseur Resend (clé API https://resend.com/api-keys)
+    resend_api_key: str = ""
+
+    # --- Connexion « Se connecter avec Google » (OAuth 2.0) ----------------
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # URI de redirection exacte (doit être déclarée dans Google Cloud).
+    # Vide → calculée automatiquement depuis la requête (localhost / Vercel).
+    google_redirect_uri: str = ""
+
+    @property
+    def google_active(self) -> bool:
+        """Vrai si les identifiants OAuth Google sont présents."""
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def email_active(self) -> bool:
+        """Vrai si un fournisseur d'email (Resend ou SMTP) est configuré."""
+        if not self.email_from:
+            return False
+        if self.resend_api_key:
+            return True
+        return bool(self.smtp_host and self.smtp_user and self.smtp_pass)
+
     @property
     def db_path(self) -> Path:
         return BACKEND_DIR / "data" / self.db_name

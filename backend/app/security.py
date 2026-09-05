@@ -44,13 +44,16 @@ def verify_password(password: str, stored: str) -> bool:
 # ---------------------------------------------------------------------------
 # Jetons JWT
 # ---------------------------------------------------------------------------
-def create_access_token(subject: str, extra: dict | None = None) -> str:
+def create_access_token(
+    subject: str, extra: dict | None = None, expire_minutes: int | None = None
+) -> str:
     """Crée un JWT signé contenant sub=id utilisateur + informations annexes."""
+    duree = expire_minutes or settings.access_token_expire_minutes
     now = datetime.now(timezone.utc)
     payload = {
         "sub": subject,
         "iat": now,
-        "exp": now + timedelta(minutes=settings.access_token_expire_minutes),
+        "exp": now + timedelta(minutes=duree),
     }
     if extra:
         payload.update(extra)
@@ -60,3 +63,20 @@ def create_access_token(subject: str, extra: dict | None = None) -> str:
 def decode_token(token: str) -> dict:
     """Décode et valide un JWT ; lève jwt.PyJWTError si invalide/expiré."""
     return jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+
+
+# ---------------------------------------------------------------------------
+# Codes de vérification par email (connexion sans mot de passe)
+# ---------------------------------------------------------------------------
+def hasher_code_verification(code: str) -> str:
+    """Hache un code avec la SECRET_KEY (HMAC-SHA256) avant stockage."""
+    return hmac.new(
+        settings.secret_key.encode("utf-8"), code.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
+
+def verifier_code_verification(code: str, stocke: str) -> bool:
+    """Compare en temps constant un code saisi au code haché stocké."""
+    if not code or not stocke:
+        return False
+    return hmac.compare_digest(hasher_code_verification(code), stocke)

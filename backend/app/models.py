@@ -9,12 +9,13 @@ Conventions de parité avec le front :
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
     Column,
     Date,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -283,3 +284,25 @@ class User(Base):
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("parents.id"), nullable=True
     )
+
+
+# ---------------------------------------------------------------
+# Codes de connexion par email (Phase 4 — connexion sans mot de passe)
+# ---------------------------------------------------------------
+class EmailCode(Base):
+    """Code à 6 chiffres, à usage unique, envoyé par email.
+
+    Une seule ligne active par email (clé primaire = email). Le code est
+    stocké haché (HMAC-SHA256 avec la SECRET_KEY) ; seule sa date d'expiration
+    et le compteur de tentatives sont conservés en clair.
+    """
+
+    __tablename__ = "email_codes"
+
+    email: Mapped[str] = mapped_column(String(80), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    tentatives: Mapped[int] = mapped_column(Integer, default=0)
