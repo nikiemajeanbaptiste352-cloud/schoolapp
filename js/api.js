@@ -30,7 +30,14 @@
         return "/api/v1"; // file:// → jamais utilisé (mode démo)
       }
       var port = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
-      if (port !== "8000") {
+      var hote = window.location.hostname || "";
+      // Page servie par un AUTRE serveur local (Live Server, python -m
+      // http.server…) → on cible le backend SchoolManager en 127.0.0.1:8000.
+      // Cas particulier du dev local uniquement : si le site est servi sur un
+      // hôte distant (ex. Vercel), on reste en même origine (/api/v1) car le
+      // backend est déployé avec le front sur le même domaine.
+      var hoteLocal = hote === "localhost" || hote === "127.0.0.1" || hote === "::1";
+      if (hoteLocal && port !== "8000") {
         return "http://127.0.0.1:8000/api/v1";
       }
     } catch (e) { /* on garde le chemin relatif */ }

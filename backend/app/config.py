@@ -29,8 +29,14 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
 
-    # Base de données (SQLite)
+    # Base de données locale (SQLite)
     db_name: str = "school.db"
+
+    # En production (déploiement Vercel) : URL PostgreSQL complète fournie par
+    # la variable d'environnement DATABASE_URL (ex. Supabase) :
+    #   postgresql://user:motdepasse@hôte:5432/postgres
+    # Vide (défaut) → moteur SQLite local dans backend/data/{db_name}.
+    database_url: str = ""
 
     # True (SEED_DEMO=1) → réinjecte le jeu de démonstration fictif à chaque
     # démarrage (utilisé par les tests pytest uniquement).
@@ -43,7 +49,19 @@ class Settings(BaseSettings):
         return BACKEND_DIR / "data" / self.db_name
 
     @property
-    def database_url(self) -> str:
+    def engine_url(self) -> str:
+        """URL SQLAlchemy effective.
+
+        Si DATABASE_URL est définie (production Vercel), on l'utilise telle
+        quelle ; sinon repli sur le fichier SQLite local (dev + tests pytest).
+        Le driver PostgreSQL installé est psycopg v3 : on explicite son
+        dialecte quand l'URL Supabase arrive en « postgresql://… » brut.
+        """
+        url = self.database_url.strip() if self.database_url else ""
+        if url:
+            if url.startswith("postgresql://"):
+                return url.replace("postgresql://", "postgresql+psycopg://", 1)
+            return url
         # Windows : chemin absolu requis par SQLAlchemy pour sqlite:///
         return f"sqlite:///{self.db_path.as_posix()}"
 

@@ -18,6 +18,7 @@ import unicodedata
 from datetime import date, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, init_db
@@ -403,16 +404,24 @@ def seed_users(db: Session) -> bool:
 def seed_bootstrap(db: Session) -> bool:
     """Mode données réelles : crée UNIQUEMENT le compte administrateur initial.
 
-    Idempotent : ne fait rien si un utilisateur existe déjà.
+    Idempotent : ne fait rien si un utilisateur existe déjà. En cas de course
+    entre instances serverless (déploiement Vercel), l'insertion en double est
+    absorbée silencieusement (contrainte d'unicité e-mail).
     Aucune donnée fictive (élèves, classes, notes…) n'est insérée : la base
     reste vide, l'établissement est ensuite configuré par ses propres données.
     Mot de passe initial : {PASSWORD_DEMO}
     """
     if db.query(User).count() > 0:
         return False
+
     _nouvel_user(db, "admin@lesavoir.edu", "Administrateur", "Administration")
-    db.commit()
-    return True
+    try:
+        db.commit()
+        return True
+    except IntegrityError:
+        # Un autre processus a créé l'administrateur entre-temps.
+        db.rollback()
+        return False
 
 
 # ---------------------------------------------------------------

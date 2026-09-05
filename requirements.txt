@@ -1,0 +1,11 @@
+# Dépendances du runtime Python Vercel (déploiement).
+# Vercel installe ce fichier à la RACINE du projet (le backend vit dans
+# backend/ mais l'app y est importée via asgi.py). Garder la liste au strict
+# nécessaire au runtime : les tests/utilisés en local (uvicorn) ne sont pas
+# requis côté serverless.
+fastapi>=0.115
+sqlalchemy>=2.0.36
+pydantic>=2.9
+pydantic-settings>=2.6
+PyJWT>=2.9
+psycopg[binary]>=3.2

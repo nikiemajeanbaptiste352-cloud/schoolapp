@@ -4,3 +4,4 @@ sqlalchemy>=2.0.36
 pydantic>=2.9
 pydantic-settings>=2.6
 PyJWT>=2.9
+psycopg[binary]>=3.2
