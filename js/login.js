@@ -21,6 +21,12 @@
   var modeConnecte = null; // null = indéterminé, true = API joignable, false = injoignable
   var info = document.getElementById("serveurInfo");
   var linkForgot = document.getElementById("linkForgot");
+  // Sur un site distant (Vercel…), le message « démarrez le backend local »
+  // n'a pas de sens : on affiche alors une mention de nouvelle tentative.
+  var hoteLocal = window.location &&
+    (window.location.hostname === "localhost" ||
+     window.location.hostname === "127.0.0.1" ||
+     window.location.hostname === "::1");
 
   function texteMode() {
     if (!info) return;
@@ -32,7 +38,9 @@
       info.style.color = "#b91c1c";
       info.style.background = "#fef2f2";
       info.style.borderColor = "#fecaca";
-      info.innerHTML = "<strong>Serveur injoignable.</strong> Démarrez le backend SchoolManager puis ouvrez <b>http://127.0.0.1:8000</b>.";
+      info.innerHTML = hoteLocal
+        ? "<strong>Serveur injoignable.</strong> Démarrez le backend SchoolManager puis ouvrez <b>http://127.0.0.1:8000</b>."
+        : "<strong>Serveur injoignable.</strong> Le serveur ne répond pas encore — nouvelle tentative automatique…";
     }
   }
 
@@ -68,16 +76,27 @@
   inputEmail.addEventListener("input", function () { ok(inputEmail, errEmail); });
   inputMdp.addEventListener("input", function () { ok(inputMdp, errMdp); });
 
-  /* ---------- Détection initiale du mode ---------- */
-  if (window.API && window.API.enLigne()) {
+  /* ---------- Détection initiale du mode ----------
+     Le premier appel peut réveiller un backend « serverless » (Vercel), dont
+     le démarrage dépasse parfois le délai d'attente du ping : on réessaie
+     quelques fois avant de conclure à une panne. */
+  var essaies = 0;
+  function verifierServeur() {
+    if (!window.API || !window.API.enLigne()) {
+      modeConnecte = false;
+      texteMode();
+      return;
+    }
     window.API.disponible().then(function (ok) {
       modeConnecte = ok;
       texteMode();
+      if (!ok && essaies < 5) {
+        essaies += 1;
+        setTimeout(verifierServeur, 2500);
+      }
     });
-  } else {
-    modeConnecte = false;
-    texteMode();
   }
+  verifierServeur();
 
   /* ---------- Connexion (API uniquement) ---------- */
   function connexionApi() {
@@ -127,12 +146,9 @@
     if (!mdp) { invalid(inputMdp, errMdp); valid = false; }
     if (!valid) return;
 
-    if (modeConnecte === false) {
-      // Backend injoignable (détecté) → pas de connexion fictive possible
-      texteMode();
-      afficherErreur("Serveur injoignable : connexion impossible.");
-      return;
-    }
+    // Même si le serveur semblait injoignable, on tente la vraie requête : si
+    // le backend a fini de démarrer (serverless), elle réussit ; sinon
+    // connexionApi() affichera l'erreur réseau. Aucune donnée fictive.
     connexionApi();
   });
 })();
