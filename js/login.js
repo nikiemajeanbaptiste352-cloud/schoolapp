@@ -93,18 +93,24 @@
     if (email) email.focus();
   }
 
-  /* ---------- Choix du profil d'entrée : « Établissement » ou « Parent » ---------- */
-  var profilActuel = "etablissement"; // "etablissement" | "parent"
+  /* ---------- Choix du profil d'entrée : « Établissement », « Enseignant » ou « Parent » ---------- */
+  var profilActuel = "etablissement"; // "etablissement" | "enseignant" | "parent"
   var btnModeEtab = document.getElementById("btnModeEtab");
+  var btnModeEnseignant = document.getElementById("btnModeEnseignant");
   var btnModeParent = document.getElementById("btnModeParent");
   var lcTitreConnexion = document.getElementById("lcTitreConnexion");
   var lcSousConnexion = document.getElementById("lcSousConnexion");
   var actionEtab = document.getElementById("actionEtab");
   var actionParent = document.getElementById("actionParent");
+  var actionEnseignant = document.getElementById("actionEnseignant");
   var TITRES_CONNEXION = {
     etablissement: {
       titre: "Espace Établissement 🏫",
       sous: "Connexion de la direction et de l'équipe de votre école — utilisez les identifiants fournis par l'établissement."
+    },
+    enseignant: {
+      titre: "Espace Enseignant 👨‍🏫",
+      sous: "Connexion des enseignants — utilisez les identifiants remis par votre établissement."
     },
     parent: {
       titre: "Bon retour 👋",
@@ -113,29 +119,36 @@
   };
 
   // Applique l'apparence de la carte de connexion selon le profil choisi
-  // (titre, lien contextuel, méthodes Google / code email réservées aux parents).
+  // (titre, note contextuelle ; Google / code email réservés aux parents).
   function appliquerAffichageProfil() {
-    var etab = profilActuel === "etablissement";
+    var estEtab = profilActuel === "etablissement";
+    var estEnseignant = profilActuel === "enseignant";
+    var estParent = profilActuel === "parent";
     var opts = optionsAuthMemorisees || {};
     if (lcTitreConnexion) lcTitreConnexion.textContent = TITRES_CONNEXION[profilActuel].titre;
     if (lcSousConnexion) lcSousConnexion.textContent = TITRES_CONNEXION[profilActuel].sous;
     if (btnModeEtab) {
-      btnModeEtab.classList.toggle("is-actif", etab);
-      btnModeEtab.setAttribute("aria-selected", etab ? "true" : "false");
+      btnModeEtab.classList.toggle("is-actif", estEtab);
+      btnModeEtab.setAttribute("aria-selected", estEtab ? "true" : "false");
+    }
+    if (btnModeEnseignant) {
+      btnModeEnseignant.classList.toggle("is-actif", estEnseignant);
+      btnModeEnseignant.setAttribute("aria-selected", estEnseignant ? "true" : "false");
     }
     if (btnModeParent) {
-      btnModeParent.classList.toggle("is-actif", !etab);
-      btnModeParent.setAttribute("aria-selected", etab ? "false" : "true");
+      btnModeParent.classList.toggle("is-actif", estParent);
+      btnModeParent.setAttribute("aria-selected", estParent ? "true" : "false");
     }
-    if (actionEtab) { if (etab) actionEtab.removeAttribute("hidden"); else actionEtab.setAttribute("hidden", ""); }
-    if (actionParent) { if (etab) actionParent.setAttribute("hidden", ""); else actionParent.removeAttribute("hidden"); }
-    if (zoneGoogle) zoneGoogle.style.display = (!etab && opts.google) ? "" : "none";
-    if (zoneCode) zoneCode.style.display = (!etab && opts.code_email) ? "" : "none";
+    if (actionEtab) { if (estEtab) actionEtab.removeAttribute("hidden"); else actionEtab.setAttribute("hidden", ""); }
+    if (actionParent) { if (estParent) actionParent.removeAttribute("hidden"); else actionParent.setAttribute("hidden", ""); }
+    if (actionEnseignant) { if (estEnseignant) actionEnseignant.removeAttribute("hidden"); else actionEnseignant.setAttribute("hidden", ""); }
+    if (zoneGoogle) zoneGoogle.style.display = (estParent && opts.google) ? "" : "none";
+    if (zoneCode) zoneCode.style.display = (estParent && opts.code_email) ? "" : "none";
   }
 
   // Bascule vers le profil demandé puis revient à l'écran de connexion.
   function definirProfil(p) {
-    if (p !== "etablissement" && p !== "parent") return;
+    if (p !== "etablissement" && p !== "enseignant" && p !== "parent") return;
     profilActuel = p;
     appliquerAffichageProfil();
     montrerConnexion();
@@ -144,6 +157,12 @@
     btnModeEtab.addEventListener("click", function (e) {
       e.preventDefault();
       definirProfil("etablissement");
+    });
+  }
+  if (btnModeEnseignant) {
+    btnModeEnseignant.addEventListener("click", function (e) {
+      e.preventDefault();
+      definirProfil("enseignant");
     });
   }
   if (btnModeParent) {
@@ -210,7 +229,7 @@
     if (!window.API || !window.API.optionsAuth) return;
     window.API.optionsAuth().then(function (o) {
       optionsAuthMemorisees = o || {};
-      appliquerAffichageProfil(); // réaffiche selon le profil Établissement / Parent
+      appliquerAffichageProfil(); // réaffiche selon le profil Établissement / Enseignant / Parent
     }).catch(function () { /* silencieux : méthodes laissées masquées */ });
   }
   appliquerOptionsAuth();
