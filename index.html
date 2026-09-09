@@ -4,35 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion — SchoolManager</title>
+    <title>SchoolManager — Gestion scolaire moderne en Afrique</title>
+    <meta name="description" content="SchoolManager : plateforme de gestion scolaire pour les établissements d'Afrique — élèves, enseignants, notes, bulletins, paiements, emplois du temps.">
     <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%8F%AB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/landing.css">
     <link rel="stylesheet" href="css/responsive.css">
-    <style>
-        /* Bouton « Se connecter avec Google » (blanc, cohérent avec la charte) */
-        .btn-google {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            background: #ffffff;
-            color: #3c4043;
-            border: 1px solid #dadce0;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 14.5px;
-            padding: 11px 14px;
-            cursor: pointer;
-            transition: background 0.15s ease, box-shadow 0.15s ease;
-            box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
-        }
-        .btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 4px rgba(60, 64, 67, 0.2); }
-        .btn-google svg { flex-shrink: 0; }
-        .btn-google:disabled { opacity: 0.65; cursor: default; }
-        .lien-connexion { text-align: center; font-size: 13.5px; margin: 8px 0 0; }
-        .lien-connexion a { font-weight: 600; }
-    </style>
 </head>
 
 <body class="login-body" data-auth="false">
@@ -40,34 +17,162 @@
 
         <!-- Partie gauche : présentation -->
         <div class="login-left">
-            <div class="login-brand">
-                <img src="assets/logo.svg" alt="Logo SchoolManager">
-                <div>
-                    <div class="bn">SchoolManager</div>
-                    <div class="bs">Gestion scolaire intelligente</div>
-                </div>
-            </div>
+            <!-- ================= Landing : navigation ================= -->
+            <header class="lp-hero" id="haut">
+                <nav class="lp-nav">
+                    <a class="lp-nav-brand" href="#haut">
+                        <img src="assets/logo.svg" alt="Logo SchoolManager">
+                        <span>
+                            <b>SchoolManager</b>
+                            <small>Gestion scolaire</small>
+                        </span>
+                    </a>
+                    <div class="lp-nav-links">
+                        <a href="#fonctionnalites">Modules</a>
+                        <a href="#espaces">Espaces</a>
+                        <a href="#connexion">Connexion</a>
+                    </div>
+                    <a class="lp-btn lp-btn-gold lp-nav-cta" href="#connexion">Espace connexion →</a>
+                </nav>
 
-            <div class="login-hero">
-                <h1>Gérez votre établissement <span>simplement et efficacement.</span></h1>
-                <p>Élèves, enseignants, notes, bulletins, paiements et emplois du temps : tout au même endroit, accessible depuis n'importe quel appareil.</p>
-                <div class="login-feats">
-                    <span class="ft">👨‍🎓 Élèves</span>
-                    <span class="ft">👨‍🏫 Enseignants</span>
-                    <span class="ft">📝 Notes</span>
-                    <span class="ft">📊 Bulletins</span>
-                    <span class="ft">💰 Paiements</span>
-                    <span class="ft">📅 Emploi du temps</span>
-                </div>
-            </div>
+                <div class="lp-hero-cols">
+                    <div class="lp-hero-txt">
+                        <span class="lp-chip lp-chip-gold">🎓 Conçu pour l'école en Afrique</span>
+                        <h1>L'excellence scolaire africaine, <span class="accent">pilotée simplement.</span></h1>
+                        <p class="lp-lead">Élèves, enseignants, notes, bulletins, paiements et emplois du temps : SchoolManager réunit toute la vie de votre établissement dans un outil clair, rapide et accessible sur tous les appareils.</p>
+                        <ul class="lp-points">
+                            <li>🎒 Cycles Collège &amp; Lycée, classes, professeurs principaux</li>
+                            <li>🧮 Moyennes automatiques, rangs, appréciations &amp; bulletins imprimables</li>
+                            <li>💰 Suivi des frais de scolarité en FCFA, dossiers &amp; versements</li>
+                            <li>📢 Annonces &amp; espace Parent sécurisé (connexion par code)</li>
+                        </ul>
+                        <div class="lp-cta">
+                            <a class="lp-btn lp-btn-gold" href="#connexion">Espace connexion →</a>
+                            <a class="lp-btn lp-btn-ghost" href="#fonctionnalites">Découvrir les modules</a>
+                        </div>
+                    </div>
 
-            <div class="login-foot">
-                © 2026 SchoolManager — Gestion scolaire
-            </div>
+                    <div class="lp-visuel">
+                        <div class="lp-soleil" aria-hidden="true"></div>
+                        <!-- Photo : Bright Kwame Ayisi (Ghana) — Wikimedia Commons, CC0 1.0
+                             https://commons.wikimedia.org/wiki/File:A_student_asking_a_question_in_a_classroom_04.jpg -->
+                        <figure class="lp-photo">
+                            <img src="assets/hero-photo.jpg" alt="Élèves en classe, une main levée pour répondre" width="1280" height="871" fetchpriority="high">
+                            <figcaption class="lp-photo-caption">
+                                <span class="lp-photo-caption-ic" aria-hidden="true">🎓</span>
+                                <span>
+                                    <b>Vos élèves, au cœur de l'école</b>
+                                    <small>Notes, bulletins, présences et paiements : toute la vie de la classe, en un seul outil.</small>
+                                </span>
+                            </figcaption>
+                            <div class="lp-flotte lp-flotte-1"><span class="ico">✅</span> Notes enregistrées</div>
+                            <div class="lp-flotte lp-flotte-2"><span class="ico">📢</span> Annonce publiée aux parents</div>
+                            <div class="lp-flotte lp-flotte-3"><span class="ico">💳</span> Paiement FCFA reçu</div>
+                        </figure>
+                    </div>
+                </div>
+
+                <div class="lp-kente" aria-hidden="true"></div>
+            </header>
+
+            <main class="lp-main">
+                <!-- ================= Modules ================= -->
+                <section class="lp-sec lp-fonct" id="fonctionnalites">
+                    <div class="lp-sec-in">
+                        <div class="lp-sec-titre">
+                            <span class="lp-chip">✨ Modules complets</span>
+                            <h2>Toute la vie scolaire, en un seul endroit</h2>
+                            <p>De l'inscription à l'édition des bulletins, chaque équipe dispose d'outils simples et adaptés au terrain.</p>
+                        </div>
+                        <div class="lp-grille">
+                            <article class="lp-carte">
+                                <span class="ic ic-bleu">🎒</span>
+                                <h3>Scolarité &amp; effectifs</h3>
+                                <p>Élèves, classes, cycles Collège et Lycée, professeurs principaux : un référentiel à jour en permanence.</p>
+                            </article>
+                            <article class="lp-carte">
+                                <span class="ic ic-violet">📝</span>
+                                <h3>Notes &amp; moyennes</h3>
+                                <p>Saisie par matière, moyennes automatiques, rangs, mentions et appréciations à chaque évaluation.</p>
+                            </article>
+                            <article class="lp-carte">
+                                <span class="ic ic-vert">📊</span>
+                                <h3>Bulletins imprimables</h3>
+                                <p>Des bulletins soignés, générés en un clic et prêts à être signés par la direction et les familles.</p>
+                            </article>
+                            <article class="lp-carte">
+                                <span class="ic ic-cyan">📅</span>
+                                <h3>Emplois du temps</h3>
+                                <p>Construisez les emplois du temps par classe, avec créneaux, pauses et salles, consultables partout.</p>
+                            </article>
+                            <article class="lp-carte">
+                                <span class="ic ic-or">💰</span>
+                                <h3>Paiements en FCFA</h3>
+                                <p>Frais de scolarité, dossiers et versements suivis en toute transparence, du premier au dernier paiement.</p>
+                            </article>
+                            <article class="lp-carte">
+                                <span class="ic ic-rouge">📢</span>
+                                <h3>Annonces &amp; familles</h3>
+                                <p>Communiquez avec les parents et offrez-leur un espace dédié pour suivre la scolarité de leur enfant.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= Espaces / rôles ================= -->
+                <section class="lp-sec lp-espaces" id="espaces">
+                    <div class="lp-sec-in">
+                        <div class="lp-sec-titre">
+                            <span class="lp-chip">🤝 Un espace pour chacun</span>
+                            <h2>Chaque acteur, à sa place</h2>
+                            <p>Des accès adaptés au rôle de chacun, avec des informations claires et toujours à jour.</p>
+                        </div>
+                        <div class="lp-roles">
+                            <div class="lp-role">
+                                <span class="ic">👑</span>
+                                <h3>Direction</h3>
+                                <p>Pilotage global : établissement, référentiels, effectifs, comptes et paramètres.</p>
+                            </div>
+                            <div class="lp-role">
+                                <span class="ic">🍎</span>
+                                <h3>Enseignants</h3>
+                                <p>Saisie des notes de leur matière, consultation des classes et des effectifs.</p>
+                            </div>
+                            <div class="lp-role">
+                                <span class="ic">👨‍👩‍👧</span>
+                                <h3>Parents</h3>
+                                <p>Notes, bulletins, paiements et annonces : suivez la scolarité en toute sérénité.</p>
+                            </div>
+                            <div class="lp-role">
+                                <span class="ic">🎒</span>
+                                <h3>Élèves</h3>
+                                <p>Consultation des résultats, du bulletin et de l'emploi du temps de leur classe.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= Bandeau CTA ================= -->
+                <section class="lp-cta-band">
+                    <div class="lp-cta-band-in">
+                        <div>
+                            <h2>Prêt à moderniser la gestion<br>de votre établissement ?</h2>
+                            <p>Rejoignez la nouvelle génération d'écoles connectées.</p>
+                        </div>
+                        <a class="lp-btn lp-btn-nuit" href="#connexion">Ouvrir l'espace connexion →</a>
+                    </div>
+                </section>
+            </main>
         </div>
 
-        <!-- Partie droite : formulaires -->
-        <div class="login-right">
+        <!-- ================= Espace de connexion ================= -->
+        <div class="login-right" id="connexion">
+
+            <div class="lp-auth-head">
+                <span class="lp-chip">🔐 Espace sécurisé</span>
+                <h2>Accédez à votre espace</h2>
+                <p>Utilisez les identifiants fournis par votre établissement — direction, enseignant, parent ou élève.</p>
+            </div>
 
             <!-- Connexion -->
             <div class="login-card" id="vueConnexion">
@@ -207,6 +312,43 @@
             </div>
         </div>
     </div>
+
+    <!-- ================= Pied de page ================= -->
+    <footer class="lp-footer">
+        <div class="lp-footer-in">
+            <div class="lp-footer-brand">
+                <a class="lp-nav-brand" href="#haut">
+                    <img src="assets/logo.svg" alt="Logo SchoolManager">
+                    <span>
+                        <b>SchoolManager</b>
+                        <small>Gestion scolaire</small>
+                    </span>
+                </a>
+                <p>Plateforme de gestion scolaire moderne, pensée pour les établissements d'enseignement en Afrique — du collège au lycée.</p>
+            </div>
+            <div class="lp-footer-col">
+                <h4>Découvrir</h4>
+                <a href="#fonctionnalites">Modules</a>
+                <a href="#espaces">Espaces</a>
+                <a href="#haut">Haut de page</a>
+            </div>
+            <div class="lp-footer-col">
+                <h4>Accès</h4>
+                <a href="#connexion">Connexion</a>
+                <a href="#connexion">Compte Parent</a>
+                <a href="#connexion">Mot de passe oublié</a>
+            </div>
+            <div class="lp-footer-col">
+                <h4>Établissement</h4>
+                <a href="#">Ouagadougou · Burkina Faso 🇧🇫</a>
+                <a href="#">contact@lesavoir.edu</a>
+            </div>
+        </div>
+        <div class="lp-footer-bas">
+            <span>© 2026 SchoolManager — Tous droits réservés.</span>
+            <span>Au service de l'éducation en Afrique 🌍</span>
+        </div>
+    </footer>
 
     <script src="js/api.js"></script>
     <script src="js/login.js"></script>
