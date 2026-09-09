@@ -25,6 +25,7 @@
                     </div>
                     <div class="header-actions">
                         <span class="chip-plain">🧮 Coef. <b id="coefTotal"></b></span>
+                        <button class="btn btn-primary" id="btnAddMatiere" style="display:none">➕ Ajouter une matière</button>
                     </div>
                 </div>
 
@@ -40,12 +41,76 @@
                                 <th class="text-center">Coef.</th>
                                 <th>Enseignant(s)</th>
                                 <th>Classes concernées</th>
+                                <th id="thActions" style="text-align:center;display:none">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody"></tbody>
                     </table>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Modale Ajouter / Modifier une matière -->
+    <div class="modal-overlay" id="modalMatiereEdit">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="matiereModalTitle">➕ Ajouter une matière</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="matiereId">
+                <div class="form-grid">
+                    <div class="field span-2">
+                        <label>Nom de la matière <span class="req">*</span></label>
+                        <input class="input" id="matiereNom" placeholder="Ex. Informatique">
+                        <div class="field-error" id="errMatiereNom">Le nom de la matière est obligatoire.</div>
+                    </div>
+                    <div class="field">
+                        <label>Coefficient <span class="req">*</span></label>
+                        <input class="input" type="number" min="1" max="20" id="matiereCoef" value="1">
+                        <div class="field-error" id="errMatiereCoef">Le coefficient doit être un entier entre 1 et 20.</div>
+                    </div>
+                    <div class="field">
+                        <label>Icône (emoji)</label>
+                        <input class="input" id="matiereIcone" placeholder="Ex. 💻" maxlength="6">
+                    </div>
+                    <div class="field">
+                        <label>Couleur</label>
+                        <select class="select" id="matiereCouleur">
+                            <option value="blue">🔵 Bleu</option>
+                            <option value="green">🟢 Vert</option>
+                            <option value="cyan">🩵 Cyan</option>
+                            <option value="orange">🟠 Orange</option>
+                            <option value="purple">🟣 Violet</option>
+                            <option value="red">🔴 Rouge</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Code auto</label>
+                        <input class="input" id="matiereCode" readonly placeholder="Attribué par le serveur (ex. S9)">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnSaveMatiere">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de suppression d'une matière -->
+    <div class="modal-overlay" id="modalDelMatiere">
+        <div class="modal modal-sm">
+            <div class="modal-body" style="padding:28px">
+                <div class="confirm-ico">🗑️</div>
+                <div class="confirm-title">Supprimer cette matière ?</div>
+                <div class="confirm-text" id="delMatiereText">Cette action est irréversible.</div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-danger-soft" id="btnConfirmDelMatiere">Supprimer</button>
+            </div>
         </div>
     </div>
 

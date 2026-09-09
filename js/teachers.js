@@ -199,32 +199,57 @@
       classes: classesSelectionnees(),
       statut: el("fStatut").value
     };
-    if (editId) {
-      var p = SD.getEnseignant(editId);
-      Object.assign(p, d);
-      SM.toast("Enseignant " + editId + " modifié avec succès ✅", "success");
-    } else {
-      var max = 0;
-      profs.forEach(function (x) {
-        var n = parseInt(x.id.replace("T", ""), 10);
-        if (n > max) max = n;
-      });
-      d.id = "T" + String(max + 1).padStart(3, "0");
-      profs.push(d);
-      SM.toast("Enseignant " + d.id + " ajouté avec succès ✅", "success");
+    var bouton = el("btnSaveProf");
+    bouton.disabled = true;
+    bouton.textContent = "Enregistrement…";
+
+    function terminer() {
+      bouton.disabled = false;
+      bouton.textContent = "💾 Enregistrer";
     }
-    SM.closeModal("modalProf");
-    actualiser();
+    function reussite(message) {
+      SM.closeModal("modalProf");
+      SM.toast(message, "success");
+      actualiser();
+    }
+    function echec(err) {
+      SM.toast("Enregistrement impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+      terminer();
+    }
+
+    if (editId) {
+      API.majEnseignant(editId, d).then(function (rep) {
+        var idx = profs.findIndex(function (x) { return x.id === editId; });
+        if (idx !== -1) profs[idx] = rep; else profs.push(rep);
+        reussite("Enseignant " + editId + " modifié avec succès ✅");
+        terminer();
+      }, echec);
+    } else {
+      API.creerEnseignant(d).then(function (rep) {
+        profs.push(rep);
+        reussite("Enseignant " + rep.id + " ajouté avec succès ✅");
+        terminer();
+      }, echec);
+    }
   });
 
   /* ---------- Suppression ---------- */
   el("btnConfirmDel").addEventListener("click", function () {
     if (!deleteId) return;
-    var idx = profs.findIndex(function (x) { return x.id === deleteId; });
-    if (idx !== -1) profs.splice(idx, 1);
-    SM.toast("Enseignant " + deleteId + " supprimé.", "warning");
-    SM.closeModal("modalDel");
-    deleteId = null;
-    actualiser();
+    var bouton = el("btnConfirmDel");
+    bouton.disabled = true;
+    var id = deleteId;
+    API.supprimerEnseignant(id).then(function () {
+      var idx = profs.findIndex(function (x) { return x.id === id; });
+      if (idx !== -1) profs.splice(idx, 1);
+      SM.toast("Enseignant " + id + " supprimé.", "warning");
+      SM.closeModal("modalDel");
+      deleteId = null;
+      actualiser();
+    }).catch(function (err) {
+      SM.toast("Suppression impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+    });
   });
 })();

@@ -28,17 +28,50 @@ def lire_ecole(db: Session = Depends(get_db)) -> Ecole:
     return ecole
 
 
+@router.post("/ecole", response_model=EcoleOut, summary="Créer la fiche école (admin)")
+def creer_ecole(
+    payload: dict,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_roles(ROLE_ADMIN)),
+) -> Ecole:
+    """Crée la fiche unique de l'établissement (permet de bootstraper une
+    base vide depuis l'interface Réglages). Échoue si elle existe déjà."""
+    if db.scalar(select(Ecole).limit(1)) is not None:
+        raise HTTPException(status_code=409, detail="L'école est déjà configurée : utilisez la modification.")
+    nom = (payload.get("nom") or "").strip()
+    if not nom:
+        raise HTTPException(status_code=400, detail="Le nom de l'établissement est obligatoire.")
+    ecole = Ecole(
+        id=1,
+        nom=nom,
+        sigle=payload.get("sigle") or "",
+        slogan=payload.get("slogan") or "",
+        annee=payload.get("annee") or "2026 – 2027",
+        devise=payload.get("devise") or "FCFA",
+        telephone=payload.get("telephone") or "",
+        email=payload.get("email") or "",
+        adresse=payload.get("adresse") or "",
+        version=payload.get("version") or "1.0.0",
+    )
+    db.add(ecole)
+    db.commit()
+    db.refresh(ecole)
+    return ecole
+
+
 @router.put("/ecole", response_model=EcoleOut, summary="Modifier l'école (admin)")
 def modifier_ecole(
-    body: EcoleOut,
+    payload: dict,
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> Ecole:
     ecole = db.scalar(select(Ecole).limit(1))
     if ecole is None:
         raise HTTPException(status_code=404, detail="École non configurée.")
-    for champ, valeur in body.model_dump().items():
-        setattr(ecole, champ, valeur)
+    # Mise à jour partielle : seuls les champs fournis sont modifiés.
+    for champ, valeur in payload.items():
+        if hasattr(ecole, champ):
+            setattr(ecole, champ, valeur)
     db.commit()
     db.refresh(ecole)
     return ecole
@@ -59,11 +92,9 @@ def creer_annonce(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    # Identifiant auto : A{max+1}
-    dernier = db.execute(
-        select(Annonce).order_by(Annonce.id.desc()).limit(1)
-    ).scalar_one_or_none()
-    num = int(dernier.id[1:]) + 1 if dernier else 1
+    # Identifiant auto : A{max+1} (max numérique — A10 > A9 en ordre chaîne)
+    tous = db.execute(select(Annonce.id)).scalars().all()
+    num = max((int(a[1:]) for a in tous if a[:1] == "A" and a[1:].isdigit()), default=0) + 1
     annonce = Annonce(
         id=f"A{num}",
         titre=payload["titre"],

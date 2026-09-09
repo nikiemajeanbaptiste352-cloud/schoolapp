@@ -88,12 +88,28 @@ def encaisser(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    paiement = sd.paiement_eleve(db, eleve_id)
-    if paiement is None:
-        raise HTTPException(status_code=404, detail="Aucun paiement pour cet élève.")
+    """Encaissement d'un versement (admin).
+
+    Si l'élève n'a pas encore de dossier côté serveur, un dossier par défaut
+    est créé à partir des champs optionnels `motif` / `total` (ou des valeurs
+    par défaut cycle Collège 150 000 / Lycée 200 000) : l'interface de
+    l'école réelle part d'une base vide, sans dossier pré-existant.
+    """
+    eleve = db.get(Eleve, eleve_id)
+    if eleve is None:
+        raise HTTPException(status_code=404, detail="Élève introuvable.")
     montant = int(payload["montant"])
     if montant <= 0:
         raise HTTPException(status_code=400, detail="Montant invalide.")
+
+    paiement = sd.paiement_eleve(db, eleve_id)
+    if paiement is None:
+        cycle = eleve.classe.cycle if eleve.classe else None
+        total = int(payload.get("total") or (200000 if cycle == "Lycée" else 150000))
+        motif = (payload.get("motif") or "").strip() or "Frais de scolarité"
+        paiement = Paiement(eleve_id=eleve_id, motif=motif, total=total)
+        db.add(paiement)
+        db.flush()
 
     versement = Versement(
         paiement_id=paiement.id,

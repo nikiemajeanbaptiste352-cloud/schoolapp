@@ -239,6 +239,8 @@
 
     /* --- Référentiel --- */
     ecole: function () { return get("/ecole"); },
+    // Crée la fiche école (POST /ecole) : base vide non encore configurée.
+    creerEcole: function (corps) { return post("/ecole", corps); },
     majEcole: function (corps) { return put("/ecole", corps); },
 
     annonces: function () { return get("/annonces"); },
@@ -248,10 +250,21 @@
 
     classes: function () { return get("/classes"); },
     classe: function (id) { return get("/classes/" + enc(id)); },
+    creerClasse: function (corps) { return post("/classes", corps); },
+    majClasse: function (id, corps) { return put("/classes/" + enc(id), corps); },
+    supprimerClasse: function (id) { return del("/classes/" + enc(id)); },
     emploiDuTemps: function (classeId) { return get("/classes/" + enc(classeId) + "/emploi-du-temps"); },
+
     matieres: function () { return get("/matieres"); },
+    creerMatiere: function (corps) { return post("/matieres", corps); },
+    majMatiere: function (id, corps) { return put("/matieres/" + enc(id), corps); },
+    supprimerMatiere: function (id) { return del("/matieres/" + enc(id)); },
+
     enseignants: function () { return get("/enseignants"); },
     enseignant: function (id) { return get("/enseignants/" + enc(id)); },
+    creerEnseignant: function (corps) { return post("/enseignants", corps); },
+    majEnseignant: function (id, corps) { return put("/enseignants/" + enc(id), corps); },
+    supprimerEnseignant: function (id) { return del("/enseignants/" + enc(id)); },
 
     /* --- Élèves --- */
     eleves: function (filtres) { return get("/eleves/" + params(filtres)); },
@@ -263,6 +276,11 @@
     /* --- Pédagogie --- */
     notes: function (filtres) { return get("/notes" + params(filtres)); },
     enregistrerNotes: function (corps) { return put("/notes", corps); },
+    // Supprime une note précise (élève + matière + évaluation) : case vidée
+    // à l'écran de saisie puis « Enregistrer ».
+    supprimerNote: function (eleveId, matiereId, evalNom) {
+      return del("/notes" + params({ eleveId: eleveId, matiereId: matiereId, eval: evalNom }));
+    },
     statsNotes: function (filtres) { return get("/notes/stats" + params(filtres)); },
     bulletins: function (classeId) { return get("/classes/" + enc(classeId) + "/bulletins"); },
 
@@ -271,6 +289,8 @@
     pointerPresence: function (corps) { return post("/presences", corps); },
     paiements: function (filtres) { return get("/paiements" + params(filtres)); },
     statsPaiements: function () { return get("/paiements/stats"); },
+    // Encaisser un versement. Si l'élève n'a pas encore de dossier côté
+    // serveur, un dossier par défaut est créé (motif/total facultatifs).
     versement: function (eleveId, corps) { return post("/paiements/" + enc(eleveId) + "/versements", corps); },
 
     /* --- Tableau de bord --- */

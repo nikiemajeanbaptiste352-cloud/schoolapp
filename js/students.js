@@ -86,7 +86,7 @@
       if (el.tagName === "SELECT") el.value = "";
       else el.value = "";
     });
-    el("fClasse").value = "3A";
+    el("fClasse").value = selClasse.options.length ? selClasse.options[0].value : "";
     el("fStatut").value = "Actif";
     el("fSexe").value = "M";
     clearErreurs();
@@ -158,65 +158,101 @@
   }
 
   /* ---------- Enregistrement ---------- */
+  // Reconstitue la forme canonique locale attendue par le rendu (le serveur
+  // renvoie la fiche enrichie : classeNom, tauxPresence, parent.id…).
+  function normaliserEleve(e) {
+    var p = e.parent || {};
+    return {
+      id: e.id,
+      nom: e.nom,
+      prenom: e.prenom,
+      sexe: e.sexe,
+      naissance: e.naissance,
+      classe: e.classe,
+      statut: e.statut,
+      inscription: e.inscription || new Date().toISOString().slice(0, 10),
+      parent: {
+        nom: p.nom || "—",
+        lien: p.lien || "Tuteur",
+        tel: p.tel || "—",
+        email: p.email || "—",
+        profession: p.profession || "—",
+        adresse: p.adresse || "—"
+      }
+    };
+  }
   document.getElementById("btnSaveEleve").addEventListener("click", function () {
     if (!valider()) { SM.toast("Veuillez compléter les champs obligatoires.", "error"); return; }
+    if (!el("fClasse").value) {
+      SM.toast("Aucune classe disponible : créez d'abord le référentiel (classes).", "error");
+      return;
+    }
+    var edite = editId ? SD.getEleve(editId) : null;
+    var parentActuel = (edite && edite.parent) || {};
     var d = {
       nom: el("fNom").value.trim(),
       prenom: el("fPrenom").value.trim(),
       sexe: el("fSexe").value,
       naissance: el("fNaissance").value,
       classe: el("fClasse").value,
-      statut: el("fStatut").value
+      statut: el("fStatut").value,
+      parent: {
+        nom: el("fParent").value.trim() || parentActuel.nom || "—",
+        tel: el("fTel").value.trim() || parentActuel.tel || "—",
+        email: el("fEmail").value.trim() || parentActuel.email || "—"
+      }
     };
-    if (editId) {
-      var e = SD.getEleve(editId);
-      Object.assign(e, d);
-      e.parent.nom = el("fParent").value.trim() || e.parent.nom;
-      e.parent.tel = el("fTel").value.trim() || e.parent.tel;
-      e.parent.email = el("fEmail").value.trim() || e.parent.email;
-      SM.toast("Élève " + editId + " modifié avec succès ✅", "success");
-    } else {
-      var max = 0;
-      SD.eleves.forEach(function (x) {
-        var n = parseInt(x.id.replace("EL", ""), 10);
-        if (n > max) max = n;
-      });
-      var nouvelId = "EL" + String(max + 1).padStart(3, "0");
-      SD.eleves.push({
-        id: nouvelId,
-        nom: d.nom,
-        prenom: d.prenom,
-        sexe: d.sexe,
-        naissance: d.naissance,
-        classe: d.classe,
-        statut: d.statut,
-        inscription: new Date().toISOString().slice(0, 10),
-        parent: {
-          nom: el("fParent").value.trim() || "—",
-          lien: "Tuteur",
-          tel: el("fTel").value.trim() || "—",
-          email: el("fEmail").value.trim() || "—",
-          profession: "—",
-          adresse: "—"
-        }
-      });
-      SM.toast("Élève " + nouvelId + " ajouté avec succès ✅", "success");
+    var bouton = document.getElementById("btnSaveEleve");
+    bouton.disabled = true;
+    bouton.textContent = "Enregistrement…";
+
+    function terminer() {
+      bouton.disabled = false;
+      bouton.textContent = "💾 Enregistrer";
     }
-    SM.closeAllModals();
-    actualiser();
+    function reussite(message) {
+      SM.closeAllModals();
+      SM.toast(message, "success");
+      actualiser();
+      terminer();
+    }
+    function echec(err) {
+      SM.toast("Enregistrement impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+      terminer();
+    }
+
+    if (editId) {
+      API.majEleve(editId, d).then(function (rep) {
+        var pos = eleves.findIndex(function (x) { return x.id === editId; });
+        if (pos !== -1) eleves[pos] = normaliserEleve(rep);
+        reussite("Élève " + editId + " modifié avec succès ✅");
+      }, echec);
+    } else {
+      API.creerEleve(d).then(function (rep) {
+        eleves.push(normaliserEleve(rep));
+        reussite("Élève " + rep.id + " ajouté avec succès ✅");
+      }, echec);
+    }
   });
 
   /* ---------- Suppression ---------- */
   document.getElementById("btnConfirmDel").addEventListener("click", function () {
     if (!deleteId) return;
-    var pos = SD.eleves.findIndex(function (x) { return x.id === deleteId; });
-    if (pos !== -1) {
-      SD.eleves.splice(pos, 1);
-      SM.toast("Élève " + deleteId + " supprimé.", "success");
-    }
-    deleteId = null;
-    SM.closeAllModals();
-    actualiser();
+    var bouton = document.getElementById("btnConfirmDel");
+    bouton.disabled = true;
+    var id = deleteId;
+    API.supprimerEleve(id).then(function () {
+      var pos = eleves.findIndex(function (x) { return x.id === id; });
+      if (pos !== -1) eleves.splice(pos, 1);
+      SM.toast("Élève " + id + " supprimé.", "warning");
+      deleteId = null;
+      SM.closeAllModals();
+      actualiser();
+    }).catch(function (err) {
+      SM.toast("Suppression impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+    });
   });
 
   function actualiser() {

@@ -29,7 +29,10 @@
                     <div>
                         <!-- Établissement -->
                         <div class="card card-pad settings-sec">
-                            <h3 class="mb-8">🏫 Établissement</h3>
+                            <div class="flex" style="gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                                <h3 class="mb-8">🏫 Établissement</h3>
+                                <button class="btn btn-outline btn-sm" id="btnEditEcole" style="display:none">✏️ Modifier l'établissement</button>
+                            </div>
                             <p class="text-sm text-muted mb-8">Coordonnées de votre établissement (configurées dans la base).</p>
                             <div id="ecoleRows"></div>
                         </div>
@@ -90,7 +93,7 @@
                         <!-- Données -->
                         <div class="card card-pad settings-sec">
                             <h3 class="mb-8">💾 Données de l'établissement</h3>
-                            <p class="text-sm text-muted">Les pages affichent les données réelles de la base (backend). Les modifications faites dans l'interface sont pour l'instant conservées en mémoire et perdues au rechargement — la persistance des écritures est une prochaine étape.</p>
+                            <p class="text-sm text-muted">Les pages affichent les données réelles du serveur (base de données). Les écritures de l'interface — élèves, enseignants, annonces, paiements, classes, matières, école — sont enregistrées immédiatement et persistées.</p>
                         </div>
 
                         <!-- À propos -->
@@ -108,6 +111,62 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Modale Modifier l'établissement -->
+    <div class="modal-overlay" id="modalEcole">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="ecoleModalTitle">✏️ Modifier l'établissement</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field span-2">
+                        <label>Nom de l'établissement <span class="req">*</span></label>
+                        <input class="input" id="ecNom" placeholder="Ex. Complexe Scolaire Privé Le Savoir">
+                        <div class="field-error" id="errEcNom">Le nom de l'établissement est obligatoire.</div>
+                    </div>
+                    <div class="field">
+                        <label>Sigle</label>
+                        <input class="input" id="ecSigle" placeholder="Ex. CSP Le Savoir">
+                    </div>
+                    <div class="field">
+                        <label>Devise</label>
+                        <input class="input" id="ecDevise" placeholder="Ex. FCFA" maxlength="10">
+                    </div>
+                    <div class="field span-2">
+                        <label>Slogan</label>
+                        <input class="input" id="ecSlogan" placeholder="Ex. Éduquer, former, réussir">
+                    </div>
+                    <div class="field">
+                        <label>Téléphone</label>
+                        <input class="input" id="ecTel" placeholder="Ex. +226 25 40 12 34">
+                    </div>
+                    <div class="field">
+                        <label>Email</label>
+                        <input class="input" type="email" id="ecEmail" placeholder="contact@exemple.edu">
+                    </div>
+                    <div class="field span-2">
+                        <label>Adresse</label>
+                        <input class="input" id="ecAdresse" placeholder="Ex. Ouagadougou, Burkina Faso">
+                    </div>
+                    <div class="field">
+                        <label>Année scolaire</label>
+                        <input class="input" id="ecAnnee" placeholder="Ex. 2026 – 2027">
+                        <div class="field-error" id="errEcAnnee">Format attendu : 2026 – 2027.</div>
+                    </div>
+                    <div class="field">
+                        <label>Version</label>
+                        <input class="input" id="ecVersion" placeholder="1.0.0" maxlength="10">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnSaveEcole">💾 Enregistrer</button>
+            </div>
         </div>
     </div>
 

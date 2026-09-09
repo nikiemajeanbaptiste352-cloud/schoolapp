@@ -1,5 +1,5 @@
 /* ============================================================
-   SchoolManager — Classes (grille de cartes)
+   SchoolManager — Classes (grille de cartes + gestion admin)
    ============================================================ */
 
 (function () {
@@ -10,16 +10,36 @@
 
   function el(id) { return document.getElementById(id); }
 
+  var sess = SM.getSession() || {};
+  var estAdmin = sess.role === "Administrateur";
+  var editId = null;   // code de la classe en édition (null = création)
+  var deleteId = null;
+
+  /* ---------- Sélecteur professeur principal ---------- */
+  function remplirPrincipaux(selection) {
+    var sel = el("classePrincipal");
+    sel.innerHTML = '<option value="">— Aucun</option>';
+    SD.enseignants.forEach(function (e) {
+      var o = document.createElement("option");
+      o.value = e.id;
+      o.textContent = e.id + " — " + e.prenom + " " + e.nom;
+      sel.appendChild(o);
+    });
+    sel.value = selection || "";
+  }
+
   /* ---------- Compteurs généraux ---------- */
-  var totalEleves = SD.eleves.length;
-  var nbCollege = SD.classes.filter(function (c) { return c.cycle === "Collège"; }).length;
-  var nbLycee = SD.classes.filter(function (c) { return c.cycle === "Lycée"; }).length;
-  el("miniCounts").innerHTML =
-    '<div class="mini-stat"><div class="v">' + SD.classes.length + '</div><div class="l">Classes</div></div>' +
-    '<div class="mini-stat"><div class="v">' + nbCollege + '</div><div class="l">Collège</div></div>' +
-    '<div class="mini-stat"><div class="v">' + nbLycee + '</div><div class="l">Lycée</div></div>' +
-    '<div class="mini-stat"><div class="v">' + totalEleves + '</div><div class="l">Élèves</div></div>';
-  el("countBadge").textContent = "Année scolaire " + SD.ecole.annee;
+  function compteurs() {
+    var nbCollege = SD.classes.filter(function (c) { return c.cycle === "Collège"; }).length;
+    var nbLycee = SD.classes.filter(function (c) { return c.cycle === "Lycée"; }).length;
+    el("miniCounts").innerHTML =
+      '<div class="mini-stat"><div class="v">' + SD.classes.length + '</div><div class="l">Classes</div></div>' +
+      '<div class="mini-stat"><div class="v">' + nbCollege + '</div><div class="l">Collège</div></div>' +
+      '<div class="mini-stat"><div class="v">' + nbLycee + '</div><div class="l">Lycée</div></div>' +
+      '<div class="mini-stat"><div class="v">' + SD.eleves.length + '</div><div class="l">Élèves</div></div>';
+    el("countBadge").textContent = "Année scolaire " + (SD.ecole && SD.ecole.annee ? SD.ecole.annee : "—");
+  }
+  compteurs();
 
   /* ---------- Rendu des cartes ---------- */
   function render() {
@@ -30,12 +50,16 @@
       var badgeCycle = c.cycle === "Lycée"
         ? '<span class="badge badge-warning">Lycée</span>'
         : '<span class="badge badge-info">Collège</span>';
+      var btnAdmin = estAdmin
+        ? '<button class="btn-icon primary-h" title="Modifier" data-edit="' + c.id + '">✏️</button>' +
+          '<button class="btn-icon danger" title="Supprimer" data-del="' + c.id + '">🗑️</button>'
+        : "";
       return (
         '<div class="card class-card">' +
         '  <div class="c-top">' +
         "    <div>" +
         '      <div class="c-name">' + SM.escapeHtml(c.nom) + "</div>" +
-        '      <div class="text-sm text-muted mt-4">Salle ' + SM.escapeHtml(c.salle) + "</div>" +
+        '      <div class="text-sm text-muted mt-4">Salle ' + SM.escapeHtml(c.salle || "—") + "</div>" +
         "    </div>" +
         "    " + badgeCycle +
         "  </div>" +
@@ -52,12 +76,16 @@
         '    <button class="btn btn-outline btn-sm" data-detail="' + c.id + '">👥 Détails</button>' +
         '    <a class="btn btn-outline btn-sm" href="grades.html?classe=' + c.id + '" title="Saisir les notes">📝 Notes</a>' +
         '    <a class="btn btn-ghost btn-sm" href="timetable.html?classe=' + c.id + '" title="Emploi du temps">📅 EDT</a>' +
+        btnAdmin +
         "  </div>" +
         "</div>"
       );
     }).join("");
   }
   render();
+
+  // Bouton « Ajouter » visible pour l'administrateur uniquement
+  if (estAdmin && el("btnAddClasse")) el("btnAddClasse").style.display = "";
 
   /* ---------- Modale détails ---------- */
   function ouvrirDetail(classeId) {
@@ -106,8 +134,151 @@
     SM.openModal("modalClasse");
   }
 
+  /* ---------- Actions des cartes ---------- */
   el("classesGrid").addEventListener("click", function (e) {
-    var btn = e.target.closest("[data-detail]");
-    if (btn) ouvrirDetail(btn.getAttribute("data-detail"));
+    var btnDetail = e.target.closest("[data-detail]");
+    if (btnDetail) { ouvrirDetail(btnDetail.getAttribute("data-detail")); return; }
+    if (!estAdmin) return;
+    var btn = e.target.closest("[data-edit], [data-del]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-edit") || btn.getAttribute("data-del");
+    if (btn.hasAttribute("data-edit")) {
+      ouvrirEdition(id);
+    } else {
+      deleteId = id;
+      var c = SD.getClasse(id);
+      var nb = SD.elevesDeClasse(id).length;
+      el("delClasseText").innerHTML =
+        "La classe <b>" + SM.escapeHtml(c ? c.nom : id) + "</b> (" + id + ") sera supprimée." +
+        (nb
+          ? ' <div class="mt-8 text-sm" style="color:var(--danger-text)">⚠️ ' + nb + " élève(s) inscrit(s) : la suppression sera refusée tant que la classe n'est pas vide.</div>"
+          : "");
+      SM.openModal("modalDelClasse");
+    }
+  });
+
+  /* ---------- Formulaire ajout / modification ---------- */
+  function clearErreurs() {
+    document.querySelectorAll(".field-error.show").forEach(function (x) { x.classList.remove("show"); });
+    document.querySelectorAll(".input.invalid").forEach(function (x) { x.classList.remove("invalid"); });
+  }
+  function cyclePourCode(code) {
+    // Codes type lycée : 2nde, 1ère, Terminale (commencent par 1, 2 ou T)
+    return /^[12T]/.test((code || "").trim()) ? "Lycée" : "Collège";
+  }
+  function resetForm() {
+    editId = null;
+    el("classeModalTitle").textContent = "➕ Ajouter une classe";
+    el("classeCode").value = "";
+    el("classeCode").readOnly = false;
+    el("classeNom").value = "";
+    el("classeCycle").value = "Collège";
+    el("classeSalle").value = "";
+    remplirPrincipaux("");
+    clearErreurs();
+    SM.openModal("modalClasseEdit");
+  }
+  function ouvrirEdition(id) {
+    var c = SD.getClasse(id);
+    if (!c) return;
+    editId = id;
+    el("classeModalTitle").textContent = "✏️ Modifier la classe " + c.id;
+    el("classeCode").value = c.id;
+    el("classeCode").readOnly = true; // le code est la clé primaire : non modifiable
+    el("classeNom").value = c.nom;
+    el("classeCycle").value = c.cycle;
+    el("classeSalle").value = c.salle || "";
+    remplirPrincipaux(c.principal || "");
+    clearErreurs();
+    SM.openModal("modalClasseEdit");
+  }
+
+  var btnAdd = el("btnAddClasse");
+  if (estAdmin && btnAdd) {
+    btnAdd.addEventListener("click", resetForm);
+    el("classeCode").addEventListener("input", function () {
+      if (!editId && el("classeCycle").value !== cyclePourCode(el("classeCode").value)) {
+        el("classeCycle").value = cyclePourCode(el("classeCode").value);
+      }
+    });
+  }
+
+  /* ---------- Enregistrement ---------- */
+  el("btnSaveClasse").addEventListener("click", function () {
+    clearErreurs();
+    var code = el("classeCode").value.trim().toUpperCase();
+    var ok = true;
+    if (!code) {
+      el("classeCode").classList.add("invalid");
+      el("errClasseCode").classList.add("show");
+      ok = false;
+    } else if (!/^[A-Z0-9]{1,6}$/.test(code)) {
+      el("classeCode").classList.add("invalid");
+      el("errClasseCode").textContent = "Code invalide : lettres et chiffres uniquement (ex. 6C, TA).";
+      el("errClasseCode").classList.add("show");
+      ok = false;
+    } else {
+      el("errClasseCode").textContent = "Le code est obligatoire (ex. 6C, 3C, TA…).";
+    }
+    if (!ok) { SM.toast("Veuillez corriger le formulaire.", "error"); return; }
+
+    var d = {
+      id: code,
+      nom: el("classeNom").value.trim() || code,
+      cycle: el("classeCycle").value,
+      salle: el("classeSalle").value.trim() || "—",
+      principal: el("classePrincipal").value || null
+    };
+    var bouton = el("btnSaveClasse");
+    bouton.disabled = true;
+    bouton.textContent = "Enregistrement…";
+
+    function terminer() { bouton.disabled = false; bouton.textContent = "💾 Enregistrer"; }
+    function reussite(message) {
+      SM.closeModal("modalClasseEdit");
+      SM.toast(message, "success");
+      compteurs();
+      render();
+    }
+    function echec(err) {
+      SM.toast("Enregistrement impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+      terminer();
+    }
+
+    if (editId) {
+      API.majClasse(editId, d).then(function (rep) {
+        var idx = SD.classes.findIndex(function (x) { return x.id === editId; });
+        if (idx !== -1) SD.classes[idx] = rep; else SD.classes.push(rep);
+        reussite("Classe " + editId + " modifiée ✅");
+        terminer();
+      }, echec);
+    } else {
+      API.creerClasse(d).then(function (rep) {
+        SD.classes.push(rep);
+        reussite("Classe " + rep.id + " ajoutée ✅");
+        terminer();
+      }, echec);
+    }
+  });
+
+  /* ---------- Suppression ---------- */
+  el("btnConfirmDelClasse").addEventListener("click", function () {
+    if (!deleteId) return;
+    var bouton = el("btnConfirmDelClasse");
+    bouton.disabled = true;
+    var id = deleteId;
+    API.supprimerClasse(id).then(function () {
+      var idx = SD.classes.findIndex(function (x) { return x.id === id; });
+      if (idx !== -1) SD.classes.splice(idx, 1);
+      SM.toast("Classe " + id + " supprimée.", "warning");
+      SM.closeModal("modalDelClasse");
+      deleteId = null;
+      compteurs();
+      render();
+    }).catch(function (err) {
+      SM.toast("Suppression impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+    });
   });
 })();

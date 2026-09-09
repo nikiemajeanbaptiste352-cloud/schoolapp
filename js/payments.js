@@ -155,14 +155,43 @@
       SM.toast("Saisissez un montant valide.", "error");
       return;
     }
+    var existaitDossier = SD.paiements.some(function (x) { return x.eleveId === eleveId; });
     var pai = dossierDe(eleveId);
-    pai.paiements.push({
+    var corps = {
       montant: montant,
       date: date || new Date().toISOString().slice(0, 10),
-      mode: el("fMode").value
+      mode: el("fMode").value,
+      // Utilisés par le serveur si aucun dossier n'existe encore
+      motif: pai.motif,
+      total: pai.total
+    };
+    var bouton = el("btnSavePay");
+    bouton.disabled = true;
+    bouton.textContent = "💾 Enregistrement…";
+    API.versement(eleveId, corps).then(function (rep) {
+      // Rejoue la mise à jour locale à partir de la réponse serveur
+      var v = rep.versements && rep.versements.length ? rep.versements[rep.versements.length - 1] : null;
+      var local = SD.paiements.find(function (x) { return x.eleveId === eleveId; });
+      if (local) {
+        local.total = rep.total;
+        if (rep.motif) local.motif = rep.motif;
+        if (v) local.paiements.push({ montant: v.montant, date: v.date, mode: v.mode || corps.mode });
+      } else {
+        SD.paiements.push({ eleveId: eleveId, motif: rep.motif, total: rep.total, paiements: v ? [v] : [] });
+      }
+      SM.closeModal("modalPay");
+      SM.toast("Versement de " + SM.formatFCFA(montant) + " enregistré ✅", "success");
+      actualiser();
+    }).catch(function (err) {
+      // Dossier local créé pour rien → on le retire pour rester fidèle au serveur
+      if (!existaitDossier) {
+        var i = SD.paiements.findIndex(function (x) { return x.eleveId === eleveId; });
+        if (i !== -1) SD.paiements.splice(i, 1);
+      }
+      SM.toast("Encaissement impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+      bouton.textContent = "💾 Enregistrer le versement";
     });
-    SM.closeModal("modalPay");
-    SM.toast("Versement de " + SM.formatFCFA(montant) + " enregistré ✅", "success");
-    actualiser();
   });
 })();

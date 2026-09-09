@@ -239,6 +239,44 @@
   }
   window.SM_MODE = "api";
 
+  /* ---------- Rafraîchissement après écriture API ---------- */
+  // Les scripts de page capturent des références vers les tableaux de
+  // window.SD (ex. var eleves = SD.eleves) et les fonctions de calcul de
+  // data.js referment ces mêmes tableaux : on mute donc les tableaux EXISTANTS
+  // en place (sans reconstruire window.SD), puis on met à jour l'objet école.
+  function remplacerEnPlace(tableau, nouvelles) {
+    var liste = nouvelles || [];
+    tableau.splice.apply(tableau, [0, tableau.length].concat(liste));
+  }
+  window.rafraichirEtat = function () {
+    if (!window.API || !window.API.etat) {
+      return Promise.reject({ reseau: false, detail: "API indisponible." });
+    }
+    return window.API.etat().then(function (etat) {
+      var d = mapperEtat(etat);
+      var sd = window.SD;
+      if (!sd) {
+        window.SD = window.construireSD(d);
+        return window.SD;
+      }
+      remplacerEnPlace(sd.classes, d.classes);
+      remplacerEnPlace(sd.matieres, d.matieres);
+      remplacerEnPlace(sd.enseignants, d.enseignants);
+      remplacerEnPlace(sd.eleves, d.eleves);
+      remplacerEnPlace(sd.notes, d.notes);
+      remplacerEnPlace(sd.presences, d.presences);
+      remplacerEnPlace(sd.paiements, d.paiements);
+      remplacerEnPlace(sd.annonces, d.annonces);
+      var nouvelleEcole = d.ecole || {};
+      var cles = Object.keys(nouvelleEcole);
+      Object.keys(sd.ecole || {}).forEach(function (k) {
+        if (cles.indexOf(k) === -1) delete sd.ecole[k];
+      });
+      cles.forEach(function (k) { sd.ecole[k] = nouvelleEcole[k]; });
+      return sd;
+    });
+  };
+
   // Lance ui.js puis le script de la page (aucun inline ne les suit)
   var scripts = ["../js/ui.js"];
   if (pageJs) scripts.push("../js/" + pageJs);

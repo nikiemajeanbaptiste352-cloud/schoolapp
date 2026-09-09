@@ -130,6 +130,36 @@ def enregistrer_notes(
     return {"message": f"{nb_crees} note(s) créée(s), {nb_maj} mise(s) à jour."}
 
 
+@router.delete("/notes", summary="Supprimer une note (admin/professeur)")
+def supprimer_note(
+    eleveId: str = Query(..., description="Identifiant de l'élève (ex : EL001)"),
+    matiereId: str = Query(..., description="Identifiant de la matière (ex : S1)"),
+    eval: str = Query(..., description="Évaluation (Devoir 1 / Devoir 2 / Composition)"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(ROLE_ADMIN, ROLE_PROF)),
+) -> dict:
+    """Suppression d'une note précise (case vide à l'écran de saisie)."""
+    _verifier_acces_notes(db, user)
+    mats = _matieres_autorisees(db, user)
+    if mats is not None and matiereId not in mats:
+        raise HTTPException(status_code=403, detail="Matière non autorisée pour ce professeur.")
+    if sd.get_eleve(db, eleveId) is None:
+        raise HTTPException(status_code=404, detail=f"Élève {eleveId} introuvable.")
+
+    note = db.scalar(
+        select(Note).where(
+            Note.eleve_id == eleveId,
+            Note.matiere_id == matiereId,
+            Note.eval == eval,
+        )
+    )
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note introuvable pour ce triplet.")
+    db.delete(note)
+    db.commit()
+    return {"message": "Note supprimée."}
+
+
 # ---------------------------------------------------------------------------
 # Statistiques d'une évaluation pour une classe (grille de notes)
 # ---------------------------------------------------------------------------

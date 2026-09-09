@@ -19,25 +19,35 @@
   }
 
   /* ---------- Établissement ---------- */
-  el("ecoleRows").innerHTML = lignes([
-    ["Nom", SM.escapeHtml(SD.ecole.nom)],
-    ["Sigle", SM.escapeHtml(SD.ecole.sigle)],
-    ["Slogan", SM.escapeHtml(SD.ecole.slogan)],
-    ["Adresse", SM.escapeHtml(SD.ecole.adresse)],
-    ["Téléphone", SM.escapeHtml(SD.ecole.telephone)],
-    ["Email", SM.escapeHtml(SD.ecole.email)],
-    ["Devise", SM.escapeHtml(SD.ecole.devise)]
-  ]);
+  function rendreEcole() {
+    var e = SD.ecole || {};
+    el("ecoleRows").innerHTML = lignes([
+      ["Nom", SM.escapeHtml(e.nom || "—")],
+      ["Sigle", SM.escapeHtml(e.sigle || "—")],
+      ["Slogan", SM.escapeHtml(e.slogan || "—")],
+      ["Adresse", SM.escapeHtml(e.adresse || "—")],
+      ["Téléphone", SM.escapeHtml(e.telephone || "—")],
+      ["Email", SM.escapeHtml(e.email || "—")],
+      ["Devise", SM.escapeHtml(e.devise || "FCFA")]
+    ]);
+  }
+  function rendreAnnee() {
+    var e = SD.ecole || {};
+    el("anneeRows").innerHTML = lignes([
+      ["Année scolaire", SM.escapeHtml(e.annee || "—")],
+      ["Classes", SD.classes.length + " classes"],
+      ["Élèves inscrits", SD.eleves.length + " élèves"],
+      ["Enseignants", SD.enseignants.length + " professeurs"],
+      ["Matières au programme", SD.matieres.length + " matières"],
+      ["Évaluations", SD.EVALS.length + " par matière (" + SD.EVALS.join(", ") + ")"]
+    ]);
+  }
+  rendreEcole();
+  rendreAnnee();
 
-  /* ---------- Année scolaire ---------- */
-  el("anneeRows").innerHTML = lignes([
-    ["Année scolaire", SM.escapeHtml(SD.ecole.annee)],
-    ["Classes", SD.classes.length + " classes"],
-    ["Élèves inscrits", SD.eleves.length + " élèves"],
-    ["Enseignants", SD.enseignants.length + " professeurs"],
-    ["Matières au programme", SD.matieres.length + " matières"],
-    ["Évaluations", SD.EVALS.length + " par matière (" + SD.EVALS.join(", ") + ")"]
-  ]);
+  // Si l'école n'est pas encore configurée (base vide), on force le mode
+  // « création » dans la modale (SD.ecole n'a alors pas de nom renseigné).
+  var ecoleConfiguree = !!(SD.ecole && SD.ecole.nom);
 
   /* ---------- Session ---------- */
   var sess = SM.getSession() || {};
@@ -167,6 +177,93 @@
             SM.toast(msg, "error");
           }
         });
+    });
+  }
+
+  /* ---------- Modification de l'établissement (admin) ---------- */
+  if (sess && sess.role === "Administrateur") {
+    var btnEditEcole = el("btnEditEcole");
+    if (btnEditEcole) btnEditEcole.style.display = "";
+
+    function clearErreursEcole() {
+      document.querySelectorAll(".field-error.show").forEach(function (x) { x.classList.remove("show"); });
+      document.querySelectorAll(".input.invalid").forEach(function (x) { x.classList.remove("invalid"); });
+    }
+    function ouvrirEcole() {
+      var e = SD.ecole || {};
+      el("ecoleModalTitle").textContent = ecoleConfiguree
+        ? "✏️ Modifier l'établissement"
+        : "🏫 Configurer l'établissement";
+      el("ecNom").value = e.nom || "";
+      el("ecSigle").value = e.sigle || "";
+      el("ecDevise").value = e.devise || "FCFA";
+      el("ecSlogan").value = e.slogan || "";
+      el("ecTel").value = e.telephone || "";
+      el("ecEmail").value = e.email || "";
+      el("ecAdresse").value = e.adresse || "";
+      el("ecAnnee").value = e.annee || "";
+      el("ecVersion").value = e.version || "1.0.0";
+      clearErreursEcole();
+      SM.openModal("modalEcole");
+    }
+    if (btnEditEcole) btnEditEcole.addEventListener("click", ouvrirEcole);
+
+    // Demande de création depuis le panneau « Établissement » quand la base
+    // est vide (aucune école configurée) — bouton dédié affiché à la place.
+    if (!ecoleConfiguree && btnEditEcole) {
+      btnEditEcole.textContent = "➕ Configurer l'établissement";
+    }
+
+    el("btnSaveEcole").addEventListener("click", function () {
+      clearErreursEcole();
+      var nom = el("ecNom").value.trim();
+      var ok = true;
+      if (!nom) {
+        el("ecNom").classList.add("invalid");
+        el("errEcNom").classList.add("show");
+        ok = false;
+      }
+      if (!ok) { SM.toast("Veuillez renseigner le nom de l'établissement.", "error"); return; }
+
+      var corps = {
+        nom: nom,
+        sigle: el("ecSigle").value.trim(),
+        devise: el("ecDevise").value.trim() || "FCFA",
+        slogan: el("ecSlogan").value.trim(),
+        telephone: el("ecTel").value.trim(),
+        email: el("ecEmail").value.trim(),
+        adresse: el("ecAdresse").value.trim(),
+        annee: el("ecAnnee").value.trim(),
+        version: el("ecVersion").value.trim() || "1.0.0"
+      };
+      var bouton = el("btnSaveEcole");
+      bouton.disabled = true;
+      bouton.textContent = "Enregistrement…";
+
+      function terminer() { bouton.disabled = false; bouton.textContent = "💾 Enregistrer"; }
+      function reussite(message) {
+        SM.closeModal("modalEcole");
+        SM.toast(message, "success");
+        ecoleConfiguree = true;
+        rendreEcole();
+        rendreAnnee();
+      }
+      function echec(err) {
+        SM.toast("Enregistrement impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+        terminer();
+      }
+
+      // Base vide → création (POST /ecole) ; sinon mise à jour (PUT /ecole).
+      var requeteEcole = ecoleConfiguree ? window.API.majEcole(corps) : window.API.creerEcole(corps);
+      requeteEcole.then(function (rep) {
+        // Mise à jour sur place de SD.ecole (objet vivant partagé)
+        ["nom", "sigle", "devise", "slogan", "telephone", "email", "adresse", "annee", "version"].forEach(function (k) {
+          if (rep && rep[k] !== undefined) SD.ecole[k] = rep[k];
+        });
+        el("aboutVersion").textContent = "Version " + (SD.ecole.version || "1.0.0");
+        reussite(ecoleConfiguree ? "Établissement modifié avec succès ✅" : "Établissement configuré avec succès ✅");
+        terminer();
+      }, echec);
     });
   }
 

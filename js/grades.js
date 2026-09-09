@@ -183,34 +183,75 @@
   /* ---------- Enregistrement ---------- */
   el("btnSave").addEventListener("click", function () {
     var eleves = SD.elevesDeClasse(classeId());
-    var nb = 0;
+    var notes = [];
+    var aSupprimer = [];
     eleves.forEach(function (e) {
       var val = saisiePour(e.id);
       var existant = noteEnregistree(e.id);
       if (val === null) {
-        if (existant) {
-          var i = SD.notes.indexOf(existant);
-          if (i !== -1) SD.notes.splice(i, 1);
-        }
+        // Case vidée : une note existante doit être supprimée côté serveur
+        if (existant) aSupprimer.push(existant);
         return;
       }
       var noteArrondie = Math.round(val * 2) / 2;
-      if (existant) {
-        existant.note = noteArrondie;
-      } else {
-        SD.notes.push({
-          id: "N" + Date.now() + "-" + e.id,
-          eleveId: e.id,
-          classeId: classeId(),
-          matiereId: matiereId(),
-          eval: evalCourante(),
-          note: noteArrondie
-        });
-      }
-      nb++;
+      notes.push({ eleveId: e.id, matiereId: matiereId(), eval: evalCourante(), note: noteArrondie });
     });
-    SM.toast(nb + " note" + (nb > 1 ? "s" : "") + " enregistrée" + (nb > 1 ? "s" : "") + " ✅", "success");
-    majStats();
+
+    if (!notes.length && !aSupprimer.length) {
+      SM.toast("Aucune note à enregistrer.", "warning");
+      majStats();
+      return;
+    }
+
+    var bouton = el("btnSave");
+    bouton.disabled = true;
+    bouton.textContent = "Enregistrement…";
+
+    var operations = [];
+    // Suppressions (notes vidées)
+    aSupprimer.forEach(function (n) {
+      operations.push(API.supprimerNote(n.eleveId, n.matiereId, n.eval).then(function () {
+        var i = SD.notes.indexOf(n);
+        if (i !== -1) SD.notes.splice(i, 1);
+      }));
+    });
+    // Enregistrements / mises à jour
+    if (notes.length) {
+      operations.push(API.enregistrerNotes({ notes: notes }).then(function () {
+        notes.forEach(function (saisie) {
+          var n = SD.notes.find(function (x) {
+            return x.eleveId === saisie.eleveId && x.matiereId === saisie.matiereId && x.eval === saisie.eval;
+          });
+          if (n) {
+            n.note = saisie.note;
+          } else {
+            SD.notes.push({
+              id: "N" + Date.now() + "-" + saisie.eleveId,
+              eleveId: saisie.eleveId,
+              classeId: classeId(),
+              matiereId: saisie.matiereId,
+              eval: saisie.eval,
+              note: saisie.note
+            });
+          }
+        });
+      }));
+    }
+
+    Promise.all(operations).then(function () {
+      var retrait = aSupprimer.length;
+      SM.toast(
+        notes.length + " note" + (notes.length > 1 ? "s" : "") + " enregistrée" + (notes.length > 1 ? "s" : "") +
+        (retrait ? " · " + retrait + " supprimée" + (retrait > 1 ? "s" : "") : "") + " ✅",
+        "success"
+      );
+      majStats();
+    }).catch(function (err) {
+      SM.toast("Enregistrement impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+      bouton.textContent = "💾 Enregistrer les notes";
+    });
   });
 
   /* ---------- Changement de sélection ---------- */

@@ -25,6 +25,7 @@
                     </div>
                     <div class="header-actions">
                         <span class="badge badge-info" id="countBadge"></span>
+                        <button class="btn btn-primary" id="btnAddClasse" style="display:none">➕ Ajouter une classe</button>
                     </div>
                 </div>
 
@@ -45,6 +46,64 @@
                 <button class="btn-icon" data-close>✕</button>
             </div>
             <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Modale Ajouter / Modifier une classe -->
+    <div class="modal-overlay" id="modalClasseEdit">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="classeModalTitle">➕ Ajouter une classe</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="classeId">
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Code <span class="req">*</span></label>
+                        <input class="input" id="classeCode" placeholder="Ex. 6C, 3C, TA…" maxlength="6">
+                        <div class="field-error" id="errClasseCode">Le code est obligatoire (ex. 6C, 3C, TA…).</div>
+                    </div>
+                    <div class="field">
+                        <label>Nom complet</label>
+                        <input class="input" id="classeNom" placeholder="Ex. 6e C (laissé vide = code)">
+                    </div>
+                    <div class="field">
+                        <label>Cycle <span class="req">*</span></label>
+                        <select class="select" id="classeCycle">
+                            <option value="Collège">Collège</option>
+                            <option value="Lycée">Lycée</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Salle</label>
+                        <input class="input" id="classeSalle" placeholder="Ex. C-103">
+                    </div>
+                    <div class="field span-2">
+                        <label>Professeur principal</label>
+                        <select class="select" id="classePrincipal"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnSaveClasse">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de suppression d'une classe -->
+    <div class="modal-overlay" id="modalDelClasse">
+        <div class="modal modal-sm">
+            <div class="modal-body" style="padding:28px">
+                <div class="confirm-ico">🗑️</div>
+                <div class="confirm-title">Supprimer cette classe ?</div>
+                <div class="confirm-text" id="delClasseText">Cette action est irréversible.</div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-danger-soft" id="btnConfirmDelClasse">Supprimer</button>
+            </div>
         </div>
     </div>
 

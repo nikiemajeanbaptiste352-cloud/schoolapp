@@ -68,24 +68,28 @@
     if (!contenu) { el("fContenu").classList.add("invalid"); el("errContenu").classList.add("show"); ok = false; }
     if (!ok) { SM.toast("Veuillez compléter les champs obligatoires.", "error"); return; }
 
-    var max = 0;
-    SD.annonces.forEach(function (a) {
-      var n = parseInt(a.id.replace("A", ""), 10);
-      if (n > max) max = n;
-    });
     var sess = SM.getSession();
-    SD.annonces.push({
-      id: "A" + (max + 1),
+    var bouton = el("btnSaveAnnounce");
+    bouton.disabled = true;
+    bouton.textContent = "Publication…";
+    API.creerAnnonce({
       titre: titre,
       contenu: contenu,
       categorie: el("fCategorie").value,
       date: new Date().toISOString().slice(0, 10),
       auteur: sess && sess.nom ? sess.nom : "Administration",
       important: el("fImportant").checked
+    }).then(function (annonce) {
+      SD.annonces.push(annonce);
+      SM.closeModal("modalAnnounce");
+      SM.toast("Annonce publiée avec succès ✅", "success");
+      render();
+    }).catch(function (err) {
+      SM.toast("Publication impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+      bouton.textContent = "🚀 Publier";
     });
-    SM.closeModal("modalAnnounce");
-    SM.toast("Annonce publiée avec succès ✅", "success");
-    render();
   });
 
   /* ---------- Suppression ---------- */
@@ -100,11 +104,20 @@
 
   el("btnConfirmDel").addEventListener("click", function () {
     if (!deleteId) return;
-    var idx = SD.annonces.findIndex(function (x) { return x.id === deleteId; });
-    if (idx !== -1) SD.annonces.splice(idx, 1);
-    SM.toast("Annonce supprimée.", "warning");
-    SM.closeModal("modalDel");
-    deleteId = null;
-    render();
+    var bouton = el("btnConfirmDel");
+    bouton.disabled = true;
+    var id = deleteId;
+    API.supprimerAnnonce(id).then(function () {
+      var idx = SD.annonces.findIndex(function (x) { return x.id === id; });
+      if (idx !== -1) SD.annonces.splice(idx, 1);
+      SM.toast("Annonce supprimée.", "warning");
+      SM.closeModal("modalDel");
+      deleteId = null;
+      render();
+    }).catch(function (err) {
+      SM.toast("Suppression impossible : " + (err && err.detail ? err.detail : "erreur réseau."), "error");
+    }).then(function () {
+      bouton.disabled = false;
+    });
   });
 })();
