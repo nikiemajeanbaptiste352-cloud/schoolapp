@@ -25,6 +25,20 @@ class InscriptionIn(BaseModel):
     password: str
 
 
+class InscriptionEtablissementIn(BaseModel):
+    """Inscription publique d'un établissement (rôle Administrateur).
+
+    - ``nom`` : responsable de l'établissement qui crée le compte ;
+    - ``ecole`` : nom de l'établissement, utilisé uniquement si aucune
+      fiche École n'existe encore en base (bootstrap d'un déploiement).
+    """
+
+    nom: str
+    email: str
+    password: str
+    ecole: str = ""
+
+
 class CompteIn(BaseModel):
     """Création d'un compte par un administrateur (rôle au choix)."""
 

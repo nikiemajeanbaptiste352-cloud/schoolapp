@@ -171,13 +171,19 @@
             <div class="lp-auth-head">
                 <span class="lp-chip">🔐 Espace sécurisé</span>
                 <h2>Accédez à votre espace</h2>
-                <p>Utilisez les identifiants fournis par votre établissement — direction, enseignant, parent ou élève.</p>
+                <p>Choisissez votre profil : les établissements (direction et équipe) ouvrent leur espace ici, et les parents suivent la scolarité de leurs enfants.</p>
+            </div>
+
+            <!-- Choix du profil d'entrée : Établissement ou Parent -->
+            <div class="lp-mode" role="tablist" aria-label="Choisir votre espace">
+                <button type="button" class="lp-mode-btn is-actif" id="btnModeEtab" role="tab" aria-selected="true">🏫 Établissement</button>
+                <button type="button" class="lp-mode-btn" id="btnModeParent" role="tab" aria-selected="false">👨‍👩‍👧 Parent</button>
             </div>
 
             <!-- Connexion -->
             <div class="login-card" id="vueConnexion">
-                <h2 class="lc-title">Bon retour 👋</h2>
-                <p class="lc-sub">Connectez-vous pour accéder à votre espace.</p>
+                <h2 class="lc-title" id="lcTitreConnexion">Espace Établissement 🏫</h2>
+                <p class="lc-sub" id="lcSousConnexion">Connexion de la direction et de l'équipe de votre école — utilisez les identifiants fournis par l'établissement.</p>
 
                 <div id="zoneGoogle" style="display:none">
                     <button type="button" class="btn-google" id="btnGoogle">
@@ -215,7 +221,11 @@
                     </div>
 
                     <div class="or">ou</div>
-                    <p style="text-align:center;font-size:13.5px;margin:0">
+                    <p class="lc-alt" id="actionEtab">
+                        Premier accès de l'école ?
+                        <a href="#" id="linkInscriptionEtab">Créer le compte de mon établissement</a>
+                    </p>
+                    <p class="lc-alt" id="actionParent" hidden>
                         Vous êtes parent d'un élève ?
                         <a href="#" id="linkInscription">Créer un compte Parent</a>
                     </p>
@@ -262,6 +272,52 @@
                     <p style="text-align:center;font-size:13.5px;margin:0">
                         Déjà un compte ?
                         <a href="#" id="linkRetourConnexion">Se connecter</a>
+                    </p>
+                </form>
+            </div>
+
+            <!-- Inscription (espace Établissement → rôle Administrateur) -->
+            <div class="login-card" id="vueInscriptionEtab" style="display:none">
+                <h2 class="lc-title">Créer l'espace Établissement 🏫</h2>
+                <p class="lc-sub">Le compte de direction de votre école (premier administrateur) — vous configurerez ensuite classes, enseignants et frais de scolarité.</p>
+
+                <form id="inscriptionEtabForm" novalidate>
+                    <div class="field mb-16">
+                        <label for="ecoleEtab">Nom de l'établissement <span class="req">*</span></label>
+                        <input class="input" type="text" id="ecoleEtab" placeholder="Ex. Complexe Scolaire Le Savoir" autocomplete="organization">
+                        <div class="field-error" id="errEcoleEtab">Veuillez saisir le nom de l'établissement.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="nomEtab">Votre nom (responsable) <span class="req">*</span></label>
+                        <input class="input" type="text" id="nomEtab" placeholder="Ex. Jean Ouédraogo" autocomplete="name">
+                        <div class="field-error" id="errNomEtab">Veuillez saisir votre nom.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="emailEtab">Adresse email <span class="req">*</span></label>
+                        <input class="input" type="email" id="emailEtab" placeholder="direction@votre-ecole.org" autocomplete="email">
+                        <div class="field-error" id="errEmailEtab">Veuillez saisir une adresse email valide.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="mdpEtab">Mot de passe <span class="req">*</span></label>
+                        <input class="input" type="password" id="mdpEtab" placeholder="6 caractères minimum" autocomplete="new-password">
+                        <div class="field-error" id="errMdpEtab">Le mot de passe doit contenir au moins 6 caractères.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="mdpEtab2">Confirmer le mot de passe <span class="req">*</span></label>
+                        <input class="input" type="password" id="mdpEtab2" placeholder="••••••••" autocomplete="new-password">
+                        <div class="field-error" id="errMdpEtab2">Les deux mots de passe ne correspondent pas.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block" id="btnInscriptionEtab">Créer le compte de l'établissement →</button>
+                    <div class="field-error" id="errInscriptionEtab" style="margin-top:10px"></div>
+
+                    <div class="or">ou</div>
+                    <p class="lc-alt">
+                        <a href="#" id="linkRetourEtab">← Retour à la connexion</a>
                     </p>
                 </form>
             </div>

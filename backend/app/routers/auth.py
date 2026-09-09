@@ -24,6 +24,7 @@ from app.schemas import (
     CodeDemandeIn,
     CodeValidationIn,
     CompteIn,
+    InscriptionEtablissementIn,
     InscriptionIn,
     LoginIn,
     TokenOut,
@@ -158,6 +159,41 @@ def inscription(body: InscriptionIn, db: Session = Depends(get_db)) -> TokenOut:
     les autres rôles sont créés par l'administration.
     """
     user = _creer_user(db, body.nom, body.email, body.password, ROLE_PARENT)
+    return _token_pour(user, db)
+
+
+@router.post(
+    "/inscription-etablissement",
+    response_model=TokenOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Inscription d'un établissement (compte Administrateur)",
+)
+def inscription_etablissement(
+    body: InscriptionEtablissementIn, db: Session = Depends(get_db)
+) -> TokenOut:
+    """Crée le compte de direction d'un établissement (rôle Administrateur) puis connecte.
+
+    L'application est mono-école : si aucune fiche École n'existe encore en base
+    (bootstrap d'un nouveau déploiement), une fiche est créée avec le nom saisi —
+    l'équipe la complète ensuite depuis Réglages. Si l'école est déjà configurée,
+    le compte rejoint simplement l'équipe de direction.
+    """
+    ecole = db.scalar(select(Ecole).limit(1))
+    if ecole is None:
+        nom_ecole = (body.ecole or "").strip()[:120] or "Mon établissement"
+        db.add(Ecole(
+            nom=nom_ecole,
+            sigle="",
+            slogan="",
+            annee="",
+            devise="FCFA",
+            telephone="",
+            email="",
+            adresse="",
+            version="1.0.0",
+        ))
+        db.commit()
+    user = _creer_user(db, body.nom, body.email, body.password, ROLE_ADMIN)
     return _token_pour(user, db)
 
 

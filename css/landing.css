@@ -481,6 +481,48 @@ html { scroll-behavior: smooth; }
 .btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 4px rgba(60, 64, 67, 0.2); }
 .btn-google:disabled { opacity: 0.65; cursor: default; }
 
+/* Sélecteur de profil d'entrée : Établissement / Parent */
+.lp-mode {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 5px;
+  background: #eef2f9;
+  border: 1px solid #e3e9f2;
+  border-radius: 14px;
+}
+.lp-mode-btn {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #5b6b85;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 10px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.lp-mode-btn:hover { color: #0b1b33; }
+.lp-mode-btn.is-actif {
+  background: #ffffff;
+  color: #0b1b33;
+  box-shadow: 0 2px 10px rgba(11, 27, 51, 0.14);
+}
+.lp-mode-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+/* Lien contextuel sous le bouton « Se connecter » */
+.lc-alt { text-align: center; font-size: 13.5px; margin: 0; }
+.lc-alt a { color: #2563eb; font-weight: 600; text-decoration: none; }
+.lc-alt a:hover { text-decoration: underline; }
+.lc-alt[hidden] { display: none !important; }
+
 /* ============================================================
    Pied de page
    ============================================================ */

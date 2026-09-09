@@ -199,6 +199,21 @@
         });
     },
 
+    // Inscription publique d'un établissement (rôle Administrateur) :
+    // POST /auth/inscription-etablissement. Crée la fiche École si la base est
+    // encore vierge puis connecte aussitôt le responsable.
+    inscriptionEtablissement: function (ecole, nom, email, motDePasse) {
+      return post("/auth/inscription-etablissement",
+        { ecole: ecole, nom: nom, email: email, password: motDePasse }, { jeton: false })
+        .then(function (data) {
+          if (data && data.access_token) {
+            memoriserJeton(data.access_token);
+            memoriserUtilisateur(data.user || null);
+          }
+          return data;
+        });
+    },
+
     /* --- Connexion par code email (sans mot de passe) --- */
     // Méthodes de connexion actives (google / code_email) : GET /auth/options.
     optionsAuth: function () {

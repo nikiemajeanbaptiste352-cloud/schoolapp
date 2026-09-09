@@ -51,18 +51,22 @@
     });
   }
 
-  /* ---------- Bascule Connexion ↔ Inscription ↔ Code email ---------- */
+  /* ---------- Bascule Connexion ↔ Inscription (Établissement / Parent) ↔ Code email ---------- */
   var vueConnexion = document.getElementById("vueConnexion");
   var vueInscription = document.getElementById("vueInscription");
+  var vueInscriptionEtab = document.getElementById("vueInscriptionEtab");
   var vueCode = document.getElementById("vueCode");
   var linkInscription = document.getElementById("linkInscription");
   var linkRetourConnexion = document.getElementById("linkRetourConnexion");
+  var linkInscriptionEtab = document.getElementById("linkInscriptionEtab");
+  var linkRetourEtab = document.getElementById("linkRetourEtab");
   var linkCode = document.getElementById("linkCode");
   var linkRetourCode = document.getElementById("linkRetourCode");
 
   function cacherVues() {
     if (vueConnexion) vueConnexion.style.display = "none";
     if (vueInscription) vueInscription.style.display = "none";
+    if (vueInscriptionEtab) vueInscriptionEtab.style.display = "none";
     if (vueCode) vueCode.style.display = "none";
   }
   function montrerConnexion() {
@@ -75,6 +79,12 @@
     var nom = document.getElementById("nomParent");
     if (nom) nom.focus();
   }
+  function montrerInscriptionEtab() {
+    cacherVues();
+    if (vueInscriptionEtab) vueInscriptionEtab.style.display = "";
+    var ecole = document.getElementById("ecoleEtab");
+    if (ecole) ecole.focus();
+  }
   function montrerCode() {
     cacherVues();
     if (vueCode) vueCode.style.display = "";
@@ -82,14 +92,88 @@
     var email = document.getElementById("emailCode");
     if (email) email.focus();
   }
+
+  /* ---------- Choix du profil d'entrée : « Établissement » ou « Parent » ---------- */
+  var profilActuel = "etablissement"; // "etablissement" | "parent"
+  var btnModeEtab = document.getElementById("btnModeEtab");
+  var btnModeParent = document.getElementById("btnModeParent");
+  var lcTitreConnexion = document.getElementById("lcTitreConnexion");
+  var lcSousConnexion = document.getElementById("lcSousConnexion");
+  var actionEtab = document.getElementById("actionEtab");
+  var actionParent = document.getElementById("actionParent");
+  var TITRES_CONNEXION = {
+    etablissement: {
+      titre: "Espace Établissement 🏫",
+      sous: "Connexion de la direction et de l'équipe de votre école — utilisez les identifiants fournis par l'établissement."
+    },
+    parent: {
+      titre: "Bon retour 👋",
+      sous: "Connectez-vous pour accéder à votre espace."
+    }
+  };
+
+  // Applique l'apparence de la carte de connexion selon le profil choisi
+  // (titre, lien contextuel, méthodes Google / code email réservées aux parents).
+  function appliquerAffichageProfil() {
+    var etab = profilActuel === "etablissement";
+    var opts = optionsAuthMemorisees || {};
+    if (lcTitreConnexion) lcTitreConnexion.textContent = TITRES_CONNEXION[profilActuel].titre;
+    if (lcSousConnexion) lcSousConnexion.textContent = TITRES_CONNEXION[profilActuel].sous;
+    if (btnModeEtab) {
+      btnModeEtab.classList.toggle("is-actif", etab);
+      btnModeEtab.setAttribute("aria-selected", etab ? "true" : "false");
+    }
+    if (btnModeParent) {
+      btnModeParent.classList.toggle("is-actif", !etab);
+      btnModeParent.setAttribute("aria-selected", etab ? "false" : "true");
+    }
+    if (actionEtab) { if (etab) actionEtab.removeAttribute("hidden"); else actionEtab.setAttribute("hidden", ""); }
+    if (actionParent) { if (etab) actionParent.setAttribute("hidden", ""); else actionParent.removeAttribute("hidden"); }
+    if (zoneGoogle) zoneGoogle.style.display = (!etab && opts.google) ? "" : "none";
+    if (zoneCode) zoneCode.style.display = (!etab && opts.code_email) ? "" : "none";
+  }
+
+  // Bascule vers le profil demandé puis revient à l'écran de connexion.
+  function definirProfil(p) {
+    if (p !== "etablissement" && p !== "parent") return;
+    profilActuel = p;
+    appliquerAffichageProfil();
+    montrerConnexion();
+  }
+  if (btnModeEtab) {
+    btnModeEtab.addEventListener("click", function (e) {
+      e.preventDefault();
+      definirProfil("etablissement");
+    });
+  }
+  if (btnModeParent) {
+    btnModeParent.addEventListener("click", function (e) {
+      e.preventDefault();
+      definirProfil("parent");
+    });
+  }
   if (linkInscription) {
     linkInscription.addEventListener("click", function (e) {
       e.preventDefault();
+      definirProfil("parent");
       montrerInscription();
+    });
+  }
+  if (linkInscriptionEtab) {
+    linkInscriptionEtab.addEventListener("click", function (e) {
+      e.preventDefault();
+      definirProfil("etablissement");
+      montrerInscriptionEtab();
     });
   }
   if (linkRetourConnexion) {
     linkRetourConnexion.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerConnexion();
+    });
+  }
+  if (linkRetourEtab) {
+    linkRetourEtab.addEventListener("click", function (e) {
       e.preventDefault();
       montrerConnexion();
     });
@@ -113,6 +197,7 @@
   var zoneGoogle = document.getElementById("zoneGoogle");
   var btnGoogle = document.getElementById("btnGoogle");
   var zoneCode = document.getElementById("zoneCode");
+  var optionsAuthMemorisees = null;   // {google, code_email} — options reçues du serveur
 
   if (btnGoogle && window.API && window.API.urlConnexionGoogle) {
     btnGoogle.addEventListener("click", function () {
@@ -124,11 +209,12 @@
   function appliquerOptionsAuth() {
     if (!window.API || !window.API.optionsAuth) return;
     window.API.optionsAuth().then(function (o) {
-      if (o && zoneGoogle && o.google) zoneGoogle.style.display = "";
-      if (o && zoneCode && o.code_email) zoneCode.style.display = "";
+      optionsAuthMemorisees = o || {};
+      appliquerAffichageProfil(); // réaffiche selon le profil Établissement / Parent
     }).catch(function () { /* silencieux : méthodes laissées masquées */ });
   }
   appliquerOptionsAuth();
+  appliquerAffichageProfil();
 
   /* ---------- Validation ---------- */
   var form = document.getElementById("loginForm");
@@ -324,6 +410,110 @@
 
       if (!valide) return;
       inscriptionApi();
+    });
+  }
+
+  /* ---------- Inscription (espace Établissement, API uniquement) ---------- */
+  var formInscriptionEtab = document.getElementById("inscriptionEtabForm");
+  if (formInscriptionEtab) {
+    var ecoleEtab = document.getElementById("ecoleEtab");
+    var nomEtab = document.getElementById("nomEtab");
+    var emailEtab = document.getElementById("emailEtab");
+    var mdpEtab = document.getElementById("mdpEtab");
+    var mdpEtab2 = document.getElementById("mdpEtab2");
+    var errEcoleEtab = document.getElementById("errEcoleEtab");
+    var errNomEtab = document.getElementById("errNomEtab");
+    var errEmailEtab = document.getElementById("errEmailEtab");
+    var errMdpEtab = document.getElementById("errMdpEtab");
+    var errMdpEtab2 = document.getElementById("errMdpEtab2");
+    var errInscriptionEtab = document.getElementById("errInscriptionEtab");
+    var btnInscriptionEtab = document.getElementById("btnInscriptionEtab");
+
+    function okEtab(input, errEl) {
+      input.classList.remove("invalid");
+      if (errEl) errEl.classList.remove("show");
+    }
+    function invalideEtab(input, errEl, message) {
+      input.classList.add("invalid");
+      if (errEl) {
+        errEl.textContent = message || errEl.textContent;
+        errEl.classList.add("show");
+      }
+    }
+
+    ecoleEtab.addEventListener("input", function () { okEtab(ecoleEtab, errEcoleEtab); });
+    nomEtab.addEventListener("input", function () { okEtab(nomEtab, errNomEtab); });
+    emailEtab.addEventListener("input", function () { okEtab(emailEtab, errEmailEtab); });
+    mdpEtab.addEventListener("input", function () { okEtab(mdpEtab, errMdpEtab); });
+    mdpEtab2.addEventListener("input", function () { okEtab(mdpEtab2, errMdpEtab2); });
+
+    function inscriptionEtabApi() {
+      btnInscriptionEtab.disabled = true;
+      btnInscriptionEtab.textContent = "Création du compte…";
+      if (errInscriptionEtab) { errInscriptionEtab.classList.remove("show"); }
+
+      window.API.inscriptionEtablissement(
+        ecoleEtab.value.trim(),
+        nomEtab.value.trim(),
+        emailEtab.value.trim(),
+        mdpEtab.value
+      ).then(function (data) {
+        // L'API renvoie un jeton → l'utilisateur (Administrateur) est connecté.
+        var user = data.user || {};
+        sessionStorage.setItem("sm_session", JSON.stringify({
+          role: user.role || "Administrateur",
+          email: user.email || emailEtab.value.trim(),
+          nom: user.nom || ""
+        }));
+        window.location.href = "pages/dashboard.html";
+      }).catch(function (err) {
+        btnInscriptionEtab.disabled = false;
+        btnInscriptionEtab.textContent = "Créer le compte de l'établissement →";
+        var msg = "Inscription impossible.";
+        if (err && err.reseau) {
+          msg = "Serveur injoignable : démarrez le backend puis réessayez.";
+        } else if (err && err.detail) {
+          msg = err.detail;
+        }
+        if (errInscriptionEtab) {
+          errInscriptionEtab.textContent = msg;
+          errInscriptionEtab.classList.add("show");
+        } else {
+          alert(msg);
+        }
+      });
+    }
+
+    formInscriptionEtab.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var ecole = ecoleEtab.value.trim();
+      var nom = nomEtab.value.trim();
+      var email = emailEtab.value.trim();
+      var mdp = mdpEtab.value;
+      var mdp2 = mdpEtab2.value;
+      var valide = true;
+
+      if (!ecole) { invalideEtab(ecoleEtab, errEcoleEtab, "Veuillez saisir le nom de l'établissement."); valide = false; }
+      else { okEtab(ecoleEtab, errEcoleEtab); }
+
+      if (!nom) { invalideEtab(nomEtab, errNomEtab, "Veuillez saisir votre nom."); valide = false; }
+      else { okEtab(nomEtab, errNomEtab); }
+
+      if (!email) { invalideEtab(emailEtab, errEmailEtab, "Veuillez saisir votre adresse email."); valide = false; }
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        invalideEtab(emailEtab, errEmailEtab, "Format d'email invalide (ex. nom@exemple.com).");
+        valide = false;
+      } else { okEtab(emailEtab, errEmailEtab); }
+
+      if (mdp.length < 6) { invalideEtab(mdpEtab, errMdpEtab, "Le mot de passe doit contenir au moins 6 caractères."); valide = false; }
+      else { okEtab(mdpEtab, errMdpEtab); }
+
+      if (!mdp2) { invalideEtab(mdpEtab2, errMdpEtab2, "Veuillez confirmer votre mot de passe."); valide = false; }
+      else if (mdp2 !== mdp) { invalideEtab(mdpEtab2, errMdpEtab2, "Les deux mots de passe ne correspondent pas."); valide = false; }
+      else { okEtab(mdpEtab2, errMdpEtab2); }
+
+      if (!valide) return;
+      inscriptionEtabApi();
     });
   }
 
