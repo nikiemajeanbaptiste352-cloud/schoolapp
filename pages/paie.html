@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rémunérations — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%92%B6%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="paie" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>💶 Rémunérations</h2>
+                        <div class="subtitle">Fixez les barèmes, suivez le cahier de présence signé des enseignants, générez les fiches de paie du mois et validez les paiements.</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="field" style="margin:0">
+                            <input type="month" class="input" id="moisInput" title="Mois de paie">
+                        </div>
+                        <button class="btn btn-primary" id="btnGenerer">⚙️ Générer les fiches du mois</button>
+                    </div>
+                </div>
+
+                <!-- Compteurs -->
+                <div class="cards-grid mb-16" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))" id="miniStats"></div>
+
+                <!-- Message post-génération -->
+                <div id="msgGen" style="display:none;margin-bottom:16px"></div>
+
+                <!-- Récapitulatif du mois -->
+                <div class="card" style="margin-bottom:20px">
+                    <div class="card-head">
+                        <h3>📋 Récapitulatif du mois <span id="recapMoisLabel" class="text-muted"></span></h3>
+                        <span class="text-muted" id="recapCount" style="font-size:13px"></span>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table class="data">
+                            <thead>
+                                <tr>
+                                    <th>Enseignant</th>
+                                    <th>Taux</th>
+                                    <th>Séances</th>
+                                    <th>Heures</th>
+                                    <th>Brut</th>
+                                    <th>Fiche</th>
+                                    <th style="text-align:center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recapBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Barèmes (taux horaires) -->
+                <div class="card">
+                    <div class="card-head">
+                        <h3>💼 Barèmes — taux horaire (FCFA / heure signée)</h3>
+                        <span class="text-muted" style="font-size:13px">Le montant mensuel = taux × heures signées dans le cahier de présence.</span>
+                    </div>
+                    <div style="overflow-x:auto">
+                        <table class="data">
+                            <thead>
+                                <tr>
+                                    <th>Enseignant</th>
+                                    <th>Matière</th>
+                                    <th>Statut</th>
+                                    <th>Classes</th>
+                                    <th>Taux horaire (FCFA)</th>
+                                    <th style="text-align:center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tauxBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale de confirmation d'action -->
+    <div class="modal-overlay" id="modalAction">
+        <div class="modal modal-sm">
+            <div class="modal-body" style="padding:28px">
+                <div class="confirm-ico" id="actionIco">⚠️</div>
+                <div class="confirm-title" id="actionTitle">Confirmer ?</div>
+                <div class="confirm-text" id="actionText"></div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnConfirmAction">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="paie.js"></script>
+</body>
+
+</html>

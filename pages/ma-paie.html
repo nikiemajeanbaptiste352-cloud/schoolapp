@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ma rémunération — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%92%B5%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/print.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <style>
+        /* La fiche officielle n'apparaît qu'à l'impression. */
+        #fichePrint { display: none; }
+        @media print {
+            .screen-only { display: none !important; }
+            #fichePrint { display: block !important; }
+        }
+    </style>
+</head>
+
+<body data-page="ma-paie" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header no-print">
+                    <div>
+                        <h2>💵 Ma rémunération</h2>
+                        <div class="subtitle">Consultez vos fiches mensuelles : heures signées, taux horaire et montant à percevoir.</div>
+                    </div>
+                    <div class="header-actions">
+                        <span class="chip">Rémunération à la vacation</span>
+                    </div>
+                </div>
+
+                <!-- Statistiques -->
+                <div class="cards-grid mb-16 screen-only" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))" id="miniStats"></div>
+
+                <!-- Note de consultation -->
+                <div class="alert alert-info screen-only" style="margin-bottom:16px">
+                    <div>ℹ️ <div>Vos fiches de paie sont générées par la direction chaque mois à partir de votre cahier de présence signé. Cette page est en <strong>consultation seule</strong> : pour toute correction, contactez l'administration.</div></div>
+                </div>
+
+                <!-- Liste des fiches -->
+                <div id="ficheList"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Fiche de paie (impression / PDF) -->
+    <div id="fichePrint"></div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="ma-paie.js"></script>
+</body>
+
+</html>

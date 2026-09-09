@@ -306,3 +306,78 @@ class EmailCode(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     tentatives: Mapped[int] = mapped_column(Integer, default=0)
+
+
+# ---------------------------------------------------------------
+# Espace enseignant — cahier de présence (signatures) & rémunération
+# ---------------------------------------------------------------
+# Notes de conception :
+# - Le barème est stocké dans une table dédiée (et non en colonne de
+#   `enseignants`) pour rester compatible avec des bases déjà créées
+#   (create_all n'ajoute jamais de colonne sur une table existante).
+# - Chaque signature de séance est horodatée (le « cahier » papier numérisé).
+# - Les fiches de paie sont générées par la direction et figent les heures
+#   réellement données ainsi que le taux appliqué (instantané).
+def _maintenant_utc() -> datetime:
+    """Horodatage UTC « naïf » (compatible SQLite et PostgreSQL)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class EnseignantTaux(Base):
+    """Barème horaire d'un enseignant (FCFA par heure de cours donnée)."""
+
+    __tablename__ = "enseignant_taux"
+
+    enseignant_id: Mapped[str] = mapped_column(
+        ForeignKey("enseignants.id"), primary_key=True
+    )
+    taux_horaire: Mapped[int] = mapped_column(Integer, default=0)
+    maj_le: Mapped[datetime] = mapped_column(
+        DateTime, default=_maintenant_utc, onupdate=_maintenant_utc
+    )
+
+
+class Seance(Base):
+    """Signature d'une séance de cours réellement donnée (cahier numérique).
+
+    Une ligne = une entrée du cahier : date, classe, matière, horaires.
+    L'horodatage ``cree_le`` fait office de signature horodatée.
+    """
+
+    __tablename__ = "seances"
+    __table_args__ = (
+        UniqueConstraint(
+            "enseignant_id", "date", "classe_id", "heure_debut",
+            name="uq_seance_ens_classe_debut",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    enseignant_id: Mapped[str] = mapped_column(ForeignKey("enseignants.id"))
+    date: Mapped[date] = mapped_column(Date)
+    classe_id: Mapped[str] = mapped_column(ForeignKey("classes.id"))
+    matiere_id: Mapped[str | None] = mapped_column(
+        ForeignKey("matieres.id"), nullable=True
+    )
+    heure_debut: Mapped[str] = mapped_column(String(5))     # "08:00"
+    heure_fin: Mapped[str] = mapped_column(String(5))       # "10:00"
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
+
+
+class FichePaie(Base):
+    """Fiche de paie mensuelle d'un enseignant (générée par la direction)."""
+
+    __tablename__ = "fiches_paie"
+    __table_args__ = (
+        UniqueConstraint("enseignant_id", "mois", name="uq_fiche_ens_mois"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    enseignant_id: Mapped[str] = mapped_column(ForeignKey("enseignants.id"))
+    mois: Mapped[str] = mapped_column(String(7))            # "2026-09"
+    heures: Mapped[float] = mapped_column(Float, default=0.0)
+    taux_horaire: Mapped[int] = mapped_column(Integer, default=0)
+    brut: Mapped[int] = mapped_column(Integer, default=0)   # FCFA
+    statut: Mapped[str] = mapped_column(String(12), default="en_attente")
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
+    payee_le: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

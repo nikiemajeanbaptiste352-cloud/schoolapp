@@ -106,3 +106,34 @@ class EcoleOut(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+
+
+# ---------------------------------------------------------------------------
+# Espace enseignant — cahier de présence (séances) & rémunération
+# ---------------------------------------------------------------------------
+class SeanceIn(BaseModel):
+    """Signature d'une séance de cours dans le cahier de présence."""
+
+    date: str                       # "YYYY-MM-DD"
+    classe_id: str
+    matiere_id: str | None = None   # défaut : matière de la fiche enseignant
+    heure_debut: str                # "08:00"
+    heure_fin: str                  # "10:00"
+
+
+class TauxIn(BaseModel):
+    """Barème horaire d'un enseignant (FCFA / heure)."""
+
+    taux_horaire: int
+
+
+class MoisIn(BaseModel):
+    """Mois au format AAAA-MM (ex. "2026-09")."""
+
+    mois: str
+
+
+class StatutFicheIn(BaseModel):
+    """Statut d'une fiche de paie : "en_attente" ou "payee"."""
+
+    statut: str

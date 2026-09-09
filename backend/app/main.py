@@ -28,6 +28,7 @@ from app.routers import (
     eleves as eleves_router,
     etat as etat_router,
     paiements as paiements_router,
+    paie as paie_router,
     pedagogie,
     presences as presences_router,
     referentiel,
@@ -111,6 +112,7 @@ for _router in (
     paiements_router.router,
     dashboard_router.router,
     etat_router.router,
+    paie_router.router,
 ):
     app.include_router(_router)
 

@@ -16,7 +16,10 @@
     { key: "grades", lien: "grades.html", icone: "📝", titre: "Notes", groupe: "Pédagogie" },
     { key: "report-cards", lien: "report-cards.html", icone: "📊", titre: "Bulletins", groupe: "Pédagogie" },
     { key: "timetable", lien: "timetable.html", icone: "📅", titre: "Emploi du temps", groupe: "Pédagogie" },
+    { key: "mes-seances", lien: "mes-seances.html", icone: "✍️", titre: "Ma présence", groupe: "Espace enseignant", roles: ["Professeur"] },
+    { key: "ma-paie", lien: "ma-paie.html", icone: "💵", titre: "Ma rémunération", groupe: "Espace enseignant", roles: ["Professeur"] },
     { key: "payments", lien: "payments.html", icone: "💰", titre: "Paiements", groupe: "Finance" },
+    { key: "paie", lien: "paie.html", icone: "💶", titre: "Rémunérations", groupe: "Finance", roles: ["Administrateur"] },
     { key: "announcements", lien: "announcements.html", icone: "📢", titre: "Annonces", groupe: "Communication" },
     { key: "settings", lien: "settings.html", icone: "⚙️", titre: "Paramètres", groupe: "Système" }
   ];
@@ -48,6 +51,14 @@
       return;
     }
 
+    // Rôle courant : sert à masquer les entrées de menu réservées
+    // (propriété « roles » d'une page) — les pages existantes, sans
+    // restriction, restent visibles pour tous comme avant.
+    var sessionRole = (function () {
+      var s = getSession();
+      return s ? s.role : null;
+    })();
+
     var sidebar = document.getElementById("sidebar");
     var topbar = document.getElementById("topbar");
     if (!sidebar && !topbar) return;
@@ -57,6 +68,8 @@
       var nav = "";
       var lastGroupe = "";
       PAGES.forEach(function (p) {
+        // Page réservée à certains rôles : masquée pour les autres.
+        if (p.roles && p.roles.indexOf(sessionRole) === -1) return;
         if (p.groupe !== lastGroupe) {
           nav += '<div class="nav-section">' + p.groupe + "</div>";
           lastGroupe = p.groupe;
@@ -214,7 +227,12 @@
     "Homme": "badge-info",
     "Femme": "badge-warning",
     "M": "badge-info",
-    "F": "badge-warning"
+    "F": "badge-warning",
+    // Statuts de fiche de paie (valeurs serveur / libellés affichés)
+    "en_attente": "badge-warning",
+    "payee": "badge-success",
+    "Payée": "badge-success",
+    "En attente": "badge-warning"
   };
 
   function badgeStatut(statut) {

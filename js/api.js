@@ -308,6 +308,35 @@
     // serveur, un dossier par défaut est créé (motif/total facultatifs).
     versement: function (eleveId, corps) { return post("/paiements/" + enc(eleveId) + "/versements", corps); },
 
+    /* --- Espace enseignant (cahier de présence & rémunération) --- */
+    // Profil de l'enseignant connecté : fiche, classes affectées, taux,
+    // devise et mois courant. GET /mon-espace/profil.
+    monEspaceProfil: function () { return get("/mon-espace/profil"); },
+    // Séances signées d'un mois (AAAA-MM, défaut = mois courant).
+    mesSeances: function (mois) { return get("/mon-espace/seances" + params({ mois: mois })); },
+    // Signe une séance : { date, classe_id, matiere_id?, heure_debut, heure_fin }.
+    signerSeance: function (corps) { return post("/mon-espace/seances", corps); },
+    // Annule (supprime) une séance signée.
+    annulerSeance: function (id) { return del("/mon-espace/seances/" + enc(id)); },
+    // Fiches de paie de l'enseignant connecté (consultation seule).
+    mesFiches: function () { return get("/mon-espace/fiches"); },
+
+    /* --- Direction : rémunérations & paie --- */
+    // Enseignants + barèmes actuels (taux horaires).
+    paieEnseignants: function () { return get("/paie/enseignants"); },
+    // Fixe le taux horaire d'un enseignant : { taux_horaire }.
+    majTauxEnseignant: function (id, corps) { return put("/paie/enseignants/" + enc(id) + "/taux", corps); },
+    // Cahier des signatures d'un mois (filtres facultatifs).
+    paieSeances: function (filtres) { return get("/paie/seances" + params(filtres)); },
+    // Récapitulatif du mois par enseignant.
+    paieRecap: function (mois) { return get("/paie/recap" + params({ mois: mois })); },
+    // Génère / met à jour les fiches de paie du mois : { mois }.
+    genererFiches: function (mois) { return post("/paie/fiches", { mois: mois }); },
+    // Change le statut d'une fiche : { statut } (en_attente / payee).
+    majStatutFiche: function (id, corps) { return put("/paie/fiches/" + enc(id) + "/statut", corps); },
+    // Supprime une fiche EN ATTENTE (jamais une fiche payée).
+    supprimerFiche: function (id) { return del("/paie/fiches/" + enc(id)); },
+
     /* --- Tableau de bord --- */
     tableauDeBord: function () { return get("/dashboard"); },
 

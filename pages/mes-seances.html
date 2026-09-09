@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ma présence — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%E2%9C%8D%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/print.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <style>
+        /* Le relevé officiel n'apparaît qu'à l'impression (le reste est masqué). */
+        #relevePrint { display: none; }
+        @media print {
+            .screen-only { display: none !important; }
+            #relevePrint { display: block !important; }
+        }
+    </style>
+</head>
+
+<body data-page="mes-seances" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header no-print">
+                    <div>
+                        <h2>✍️ Ma présence</h2>
+                        <div class="subtitle">Signez chaque cours réellement donné. Votre relevé mensuel sert de base au calcul de votre rémunération (taux horaire × heures signées).</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="field" style="margin:0">
+                            <input type="month" class="input" id="moisInput" title="Mois du relevé">
+                        </div>
+                        <button class="btn" id="btnPrint">🖨️ Imprimer le relevé</button>
+                        <button class="btn btn-primary" id="btnSigner">✍️ Signer une séance</button>
+                    </div>
+                </div>
+
+                <!-- Alerte selon l'état du mois (fiche en attente / payée) -->
+                <div class="screen-only" id="noteMois" style="display:none"></div>
+
+                <!-- Compteurs -->
+                <div class="cards-grid mb-16 screen-only" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))" id="miniCounts"></div>
+
+                <!-- Cahier du mois (écran) -->
+                <div class="table-wrap screen-only">
+                    <table class="data">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Heures</th>
+                                <th>Matière</th>
+                                <th>Classe</th>
+                                <th>Durée</th>
+                                <th>Signé le</th>
+                                <th style="text-align:center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                    <div class="table-footer">
+                        <span id="countLabel"></span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale : signer une séance -->
+    <div class="modal-overlay" id="modalSeance">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>✍️ Signer une séance de cours</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Date du cours <span class="req">*</span></label>
+                        <input type="date" class="input" id="fDate" max="">
+                        <div class="field-error" id="errDate">La date est obligatoire (aujourd'hui au plus tard).</div>
+                    </div>
+                    <div class="field">
+                        <label>Classe <span class="req">*</span></label>
+                        <select class="select" id="fClasse"></select>
+                        <div class="field-error" id="errClasse">Choisissez une classe.</div>
+                    </div>
+                    <div class="field span-2">
+                        <label>Matière</label>
+                        <input class="input" id="fMatiere" readonly placeholder="—">
+                        <div class="field-error" id="errMatiere"></div>
+                    </div>
+                    <div class="field">
+                        <label>Heure de début <span class="req">*</span></label>
+                        <input type="time" class="input" id="fDebut" value="08:00">
+                        <div class="field-error" id="errHeures">Horaires invalides : début avant fin.</div>
+                    </div>
+                    <div class="field">
+                        <label>Heure de fin <span class="req">*</span></label>
+                        <input type="time" class="input" id="fFin" value="10:00">
+                    </div>
+                    <div class="field span-2">
+                        <label>Durée calculée</label>
+                        <div class="info-cell" style="background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px">
+                            <div class="v" id="fDuree">2 h 00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnSaveSeance">💾 Signer la séance</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : annuler une signature -->
+    <div class="modal-overlay" id="modalDel">
+        <div class="modal modal-sm">
+            <div class="modal-body" style="padding:28px">
+                <div class="confirm-ico">🗑️</div>
+                <div class="confirm-title">Annuler cette signature ?</div>
+                <div class="confirm-text" id="delText">Cette séance sera retirée de votre cahier de présence.</div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-danger-soft" id="btnConfirmDel">Annuler la séance</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Relevé mensuel (impression / PDF) -->
+    <div id="relevePrint"></div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="mes-seances.js"></script>
+</body>
+
+</html>

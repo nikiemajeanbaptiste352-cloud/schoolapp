@@ -13,13 +13,19 @@ from urllib.error import HTTPError as UrlHTTPError
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.auth import ROLE_ADMIN, ROLE_PARENT, get_current_user, require_roles
+from app.auth import (
+    ROLE_ADMIN,
+    ROLE_PARENT,
+    ROLE_PROF,
+    get_current_user,
+    require_roles,
+)
 from app.config import settings
 from app.database import get_db
-from app.models import Ecole, EmailCode, User
+from app.models import Ecole, EmailCode, Enseignant, User
 from app.schemas import (
     CodeDemandeIn,
     CodeValidationIn,
@@ -228,6 +234,14 @@ def creer_compte(
             detail="Rôle invalide. Choisissez parmi : " + ", ".join(ROLES_CREABLES) + ".",
         )
     user = _creer_user(db, body.nom, body.email, body.password, role)
+    # Lien automatique : si un Professeur est créé avec l'email de la fiche
+    # enseignant, le compte est relié à la fiche (accès à l'espace enseignant).
+    if role == ROLE_PROF:
+        email_l = (body.email or "").strip().lower()
+        ens = db.scalar(select(Enseignant).where(func.lower(Enseignant.email) == email_l))
+        if ens is not None:
+            user.enseignant_id = ens.id
+            db.commit()
     return _vers_user_out(user)
 
 
