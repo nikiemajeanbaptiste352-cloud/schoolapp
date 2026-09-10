@@ -47,29 +47,10 @@ import os
 import sys
 from pathlib import Path
 
-# --- Sortie console : UTF-8 garanti -----------------------------------------
-# La console Windows est souvent réglée sur cp1252 : sans cette enveloppe, la
-# moindre flèche « → » ou le moindre « ≠ » d'un message ferait planter le
-# script au pire moment (UnicodeEncodeError en plein milieu d'une migration).
-# ⚠️ `sys.stdout.reconfigure(encoding="utf-8")` ne suffit PAS : vérifié, le
-# flux annonce alors « utf-8 » mais les octets écrits restent en cp1252. Seul
-# le remplacement du flux par une enveloppe explicite agit réellement.
-for _nom_flux in ("stdout", "stderr"):
-    _flux = getattr(sys, _nom_flux, None)
-    if getattr(_flux, "buffer", None) is None:
-        continue  # flux sans tampon binaire (pythonw, flux déjà remplacé…)
-    try:
-        setattr(sys, _nom_flux, io.TextIOWrapper(
-            _flux.buffer, encoding="utf-8", errors="replace", line_buffering=True))
-    except (ValueError, AttributeError):
-        pass
-
 # --- Environnement : on se place dans backend/ (imports `app.*`) -------------
 BASE = Path(__file__).resolve().parent
-os.chdir(BASE)
-sys.path.insert(0, str(BASE))
-# Jamais de jeu de démonstration ici : on ne touche qu'à une base réelle.
-os.environ.pop("SEED_DEMO", None)
+if str(BASE) not in sys.path:
+    sys.path.insert(0, str(BASE))
 
 from sqlalchemy import create_engine, inspect, text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
@@ -78,6 +59,34 @@ from sqlalchemy.schema import UniqueConstraint  # noqa: E402
 from app import models  # noqa: E402,F401  (remplit Base.metadata)
 from app.config import settings  # noqa: E402
 from app.database import Base  # noqa: E402
+
+
+def _preparer_sortie() -> None:
+    """Enveloppe UTF-8 et réglages propres à la ligne de commande.
+
+    Ces effets sont regroupés dans une fonction — et non exécutés à l'import —
+    pour que le module puisse aussi être importé par l'application (bascule
+    embarquée) sans remplacer les flux de sortie de la plateforme, sans
+    changer le répertoire courant et sans toucher à `SEED_DEMO`.
+
+    ⚠️ `sys.stdout.reconfigure(encoding="utf-8")` ne suffit PAS : vérifié, le
+    flux annonce alors « utf-8 » mais les octets écrits restent en cp1252.
+    Seul le remplacement du flux par une enveloppe explicite agit réellement.
+    """
+    for _nom_flux in ("stdout", "stderr"):
+        _flux = getattr(sys, _nom_flux, None)
+        if getattr(_flux, "buffer", None) is None:
+            continue  # flux sans tampon binaire (pythonw, flux déjà remplacé…)
+        try:
+            setattr(sys, _nom_flux, io.TextIOWrapper(
+                _flux.buffer, encoding="utf-8", errors="replace", line_buffering=True))
+        except (ValueError, AttributeError):
+            pass
+    os.chdir(BASE)
+    # Jamais de jeu de démonstration ici : on ne touche qu'à une base réelle.
+    os.environ.pop("SEED_DEMO", None)
+
+
 
 # ---------------------------------------------------------------- Plan -------
 # Les 16 tables de domaine (tout sauf `ecole` et `email_codes`).
@@ -375,6 +384,8 @@ def verifier_apres(conn, avant: dict[str, int]) -> list[str]:
 
 # ------------------------------------------------------------------ Moteur ----
 def main() -> None:
+    _preparer_sortie()
+
     url_brute = (settings.database_url or "").strip()
     if not url_brute:
         _echec(

@@ -24,6 +24,7 @@ from app.config import FRONT_DIR, settings
 from app.database import SessionLocal, init_db
 from app.models import Annonce, Classe, Ecole, Eleve, Enseignant, Matiere, User
 from app.routers import (
+    _bascule_temporaire,
     auth as auth_router,
     dashboard as dashboard_router,
     ecole as ecole_router,
@@ -38,12 +39,18 @@ from app.routers import (
 )
 from app.security import decode_token
 from app.seed import seed_all, seed_bootstrap, seed_users
-from app.services import sd
+from app.services import bascule_prod, sd
 from app.services.membres import assurer_membres
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Conversion ponctuelle du schéma de production (Phase 2 + 3), AVANT tout
+    # accès aux modèles : sans données migrées, `create_all` ne comble pas les
+    # colonnes manquantes et les requêtes échoueraient. Sans effet sur une base
+    # déjà convertie ou sur la base locale.
+    bascule_prod.executer_si_necessaire()
+
     # Initialisation base (tables SQLite) ; aucune donnée fictive par défaut.
     init_db()
     db = SessionLocal()
@@ -183,6 +190,8 @@ for _router in (
     etat_router.router,
     paie_router.router,
     membres_router.router,
+    # --- TEMPORAIRE : diagnostic de la bascule, à retirer ensuite ---
+    _bascule_temporaire.router,
 ):
     app.include_router(_router)
 
