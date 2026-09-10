@@ -99,7 +99,7 @@ html { scroll-behavior: smooth; }
 .lp-nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: #fff; }
 .lp-nav-brand img { width: 44px; height: 44px; border-radius: 12px; }
 .lp-nav-brand b { display: block; font-size: 20px; letter-spacing: 0.2px; line-height: 1.1; }
-.lp-nav-brand small { display: block; color: #9fb6dd; font-size: 11.5px; font-weight: 500; }
+.lp-nav-brand small { display: block; color: #9fb6dd; font-size: 12.5px; font-weight: 500; }
 .lp-nav-links { display: flex; align-items: center; gap: 30px; }
 .lp-nav-links a { color: #c7d6f0; text-decoration: none; font-size: 14.5px; font-weight: 600; transition: color 0.18s ease; }
 .lp-nav-links a:hover { color: #ffd98a; }
@@ -286,7 +286,7 @@ html { scroll-behavior: smooth; }
   font-size: 21px;
 }
 .lp-photo-caption b { display: block; font-size: 14px; letter-spacing: 0.2px; line-height: 1.25; }
-.lp-photo-caption small { display: block; color: #c3d3ef; font-size: 11.5px; line-height: 1.45; margin-top: 3px; }
+.lp-photo-caption small { display: block; color: #c3d3ef; font-size: 12.5px; line-height: 1.45; margin-top: 3px; }
 
 .lp-flotte {
   position: absolute;
@@ -435,6 +435,136 @@ html { scroll-behavior: smooth; }
 .lp-btn-nuit:hover { background: #14325f; box-shadow: 0 18px 36px rgba(11, 27, 51, 0.45); }
 
 /* ============================================================
+   V2 « Aurore » — landing animée
+   ============================================================ */
+
+html { scroll-padding-top: 24px; }
+/* La page d'accueil a son propre décor : pas de fond « aurore ». */
+body.login-body::before { display: none; }
+
+/* Titre du bandeau héro : la règle globale « h1..h4 { color: var(--text) } »
+   de style.css l'emportait sur la couleur héritée du bandeau sombre.
+   Sans cette règle, le titre s'affichait en bleu nuit sur fond bleu nuit. */
+.lp-hero h1 { color: #fdfcf7; }
+
+/* ---- Navigation : soulignement doré animé ---- */
+.lp-nav-links a { position: relative; }
+.lp-nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f2b33d, #ffd98a);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.34s var(--ease);
+}
+.lp-nav-links a:hover::after { transform: scaleX(1); }
+
+.lp-nav-cta { position: relative; overflow: hidden; }
+.lp-nav-cta::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: translateX(-180%) skewX(-18deg);
+  transition: transform 0.7s var(--ease);
+  pointer-events: none;
+}
+.lp-nav-cta:hover::after { transform: translateX(520%) skewX(-18deg); }
+
+/* ---- Titre héro : dégradé doré qui défile ---- */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lp-hero h1 .accent {
+    background-image: linear-gradient(100deg, #f2b33d 0%, #ffe7b4 40%, #f2b33d 74%, #ffd98a 100%);
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: lpV2Defile 7s linear infinite;
+  }
+}
+
+/* ---- Puces, listes et pastilles ---- */
+.lp-chip { transition: transform 0.26s var(--ease), border-color 0.2s ease; }
+.lp-points li { transition: transform 0.26s var(--ease); }
+.lp-points li:hover { transform: translateX(4px); }
+
+/* ---- Cartes modules : liseré dégradé + icône vivante ---- */
+.lp-carte { position: relative; overflow: hidden; }
+.lp-carte::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #f2b33d, #e2725b, #23855c, #2563eb);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.52s var(--ease);
+}
+.lp-carte:hover::after { transform: scaleX(1); }
+.lp-carte .ic { transition: transform 0.34s var(--ease); }
+.lp-carte:hover .ic { transform: scale(1.08) rotate(-4deg); }
+
+/* ---- Rôles : icône réactive ---- */
+.lp-role .ic { display: inline-block; transition: transform 0.34s var(--ease); }
+.lp-role:hover .ic { transform: scale(1.12) translateY(-2px); }
+
+/* ---- Bandeau d'appel : balayage lumineux ---- */
+.lp-cta-band-in { position: relative; overflow: hidden; }
+.lp-cta-band-in::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.28) 50%, transparent 68%);
+  transform: translateX(-120%);
+  animation: lpV2Balaye 8s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+
+/* ---- Bande tissée « kente » en défilement ---- */
+.lp-kente {
+  background-size: 150px 100%;
+  animation: lpV2Kente 22s linear infinite;
+}
+
+/* ---- Bandeau photo : pastilles flottantes déjà animées (lp-flotte) ---- */
+.lp-photo { transition: transform 0.5s var(--ease); }
+.lp-photo:hover { transform: translateY(-4px); }
+
+@keyframes lpV2Defile { to { background-position: -220% 0; } }
+@keyframes lpV2Balaye {
+  0% { transform: translateX(-120%); }
+  45%, 100% { transform: translateX(120%); }
+}
+@keyframes lpV2Kente { to { background-position: 150px 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero h1 .accent,
+  .lp-kente,
+  .lp-cta-band-in::after,
+  .lp-flotte,
+  .lp-soleil::after { animation: none !important; }
+  .lp-cta-band-in::after { display: none; }
+}
+
+@media (max-width: 720px) {
+  .lp-carte:hover .ic,
+  .lp-role:hover .ic,
+  .lp-points li:hover,
+  .lp-photo:hover { transform: none; }
+}
+
+/* ============================================================
    Zone de connexion
    ============================================================ */
 .lp-auth-head { max-width: 560px; margin: 0 auto 26px; }
@@ -505,6 +635,11 @@ html { scroll-behavior: smooth; }
   font-weight: 700;
   line-height: 1.25;
   padding: 10px 6px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
@@ -581,5 +716,333 @@ html { scroll-behavior: smooth; }
   .lp-hero h1 { font-size: 2rem; }
   .lp-flotte-2 { display: none; }
   .lp-mode { max-width: none; }
-  .lp-mode-btn { font-size: 12px; padding: 9px 3px; }
+  .lp-mode-btn { font-size: 12px; padding: 8px 4px; }
+}
+
+/* ============================================================
+   V2 « Aurore » — sections professionnelles & navigation mobile
+   ============================================================ */
+
+/* Décalage des ancres sous l'en-tête lors du défilement */
+section[id] { scroll-margin-top: 18px; }
+
+/* ---- Menu mobile (burger) ---- */
+.lp-burger {
+  display: none;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lp-burger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: #fff;
+  transition: transform 0.3s var(--ease), opacity 0.2s ease;
+}
+.lp-burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.lp-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.lp-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.lp-nav-cta-mob { display: none; }
+
+/* ---- Bande de chiffres clés ---- */
+.lp-confiance {
+  background: #fff;
+  border-bottom: 1px solid #efe9dc;
+  position: relative;
+}
+.lp-confiance::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #f2b33d, #e2725b 34%, #23855c 66%, #2563eb);
+}
+.lp-confiance-in {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px clamp(20px, 5vw, 64px);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 30px;
+}
+.lp-conf-item { position: relative; padding-left: 20px; }
+.lp-conf-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(242, 179, 61, 0.9), rgba(226, 114, 91, 0.55));
+}
+.lp-conf-item b {
+  display: block;
+  font-size: 16.5px;
+  color: #0b1b33;
+  letter-spacing: -0.3px;
+  margin-bottom: 5px;
+}
+.lp-conf-item span { display: block; color: #5b6b85; font-size: 13.2px; line-height: 1.55; }
+
+/* ---- Démarrage en trois étapes ---- */
+.lp-etapes { background: #fff; }
+.lp-etapes-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  counter-reset: etape;
+}
+.lp-etape {
+  position: relative;
+  background: #fdfcf7;
+  border: 1px solid #ece5d6;
+  border-radius: 20px;
+  padding: 30px 24px 26px;
+  transition: transform 0.26s var(--ease), box-shadow 0.26s var(--ease), border-color 0.22s ease;
+}
+.lp-etape:hover { transform: translateY(-5px); box-shadow: 0 22px 46px rgba(15, 23, 42, 0.11); border-color: #f2d39a; }
+.lp-etape-num {
+  position: absolute;
+  top: -18px;
+  left: 24px;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #221403;
+  background: linear-gradient(135deg, #ffd98a, #f2a93b);
+  box-shadow: 0 12px 26px rgba(242, 169, 59, 0.42);
+}
+.lp-etape h3 { margin: 14px 0 8px; font-size: 17.5px; color: #0b1b33; letter-spacing: -0.2px; }
+.lp-etape p { margin: 0; color: #5b6b85; font-size: 13.8px; line-height: 1.6; }
+
+/* ---- Sécurité & confidentialité ---- */
+.lp-confiance-sec { background: #fdfcf7; }
+.lp-confiance-cols {
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 54px;
+  align-items: center;
+}
+.lp-confiance-txt .lp-chip {
+  background: rgba(35, 133, 92, 0.1);
+  border: 1px solid rgba(35, 133, 92, 0.3);
+  color: #1c6b49;
+}
+.lp-confiance-txt h2 {
+  font-size: clamp(1.6rem, 2.8vw, 2.2rem);
+  color: #0b1b33;
+  letter-spacing: -0.5px;
+  line-height: 1.22;
+  margin: 14px 0 0;
+}
+.lp-confiance-txt p { color: #5b6b85; font-size: 15px; line-height: 1.65; margin: 12px 0 0; }
+.lp-atouts { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.lp-atouts li {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #ece5d6;
+  border-radius: 18px;
+  padding: 18px 20px;
+  transition: transform 0.26s var(--ease), box-shadow 0.26s var(--ease);
+}
+.lp-atouts li:hover { transform: translateX(4px); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); }
+.lp-atouts .ic {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+}
+.lp-atouts b { display: block; font-size: 15.5px; color: #0b1b33; margin-bottom: 4px; }
+.lp-atouts p { margin: 0; color: #5b6b85; font-size: 13.4px; line-height: 1.55; }
+
+/* ---- Questions fréquentes ---- */
+.lp-faq { background: #fff; }
+.lp-faq-liste { max-width: 830px; margin: 0 auto; display: grid; gap: 12px; }
+.lp-faq-item {
+  border: 1px solid #ece5d6;
+  border-radius: 16px;
+  background: #fdfcf7;
+  padding: 0 20px;
+  transition: border-color 0.24s ease, box-shadow 0.24s ease, background 0.24s ease;
+}
+.lp-faq-item[open] { background: #fff; border-color: #f2d39a; box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07); }
+.lp-faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 18px 34px 18px 0;
+  position: relative;
+  font-size: 15.4px;
+  font-weight: 700;
+  color: #0b1b33;
+  line-height: 1.4;
+}
+.lp-faq-item summary::-webkit-details-marker { display: none; }
+.lp-faq-item summary::after {
+  content: "+";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #b8791d;
+  background: rgba(242, 179, 61, 0.16);
+  transition: transform 0.28s var(--ease), background 0.2s ease;
+}
+.lp-faq-item[open] summary::after { content: "−"; background: rgba(242, 179, 61, 0.28); transform: translateY(-50%) rotate(180deg); }
+.lp-faq-item summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; border-radius: 8px; }
+.lp-faq-item p {
+  margin: 0;
+  padding: 0 0 20px;
+  color: #5b6b85;
+  font-size: 14.2px;
+  line-height: 1.68;
+  animation: lpHousse 0.3s var(--ease) both;
+}
+@keyframes lpHousse {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Petites retouches de finition ---- */
+.lp-sec-titre h2 { letter-spacing: -0.6px; }
+.lp-role p, .lp-carte p { text-wrap: pretty; }
+
+/* ============================================================
+   V2 — Responsive des nouvelles sections
+   ============================================================ */
+@media (max-width: 1020px) {
+  .lp-burger { display: flex; }
+  .lp-nav-cta-desk { display: none; }
+  .lp-nav-cta-mob { display: inline-flex; }
+  .lp-nav-links {
+    /* Le panneau reste affiché : il est masqué par opacity/visibility,
+       sinon la transition d'ouverture ne pourrait pas jouer. */
+    display: flex;
+    position: absolute;
+    top: 100%;
+    left: 14px;
+    right: 14px;
+    z-index: 40;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 12px;
+    background: rgba(7, 18, 38, 0.97);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 18px;
+    box-shadow: 0 30px 60px rgba(4, 12, 28, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px) scale(0.98);
+    transition: opacity 0.26s var(--ease), transform 0.3s var(--ease), visibility 0.26s linear;
+  }
+  .lp-nav-links.is-ouvert { opacity: 1; visibility: visible; transform: none; }
+  .lp-nav-links a { padding: 13px 14px; border-radius: 12px; font-size: 15.5px; }
+  .lp-nav-links a:hover { background: rgba(255, 255, 255, 0.08); }
+  .lp-nav-links .lp-nav-cta { justify-content: center; margin-top: 8px; border-radius: 12px; }
+
+  .lp-confiance-in { grid-template-columns: repeat(2, 1fr); gap: 26px; }
+  .lp-confiance-cols { grid-template-columns: 1fr; gap: 34px; }
+  .lp-etapes-liste { grid-template-columns: 1fr; gap: 34px; }
+  .lp-etape { padding-top: 34px; }
+}
+
+@media (max-width: 720px) {
+  .lp-confiance-in { padding: 32px 18px; gap: 22px; }
+  .lp-conf-item b { font-size: 15.5px; }
+  .lp-atouts li:hover,
+  .lp-etape:hover { transform: none; }
+  .lp-faq-item { padding: 0 16px; }
+  .lp-faq-item summary { padding: 16px 30px 16px 0; font-size: 14.6px; }
+  .lp-faq-item p { font-size: 13.8px; }
+}
+
+@media (max-width: 460px) {
+  .lp-confiance-in { grid-template-columns: 1fr; gap: 20px; }
+  .lp-atouts li { padding: 16px; }
+  .lp-burger { width: 42px; height: 42px; }
+  .lp-nav-brand img { width: 38px; height: 38px; }
+  .lp-nav-brand b { font-size: 18px; }
+}
+
+/* ---- Confort tactile (cibles ≥ 44 px) ---- */
+/* Appliqué sur écran étroit (mobile + tablette) et sur tout appareil
+   dépourvu de survol réel, quel que soit sa largeur. */
+@media (max-width: 1020px), (hover: none) and (pointer: coarse) {
+  /* Liens de pied de page : espacés pour être tapés au doigt. */
+  .lp-footer-col a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 4px 0;
+  }
+  /* Liens isolés du formulaire de connexion. */
+  .login-card a,
+  .login-card .mt-8 a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 4px 0;
+  }
+  /* Boutons d'action du formulaire : hauteur confortable au doigt.
+     (Ils ne font que 39 px avec leur remplissage d'origine.) */
+  .login-card .btn {
+    min-height: 48px;
+  }
+  /* Champs de saisie : 40 px d'origine, un peu juste pour le pouce. */
+  .login-card .input,
+  .login-card select,
+  .login-card textarea {
+    min-height: 46px;
+  }
+  /* Menu déroulant et bouton d'en-tête : cibles carrées d'au moins 44 px. */
+  .lp-burger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .lp-nav-cta-mob {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-nav-links { transition: none; }
+  .lp-faq-item p { animation: none; }
 }

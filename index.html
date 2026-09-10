@@ -27,12 +27,17 @@
                             <small>Gestion scolaire</small>
                         </span>
                     </a>
-                    <div class="lp-nav-links">
+                    <div class="lp-nav-links" id="lpNavLinks">
                         <a href="#fonctionnalites">Modules</a>
                         <a href="#espaces">Espaces</a>
-                        <a href="#connexion">Connexion</a>
+                        <a href="#demarrage">Démarrage</a>
+                        <a href="#faq">FAQ</a>
+                        <a class="lp-btn lp-btn-gold lp-nav-cta lp-nav-cta-mob" href="#connexion">Espace connexion →</a>
                     </div>
-                    <a class="lp-btn lp-btn-gold lp-nav-cta" href="#connexion">Espace connexion →</a>
+                    <a class="lp-btn lp-btn-gold lp-nav-cta lp-nav-cta-desk" href="#connexion">Espace connexion →</a>
+                    <button type="button" class="lp-burger" id="lpBurger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="lpNavLinks">
+                        <span></span><span></span><span></span>
+                    </button>
                 </nav>
 
                 <div class="lp-hero-cols">
@@ -74,6 +79,28 @@
 
                 <div class="lp-kente" aria-hidden="true"></div>
             </header>
+
+            <!-- ================= Chiffres clés ================= -->
+            <section class="lp-confiance" aria-label="Les points forts de SchoolManager">
+                <div class="lp-confiance-in">
+                    <div class="lp-conf-item">
+                        <b>4 espaces</b>
+                        <span>Direction, enseignants, parents et élèves : chacun son accès.</span>
+                    </div>
+                    <div class="lp-conf-item">
+                        <b>Bulletins en 1 clic</b>
+                        <span>Moyennes, rangs et appréciations calculés automatiquement.</span>
+                    </div>
+                    <div class="lp-conf-item">
+                        <b>Suivi en FCFA</b>
+                        <span>Frais de scolarité, dossiers et versements sous contrôle.</span>
+                    </div>
+                    <div class="lp-conf-item">
+                        <b>Sur tous les écrans</b>
+                        <span>Téléphone, tablette ou ordinateur : aucune installation.</span>
+                    </div>
+                </div>
+            </section>
 
             <main class="lp-main">
                 <!-- ================= Modules ================= -->
@@ -148,6 +175,100 @@
                                 <h3>Élèves</h3>
                                 <p>Consultation des résultats, du bulletin et de l'emploi du temps de leur classe.</p>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ================= Démarrage en 3 étapes ================= -->
+                <section class="lp-sec lp-etapes" id="demarrage">
+                    <div class="lp-sec-in">
+                        <div class="lp-sec-titre">
+                            <span class="lp-chip">🚀 Démarrage rapide</span>
+                            <h2>Votre école en ligne en trois étapes</h2>
+                            <p>Aucune installation, aucun matériel particulier : un navigateur et une connexion suffisent.</p>
+                        </div>
+                        <ol class="lp-etapes-liste">
+                            <li class="lp-etape">
+                                <span class="lp-etape-num">1</span>
+                                <h3>Créez votre établissement</h3>
+                                <p>Renseignez le nom de l'école et le responsable : le compte de direction est créé immédiatement.</p>
+                            </li>
+                            <li class="lp-etape">
+                                <span class="lp-etape-num">2</span>
+                                <h3>Enregistrez vos classes et votre équipe</h3>
+                                <p>Cycles, classes, matières, élèves puis enseignants — par saisie ou par import de vos listes.</p>
+                            </li>
+                            <li class="lp-etape">
+                                <span class="lp-etape-num">3</span>
+                                <h3>Publiez notes, bulletins et paiements</h3>
+                                <p>Invitez les parents par email : chacun suit la scolarité depuis son propre espace sécurisé.</p>
+                            </li>
+                        </ol>
+                    </div>
+                </section>
+
+                <!-- ================= Confiance & sécurité ================= -->
+                <section class="lp-sec lp-confiance-sec" id="securite">
+                    <div class="lp-sec-in lp-confiance-cols">
+                        <div class="lp-confiance-txt">
+                            <span class="lp-chip">🛡️ Sécurité &amp; confidentialité</span>
+                            <h2>Les données de votre école restent celles de votre école</h2>
+                            <p>SchoolManager est conçu pour un usage réel en établissement : chaque compte agit sur le périmètre exact de son rôle, et rien de plus.</p>
+                        </div>
+                        <ul class="lp-atouts">
+                            <li>
+                                <span class="ic ic-bleu">🔒</span>
+                                <div>
+                                    <b>Établissements cloisonnés</b>
+                                    <p>Les données d'une école ne sont jamais mêlées à celles d'une autre, même avec un compte partagé.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="ic ic-vert">🧑‍🏫</span>
+                                <div>
+                                    <b>Accès guidés par le rôle</b>
+                                    <p>La direction pilote, l'enseignant saisit ses notes, le parent consulte : chacun voit seulement son périmètre.</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span class="ic ic-or">✉️</span>
+                                <div>
+                                    <b>Invitations nominatives</b>
+                                    <p>Les accès se distribuent par invitation à code, et se révoquent aussi simplement.</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- ================= Questions fréquentes ================= -->
+                <section class="lp-sec lp-faq" id="faq">
+                    <div class="lp-sec-in">
+                        <div class="lp-sec-titre">
+                            <span class="lp-chip">💬 Questions fréquentes</span>
+                            <h2>Ce que les équipes demandent avant de démarrer</h2>
+                        </div>
+                        <div class="lp-faq-liste">
+                            <details class="lp-faq-item" open>
+                                <summary>Faut-il installer un logiciel ou acheter du matériel ?</summary>
+                                <p>Aucun. SchoolManager fonctionne intégralement dans le navigateur, sur un téléphone, une tablette ou un ordinateur de bureau. Rien à installer sur les postes de l'école.</p>
+                            </details>
+                            <details class="lp-faq-item">
+                                <summary>Comment les parents accèdent-ils à l'espace ?</summary>
+                                <p>Après une invitation envoyée par l'établissement, le parent active son compte et consulte les notes, les bulletins, les paiements et les annonces de son enfant. Une connexion par code reçu par email évite d'avoir à mémoriser un mot de passe.</p>
+                            </details>
+                            <details class="lp-faq-item">
+                                <summary>Les données d'une école sont-elles visibles par une autre école ?</summary>
+                                <p>Non. Chaque établissement dispose de son propre périmètre : les utilisateurs invités ne voient que l'école à laquelle ils sont rattachés. Un même compte peut être rattaché à plusieurs établissements et basculer de l'un à l'autre depuis l'interface.</p>
+                            </details>
+                            <details class="lp-faq-item">
+                                <summary>Comment sont suivis les frais de scolarité ?</summary>
+                                <p>Chaque élève conserve son dossier financier : montant attendu, versements enregistrés et solde restant, en FCFA. L'objectif est la transparence pour l'administration comme pour les familles — sans dépendre d'un paiement en ligne.</p>
+                            </details>
+                            <details class="lp-faq-item">
+                                <summary>Les bulletins sont-ils vraiment imprimables ?</summary>
+                                <p>Oui. Les bulletins sont mis en page par l'application puis imprimés ou exportés depuis le navigateur, prêts à être signés par la direction et remis aux familles.</p>
+                            </details>
                         </div>
                     </div>
                 </section>
@@ -440,7 +561,8 @@
                 <h4>Découvrir</h4>
                 <a href="#fonctionnalites">Modules</a>
                 <a href="#espaces">Espaces</a>
-                <a href="#haut">Haut de page</a>
+                <a href="#demarrage">Démarrage</a>
+                <a href="#faq">Questions fréquentes</a>
             </div>
             <div class="lp-footer-col">
                 <h4>Accès</h4>
@@ -462,6 +584,7 @@
 
     <script src="js/api.js"></script>
     <script src="js/login.js"></script>
+    <script src="js/animations.js"></script>
 </body>
 
 </html>

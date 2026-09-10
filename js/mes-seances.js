@@ -97,12 +97,12 @@
     var note = el("noteMois");
     if (payee) {
       note.style.display = "";
-      note.innerHTML = '<div class="alert alert-success">🔒 <div><strong>Mois réglé :</strong> votre fiche de ' + SM.escapeHtml(libelleMois(moisSel)) +
+      note.innerHTML = '<div class="alert alert-ico alert-success">🔒 <div><strong>Mois réglé :</strong> votre fiche de ' + SM.escapeHtml(libelleMois(moisSel)) +
         ' a été payée' + (fiche.payeeLe ? " le " + SM.escapeHtml(String(fiche.payeeLe).split(" ")[0]) : "") +
         ". Ce cahier est clos : plus aucune séance ne peut être ajoutée ni annulée.</div></div>";
     } else if (fiche) {
       note.style.display = "";
-      note.innerHTML = '<div class="alert alert-warning">🧾 <div><strong>Fiche générée :</strong> votre relevé de ' + SM.escapeHtml(libelleMois(moisSel)) +
+      note.innerHTML = '<div class="alert alert-ico alert-warning">🧾 <div><strong>Fiche générée :</strong> votre relevé de ' + SM.escapeHtml(libelleMois(moisSel)) +
         " est enregistré (en attente de paiement). Les séances de ce mois ne peuvent plus être annulées.</div></div>";
     } else {
       note.style.display = "none";

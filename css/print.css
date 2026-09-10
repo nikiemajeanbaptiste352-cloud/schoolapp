@@ -27,6 +27,8 @@
   }
   .bulletin table { font-size: 12px; }
   .bulletin-head { border-bottom-color: #000; }
+  /* À l'impression, le tableau ne doit jamais être tronqué. */
+  .bulletin-tbl { overflow: visible !important; }
 
   @page {
     margin: 14mm;

@@ -411,6 +411,16 @@ h3 { font-size: 17px; }
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 18px;
 }
+/* min-width:0 : sans cela une carte dont le contenu a une largeur minimale
+   (rangée de pastilles, nom long) élargit la piste au-delà de l'écran. */
+.cards-grid > * { min-width: 0; }
+
+/* Grille des classes : la piste vise 300 px mais ne dépasse jamais la largeur
+   disponible. « min() » est indispensable : une piste minimale fixe de 300 px
+   dans un conteneur de 282 px débordait de l'écran sur téléphone étroit.
+   (Défini ici et non en style inline : une media query ne peut pas écraser
+   un style inline.) */
+#classesGrid { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
 
 /* Cartes statistiques */
 .stat-card {
@@ -913,7 +923,11 @@ table.data tbody tr:last-child td { border-bottom: none; }
 .mini-stat .v { font-size: 24px; font-weight: 700; }
 .mini-stat .l { font-size: 12.5px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
 
-.alert { display: flex; gap: 12px; padding: 13px 16px; border-radius: 12px; font-size: 14px; align-items: flex-start; }
+/* Flux de texte normal : en flex, chaque fragment inline (texte, <b>, <a>)
+   devenait un élément insécable et les liens débordaient hors de la carte.
+   Pour une icône suivie d'un bloc, utiliser la variante « .alert-ico ». */
+.alert { display: block; padding: 13px 16px; border-radius: 12px; font-size: 14px; }
+.alert-ico { display: flex; gap: 12px; align-items: flex-start; }
 .alert-info { background: var(--info-bg); color: var(--info-text); }
 .alert-warning { background: var(--warning-bg); color: var(--warning-text); }
 .alert-success { background: var(--success-bg); color: var(--success-text); }
@@ -1025,8 +1039,11 @@ table.schedule td.time-cell {
 .slot-color-7 { background: #fef3c7; color: #b45309; }
 
 /* Saisie notes */
-.notes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-@media (max-width: 1100px) { .notes-grid { grid-template-columns: 1fr; } }
+/* « minmax(0, 1fr) » + min-width:0 sur les enfants : sans cela la piste
+   s'aligne sur le contenu minimal du tableau (480 px) et déborde de l'écran. */
+.notes-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.notes-grid > * { min-width: 0; }
+@media (max-width: 1100px) { .notes-grid { grid-template-columns: minmax(0, 1fr); } }
 .note-input { width: 90px; text-align: center; font-weight: 600; }
 .rank-pill { display: inline-flex; width: 30px; height: 30px; border-radius: 50%; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: #eef2f7; color: var(--text-soft); }
 .rank-pill.r1 { background: #fef3c7; color: #b45309; }
@@ -1048,6 +1065,10 @@ table.schedule td.time-cell {
 .bulletin table .total-row td { background: #eff6ff !important; font-weight: 800; }
 .bulletin-appr { margin-top: 18px; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; background: #fafbfd; font-size: 14px; }
 .bulletin-sign { display: flex; justify-content: space-between; margin-top: 30px; font-size: 13.5px; }
+
+/* Tableau du bulletin : sur écran étroit il devient défilable horizontalement
+   (les colonnes ont une largeur minimale fixée dans le HTML généré). */
+.bulletin-tbl { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* ============ Page de connexion ============ */
 .login-body { background: #eef2f8; }
@@ -1112,3 +1133,610 @@ table.schedule td.time-cell {
 .settings-row:last-child { border-bottom: none; }
 .settings-row .s-k { font-weight: 600; font-size: 14.5px; }
 .settings-row .s-d { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+
+/* Page Paramètres : deux colonnes larges sur bureau, empilées sur écran étroit.
+   (Remplace une grille fixe écrite en style inline, qui ne se repliait jamais.) */
+.settings-cols {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  align-items: start;
+}
+.settings-cols .settings-row > * { min-width: 0; }
+.settings-cols .settings-row > :last-child { overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .settings-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .settings-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .settings-cols .btn { width: 100%; justify-content: center; }
+}
+
+
+/* ============================================================
+   SchoolManager — V2 « Aurore » (2026)
+   ------------------------------------------------------------
+   Couche de modernisation : nouveaux jetons de design, fond
+   animé, verre dépoli, dégradés vivants, micro-interactions et
+   apparitions au défilement.
+   Ces règles SURCHARGENT volontairement les règles ci-dessus
+   (elles sont plus bas dans la feuille de style).
+   Les classes utilitaires sont préfixées « sm- » (animations) et
+   « anim- » (effets prêts à l'emploi).
+   ============================================================ */
+
+/* ---------- 1. Jetons de design ---------- */
+:root {
+  /* Couleurs principales : indigo vif + violet */
+  --primary: #3b5bfd;
+  --primary-hover: #2743d9;
+  --primary-050: #eef2ff;
+  --primary-100: #e0e7ff;
+  --primary-200: #c7d2fe;
+  --accent: #7c5cff;
+  --accent-050: #f3efff;
+  --cyan: #06b6d4;
+  --gold: #f2b33d;
+
+  /* Fond / surfaces */
+  --bg: #f3f5fc;
+  --bg-tint-1: rgba(59, 91, 253, 0.17);
+  --bg-tint-2: rgba(124, 92, 255, 0.15);
+  --bg-tint-3: rgba(6, 182, 212, 0.13);
+  --bg-tint-4: rgba(242, 179, 61, 0.13);
+  --surface: #ffffff;
+  --border: rgba(23, 32, 90, 0.085);
+  --border-strong: rgba(23, 32, 90, 0.16);
+
+  /* Texte */
+  --text: #121a33;
+  --text-soft: #3e4a68;
+  --text-muted: #6a7593;
+
+  /* Sidebar « nuit » */
+  --sidebar-bg-1: #060c20;
+  --sidebar-bg-2: #101c45;
+  --sidebar-text: #c9d6f2;
+
+  /* Divers */
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow-sm: 0 1px 2px rgba(18, 26, 51, 0.04), 0 6px 16px -12px rgba(18, 26, 51, 0.22);
+  --shadow: 0 16px 38px -22px rgba(18, 26, 51, 0.34), 0 3px 10px -6px rgba(18, 26, 51, 0.1);
+  --shadow-lg: 0 38px 74px -34px rgba(9, 16, 45, 0.55), 0 14px 30px -20px rgba(9, 16, 45, 0.3);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sidebar-w: 268px;
+  --topbar-h: 68px;
+  color-scheme: light;
+}
+
+/* ---------- 2. Fond « aurore » animé + base typographique ---------- */
+html { background: var(--bg); }
+
+body {
+  background: transparent;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Halos de couleur très doux, en dérive lente derrière l'interface. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -18vh -12vw;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 34% at 10% 6%, var(--bg-tint-1), transparent 64%),
+    radial-gradient(32% 30% at 90% 2%, var(--bg-tint-2), transparent 64%),
+    radial-gradient(40% 36% at 78% 96%, var(--bg-tint-3), transparent 66%),
+    radial-gradient(30% 28% at 22% 98%, var(--bg-tint-4), transparent 66%);
+  animation: v2Aurore 28s ease-in-out infinite alternate;
+}
+
+h1, h2, h3, h4 { letter-spacing: -0.022em; }
+a { transition: color 0.18s ease; }
+
+a:focus-visible,
+button:focus-visible,
+.nav-link:focus-visible,
+.dropdown-item:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 91, 253, 0.4);
+  border-radius: 10px;
+}
+
+/* ---------- 3. Sidebar « nuit » ---------- */
+.sidebar {
+  background: linear-gradient(168deg, var(--sidebar-bg-1) 0%, var(--sidebar-bg-2) 58%, #0b1a3e 100%);
+  overflow: hidden;
+}
+/* Halo tournant, très discret, derrière la navigation. */
+.sidebar::after {
+  content: "";
+  position: absolute;
+  top: -170px;
+  left: -150px;
+  width: 430px;
+  height: 430px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.55;
+  filter: blur(36px);
+  background: conic-gradient(from 0deg,
+    rgba(96, 165, 250, 0.3),
+    rgba(124, 92, 255, 0.24),
+    transparent 58%,
+    rgba(96, 165, 250, 0.3));
+  animation: v2Tourne 42s linear infinite;
+}
+.sidebar-head,
+.sidebar-nav,
+.sidebar-foot { position: relative; z-index: 1; }
+
+.brand-logo {
+  border-radius: 14px;
+  filter: drop-shadow(0 8px 20px rgba(96, 165, 250, 0.45));
+  animation: v2Flotte 7.5s ease-in-out infinite;
+}
+.brand-name { font-weight: 800; letter-spacing: -0.02em; }
+.brand-sub { color: #8fa8d1; }
+
+.nav-section { color: rgba(159, 182, 221, 0.7); }
+
+.nav-link {
+  transition: background 0.22s var(--ease), color 0.22s var(--ease), transform 0.3s var(--ease);
+}
+.nav-link:hover { transform: translateX(3px); }
+.nav-link .nav-ico { transition: transform 0.32s var(--ease); display: inline-block; }
+.nav-link:hover .nav-ico { transform: scale(1.18) rotate(-4deg); }
+.nav-link.active {
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.24), rgba(124, 92, 255, 0.13));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+.nav-link.active::before {
+  background: linear-gradient(180deg, #93c5fd, #a78bfa);
+  box-shadow: 0 0 14px rgba(147, 197, 253, 0.9);
+}
+.sidebar-foot { color: rgba(154, 178, 214, 0.85); }
+.sidebar-foot .pill-demo {
+  background: linear-gradient(120deg, rgba(96, 165, 250, 0.22), rgba(124, 92, 255, 0.22));
+  border: 1px solid rgba(147, 197, 253, 0.3);
+  color: #cfe0ff;
+}
+
+/* ---------- 4. Topbar en verre dépoli ---------- */
+.topbar {
+  background: rgba(255, 255, 255, 0.74);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  border-bottom: 1px solid rgba(23, 32, 90, 0.07);
+}
+.page-title { font-weight: 700; letter-spacing: -0.022em; }
+
+.btn-icon {
+  transition: background 0.2s ease, color 0.2s ease, transform 0.24s var(--ease);
+}
+.btn-icon:hover { transform: translateY(-1px) scale(1.06); }
+.notif-dot { animation: v2Pulse 2.6s ease-in-out infinite; }
+
+.demo-chip {
+  background: linear-gradient(120deg, #fff8ea, #ffefd5);
+  border: 1px solid rgba(242, 179, 61, 0.45);
+  color: #8a5a05;
+}
+.ecole-chip {
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.24s var(--ease), box-shadow 0.24s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.ecole-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.user-chip { transition: background 0.2s ease, transform 0.24s var(--ease); }
+.user-chip:hover { transform: translateY(-1px); }
+.user-chip .avatar { box-shadow: 0 0 0 2px #fff, 0 8px 18px -10px rgba(18, 26, 51, 0.75); }
+
+/* ---------- 5. Boutons (dégradés + brillance + onde) ---------- */
+.btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  transition: transform 0.22s var(--ease), box-shadow 0.26s ease,
+              background-color 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+}
+.btn:hover { transform: translateY(-1.5px); }
+.btn:active { transform: translateY(0) scale(0.985); }
+.btn-sm { border-radius: 10px; }
+.btn-block { border-radius: 13px; }
+
+.btn-primary {
+  background-color: var(--primary);
+  background-image: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  box-shadow: 0 12px 26px -14px rgba(59, 91, 253, 0.85);
+}
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  box-shadow: 0 18px 34px -16px rgba(59, 91, 253, 0.9);
+}
+.btn-success {
+  background-color: var(--success);
+  background-image: linear-gradient(135deg, #1cb45c 0%, #0e9a63 100%);
+  box-shadow: 0 12px 26px -14px rgba(16, 163, 74, 0.8);
+}
+.btn-outline { background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow-sm); }
+.btn-outline:hover { transform: translateY(-1.5px); box-shadow: var(--shadow); }
+
+/* Balayage lumineux au survol des boutons pleins. */
+.btn-primary::before,
+.btn-success::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 26%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: translateX(-160%) skewX(-18deg);
+  transition: transform 0.72s var(--ease);
+  pointer-events: none;
+}
+.btn-primary:hover::before,
+.btn-success:hover::before { transform: translateX(520%) skewX(-18deg); }
+
+/* Onde au clic (élément créé par js/ui.js). */
+.sm-onde {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  transform: scale(0);
+  animation: v2Onde 0.62s var(--ease) forwards;
+  pointer-events: none;
+}
+.btn-outline .sm-onde,
+.btn-ghost .sm-onde,
+.btn-danger-soft .sm-onde { background: rgba(59, 91, 253, 0.2); }
+.quick-btn .sm-onde { background: rgba(59, 91, 253, 0.18); }
+
+/* Conteneurs susceptibles de recevoir l'onde : doivent être positionnés. */
+.btn-google,
+.lp-btn,
+.lp-mode-btn,
+.lp-nav-cta,
+.quick-btn { position: relative; overflow: hidden; }
+
+/* ---------- 6. Cartes, statistiques ---------- */
+.card,
+.table-wrap { border-color: rgba(23, 32, 90, 0.07); }
+
+.card {
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.32s var(--ease), border-color 0.3s ease, transform 0.32s var(--ease);
+}
+.card:hover { box-shadow: var(--shadow); border-color: rgba(59, 91, 253, 0.18); }
+.card-head {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 255, 0.55));
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.card-head h3 { letter-spacing: -0.018em; }
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.34s var(--ease), box-shadow 0.34s var(--ease), border-color 0.3s ease;
+}
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: rgba(59, 91, 253, 0.2); }
+/* Liseré dégradé qui se déploie au survol. */
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--accent), var(--cyan));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s var(--ease);
+}
+.stat-card:hover::before { transform: scaleX(1); }
+
+.stat-ico {
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75), 0 12px 22px -16px rgba(18, 26, 51, 0.6);
+  transition: transform 0.36s var(--ease);
+}
+.stat-card:hover .stat-ico { transform: scale(1.07) rotate(-4deg); }
+.stat-ico.blue { background: linear-gradient(140deg, #eaefff, #dbe4ff); color: #2c47c9; }
+.stat-ico.green { background: linear-gradient(140deg, #e8f9ef, #d5f2e1); color: #12813f; }
+.stat-ico.orange { background: linear-gradient(140deg, #fff5e3, #ffe8c4); color: #a95f04; }
+.stat-ico.red { background: linear-gradient(140deg, #ffecec, #ffdcdc); color: #c02626; }
+.stat-ico.purple { background: linear-gradient(140deg, #f5edff, #e9dcff); color: #6d28d9; }
+
+.stat-value { letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat-delta { font-weight: 700; }
+.mini-stat .v { font-variant-numeric: tabular-nums; }
+.mini-stat .l { font-weight: 600; }
+.rank-pill { font-variant-numeric: tabular-nums; }
+
+/* ---------- 7. Badges, puces, avatars, jauges ---------- */
+.badge { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55); letter-spacing: 0.005em; }
+.badge-success { background: linear-gradient(120deg, #e8f8ef, #d8f2e3); }
+.badge-warning { background: linear-gradient(120deg, #fdf5e6, #fcecd2); }
+.badge-danger { background: linear-gradient(120deg, #fdeeee, #fbdcdc); }
+.badge-info { background: linear-gradient(120deg, #edf1ff, #dfe6ff); }
+.badge-neutral { background: linear-gradient(120deg, #f1f4f9, #e8edf5); }
+
+.chip { background: linear-gradient(120deg, var(--primary-050), #e8edff); }
+.chip-plain { background: #eef1f7; }
+.chip-toggle { transition: transform 0.22s var(--ease), background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+.chip-toggle:hover { transform: translateY(-1px); }
+
+.avatar {
+  box-shadow: inset 0 -3px 8px rgba(0, 0, 0, 0.2), 0 8px 18px -12px rgba(18, 26, 51, 0.85);
+  letter-spacing: 0.02em;
+}
+
+.progress,
+.bar-track { background: rgba(23, 32, 90, 0.08); }
+
+.progress-bar,
+.bar-fill {
+  background-image: linear-gradient(90deg, var(--primary), var(--accent), var(--cyan), var(--primary));
+  background-size: 220% 100%;
+  animation: v2Defile 5s linear infinite, v2Barre 0.95s var(--ease) both;
+}
+.progress-bar.green,
+.bar-fill.green { background-image: linear-gradient(90deg, #34d399, #0f9d58, #34d399); }
+.progress-bar.orange,
+.bar-fill.orange { background-image: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24); }
+.progress-bar.red,
+.bar-fill.red { background-image: linear-gradient(90deg, #f87171, #dc2626, #f87171); }
+
+/* ---------- 8. Tableaux ---------- */
+.table-wrap { box-shadow: var(--shadow-sm); }
+table.data th {
+  background: linear-gradient(180deg, #f9fbff, #f1f5fc);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+table.data tbody tr { transition: background 0.18s ease, box-shadow 0.18s ease; }
+table.data tbody tr:hover { background: rgba(59, 91, 253, 0.05); box-shadow: inset 3px 0 0 var(--primary); }
+.cell-user .names { letter-spacing: -0.012em; }
+
+/* ---------- 9. Formulaires ---------- */
+.input,
+.select,
+.textarea {
+  border-color: rgba(23, 32, 90, 0.13);
+  transition: border-color 0.2s ease, box-shadow 0.26s ease, background 0.2s ease;
+}
+.input:hover,
+.select:hover,
+.textarea:hover { border-color: rgba(23, 32, 90, 0.24); }
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(59, 91, 253, 0.14);
+}
+.role-card { transition: transform 0.26s var(--ease), border-color 0.2s ease, background 0.2s ease, box-shadow 0.26s ease; }
+.role-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.role-card.selected {
+  background: linear-gradient(135deg, rgba(59, 91, 253, 0.1), rgba(124, 92, 255, 0.07));
+  box-shadow: 0 0 0 1px var(--primary), var(--shadow-sm);
+}
+
+/* ---------- 10. Modales, menus déroulants, toasts ---------- */
+.modal-overlay {
+  background: rgba(9, 14, 33, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.modal-overlay.open { animation: v2Voile 0.24s ease both; }
+.modal { border-radius: 20px; animation: v2Modale 0.4s var(--ease) both; }
+.modal-head {
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-radius: 20px 20px 0 0;
+}
+.modal-foot {
+  background: linear-gradient(180deg, rgba(248, 250, 255, 0.7), #f3f6fd);
+  border-radius: 0 0 20px 20px;
+}
+.confirm-ico { animation: v2Pop 0.4s var(--ease) both; }
+
+.dropdown-menu {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  transform-origin: top right;
+}
+.dropdown-menu.open { animation: v2Menu 0.24s var(--ease) both; }
+.dropdown-item { transition: background 0.16s ease, color 0.16s ease, transform 0.22s var(--ease); }
+.dropdown-item:hover { transform: translateX(2px); }
+
+.toast {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+  animation: v2Toast 0.36s var(--ease) backwards;
+}
+/* Compte à rebours visuel de disparition. */
+.toast .t-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--primary);
+  opacity: 0.6;
+  transform-origin: left;
+  animation: v2Temps 3.2s linear forwards;
+}
+.toast.success .t-bar { background: var(--success); }
+.toast.warning .t-bar { background: var(--warning); }
+.toast.error .t-bar { background: var(--danger); }
+
+/* ---------- 11. Bandeaux, fiches, divers ---------- */
+.banner-demo { border-radius: 20px; box-shadow: var(--shadow); }
+
+.empty-state .e-ico { animation: v2Flotte 5.5s ease-in-out infinite; }
+.alert { border-radius: 14px; }
+.alert-info { background: linear-gradient(120deg, #eef2ff, #e5ebff); }
+.alert-warning { background: linear-gradient(120deg, #fdf6e8, #fbeed6); }
+.alert-success { background: linear-gradient(120deg, #eaf9f1, #dcf4e7); }
+.alert-danger { background: linear-gradient(120deg, #fdeeee, #fbdede); }
+
+.info-cell {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfcff, #f5f8ff);
+  transition: transform 0.26s var(--ease), box-shadow 0.26s ease;
+}
+.info-cell:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+
+.profile-head { border-radius: 20px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.profile-head::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  left: -30%;
+  width: 22%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: rotate(12deg) translateX(-120%);
+  animation: v2Balaye 9s ease-in-out 1.6s infinite;
+  pointer-events: none;
+}
+
+.announce-card,
+.class-card { transition: transform 0.32s var(--ease), box-shadow 0.32s var(--ease); }
+.announce-card:hover,
+.class-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+.rank-pill.r1 { background: linear-gradient(140deg, #fff2cf, #fde3a7); }
+.rank-pill.r2 { background: linear-gradient(140deg, #eef2f7, #dfe6ef); }
+.rank-pill.r3 { background: linear-gradient(140deg, #fdeac4, #fbd9a0); }
+
+table.schedule th { background: linear-gradient(180deg, #16295c, #0d1c45); }
+table.schedule td { transition: background 0.2s ease; }
+table.schedule td:hover { background: #f6f9ff; }
+
+.bulletin-head { border-bottom-color: #12224c; }
+.bulletin table th { background: linear-gradient(120deg, #101b3c, #1c2f66); }
+.print-area { box-shadow: var(--shadow); }
+
+/* ---------- 12. Apparitions au défilement & utilitaires ---------- */
+.sm-rv { opacity: 0; transform: translateY(16px) scale(0.995); }
+.sm-rv.sm-in {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.6s var(--ease) var(--sm-d, 0ms),
+              transform 0.72s var(--ease) var(--sm-d, 0ms);
+}
+.anim-flotte { animation: v2Flotte 6s ease-in-out infinite; }
+.anim-pop { animation: v2Pop 0.4s var(--ease) both; }
+.anim-tourne { animation: v2Tourne 22s linear infinite; }
+
+/* ---------- 13. Barre de progression de navigation ---------- */
+#smCharge {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  z-index: 900;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--primary), var(--accent), var(--cyan));
+  box-shadow: 0 0 14px rgba(59, 91, 253, 0.6);
+}
+#smCharge.sm-charge-on { animation: v2Charge 1.1s var(--ease) forwards; }
+
+/* ---------- 14. Images clés ---------- */
+@keyframes v2Aurore {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(0, -3%, 0) scale(1.06); }
+}
+@keyframes v2Tourne { to { transform: rotate(360deg); } }
+@keyframes v2Flotte {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes v2Pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+  50% { transform: scale(1.14); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+}
+@keyframes v2Defile { to { background-position: -220% 0; } }
+@keyframes v2Barre {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes v2Onde {
+  to { transform: scale(2.8); opacity: 0; }
+}
+@keyframes v2Voile {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes v2Modale {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2Menu {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2Toast {
+  from { opacity: 0; transform: translateX(28px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2Temps {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@keyframes v2Pop {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2Charge {
+  0% { opacity: 1; transform: scaleX(0); }
+  55% { opacity: 1; transform: scaleX(0.72); }
+  100% { opacity: 1; transform: scaleX(1); }
+}
+@keyframes v2Balaye {
+  0% { transform: rotate(12deg) translateX(-120%); }
+  35%, 100% { transform: rotate(12deg) translateX(620%); }
+}
+
+/* ---------- 15. Accessibilité & impression ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  body::before { animation: none; }
+  .sm-rv { opacity: 1 !important; transform: none !important; }
+}
+
+@media print {
+  body::before,
+  #smCharge { display: none !important; }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .sm-rv { opacity: 1 !important; transform: none !important; }
+}

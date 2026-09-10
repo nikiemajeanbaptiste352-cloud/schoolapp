@@ -176,6 +176,227 @@
       if (flash) sessionStorage.removeItem("sm_flash");
     } catch (e) { /* stockage indisponible */ }
     if (flash) toast(escapeHtml(flash), "success");
+
+    // Micro-animations (apparitions, compteurs, onde au clic)
+    animerInterface();
+  }
+
+  /* ---------- V2 : micro-animations ----------
+     Purement décoratives et progressives : si le navigateur ne sait pas
+     faire (ou si l'utilisateur a demandé moins d'animations), l'interface
+     reste exactement fonctionnelle. */
+  var MOUVEMENT_REDUIT = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var SEL_APPARITION = ".hero-banner, .page-header, .card, .stat-card, .table-wrap, .announce-card, .settings-sec, .print-area, .class-card, .profile-head";
+  var obsAnim = null;
+  var animationsPretes = false;
+
+  // L'élément est-il déjà dans un bloc animé ? (évite les animations imbriquées)
+  function dansCible(el) {
+    var p = el.parentElement;
+    while (p && p !== document.body) {
+      if (p.matches && p.matches(SEL_APPARITION)) return true;
+      p = p.parentElement;
+    }
+    return false;
+  }
+
+  function estVisible(el) {
+    return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+  }
+
+  // Peut-on animer ce texte ? (nombres simples, éventuellement « % » ou « FCFA »)
+  function estAnimable(el) {
+    var t = String(el.textContent || "");
+    if (t.replace(/FCFA/g, "").replace(/[0-9\s\u202f\u00a0%]/g, "") !== "") return false;
+    var n = t.replace(/[^0-9]/g, "");
+    return n.length > 0 && n.length <= 7;
+  }
+
+  // Compteur qui « monte » jusqu'à la valeur affichée
+  function animerNombre(el) {
+    if (!estAnimable(el) || !window.requestAnimationFrame) return;
+    var texte = String(el.textContent || "");
+    var cible = parseInt(texte.replace(/[^0-9]/g, ""), 10);
+    if (!cible) return;
+    var premier = texte.search(/[0-9]/);
+    var dernier = texte.length - 1 - texte.split("").reverse().join("").search(/[0-9]/);
+    var prefixe = texte.slice(0, premier);
+    var suffixe = texte.slice(dernier + 1);
+    var groupe = /[\u202f\u00a0 ]/.test(texte.slice(premier, dernier + 1));
+    function format(n) {
+      var s = String(n);
+      return groupe ? s.replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f") : s;
+    }
+    var debut = null;
+    var duree = 950;
+    el.textContent = prefixe + format(0) + suffixe;
+    function image(t) {
+      if (debut === null) debut = t;
+      var p = Math.min(1, (t - debut) / duree);
+      var e = 1 - Math.pow(1 - p, 3);
+      el.textContent = prefixe + format(Math.round(cible * e)) + suffixe;
+      if (p < 1) window.requestAnimationFrame(image);
+      else el.textContent = texte;
+    }
+    window.requestAnimationFrame(image);
+  }
+
+  function reveler(el) {
+    if (el.getAttribute("data-sm-cnt")) {
+      el.removeAttribute("data-sm-cnt");
+      animerNombre(el);
+    } else {
+      el.classList.add("sm-in");
+    }
+  }
+
+  function suivantEntree(liste) {
+    for (var i = 0; i < liste.length; i++) {
+      var el = liste[i].target;
+      if (obsAnim) obsAnim.unobserve(el);
+      reveler(el);
+    }
+  }
+
+  function creerObservateur() {
+    if (obsAnim) return obsAnim;
+    if (!("IntersectionObserver" in window)) return null;
+    obsAnim = new window.IntersectionObserver(suivantEntree, {
+      threshold: 0,
+      rootMargin: "0px 0px -6% 0px"
+    });
+    return obsAnim;
+  }
+
+  // Apparition des blocs au défilement (une seule fois par bloc)
+  function preparerApparitions() {
+    var obs = creerObservateur();
+    if (!obs) return;
+    var h = window.innerHeight || document.documentElement.clientHeight || 800;
+    var liste = document.querySelectorAll(SEL_APPARITION);
+    var n = 0;
+    for (var i = 0; i < liste.length; i++) {
+      var el = liste[i];
+      if (el.getAttribute("data-sm-rv")) continue;
+      if (dansCible(el)) continue;
+      // Un bloc contenant une modale ne doit jamais être transformé :
+      // cela casserait le positionnement des fenêtres (position: fixed).
+      if (el.querySelector(".modal-overlay")) continue;
+      if (!estVisible(el)) continue;
+      var r = el.getBoundingClientRect();
+      var deja = r.top < h * 0.94 && r.bottom > 0;
+      el.setAttribute("data-sm-rv", "1");
+      el.classList.add("sm-rv");
+      el.style.setProperty("--sm-d", deja ? "0ms" : Math.min(n, 7) * 55 + "ms");
+      n++;
+      if (deja) {
+        // Déjà à l'écran : apparition immédiate, décalage géré en JS.
+        revelerDiffere(el, Math.min(n, 7) * 55);
+      } else {
+        obs.observe(el);
+      }
+    }
+  }
+
+  function revelerDiffere(el, delai) {
+    if (delai > 0) {
+      setTimeout(function () { reveler(el); }, delai);
+    } else if (window.requestAnimationFrame) {
+      window.requestAnimationFrame(function () { reveler(el); });
+    } else {
+      reveler(el);
+    }
+  }
+
+  // Filet de sécurité : si l'observateur ne s'est jamais déclenché
+  // (onglet en arrière-plan, navigateur limité), on révèle tout.
+  function securiteApparitions() {
+    if (document.querySelector(".sm-rv.sm-in")) return;
+    var liste = document.querySelectorAll(".sm-rv:not(.sm-in)");
+    for (var i = 0; i < liste.length; i++) liste[i].classList.add("sm-in");
+  }
+
+  // Compteurs animés des cartes de statistiques
+  function preparerCompteurs() {
+    var liste = document.querySelectorAll(".stat-value, .mini-stat .v");
+    for (var i = 0; i < liste.length; i++) {
+      var el = liste[i];
+      if (el.getAttribute("data-sm-fait") || !estVisible(el) || !estAnimable(el)) continue;
+      el.setAttribute("data-sm-fait", "1");
+      var obs = creerObservateur();
+      if (obs) {
+        el.setAttribute("data-sm-cnt", "1");
+        obs.observe(el);
+      } else {
+        animerNombre(el);
+      }
+    }
+  }
+
+  function preparerAnimations() {
+    if (MOUVEMENT_REDUIT) return;
+    preparerApparitions();
+    preparerCompteurs();
+  }
+
+  // Onde au clic sur les boutons
+  function ondeClic(e) {
+    var b = e.target && e.target.closest ? e.target.closest(".btn, .quick-btn") : null;
+    if (!b || b.disabled) return;
+    var r = b.getBoundingClientRect();
+    var d = Math.max(r.width, r.height, 24);
+    var cx = e.clientX ? e.clientX : r.left + r.width / 2;
+    var cy = e.clientY ? e.clientY : r.top + r.height / 2;
+    var s = document.createElement("span");
+    s.className = "sm-onde";
+    s.style.width = d + "px";
+    s.style.height = d + "px";
+    s.style.left = Math.round(cx - r.left - d / 2) + "px";
+    s.style.top = Math.round(cy - r.top - d / 2) + "px";
+    b.appendChild(s);
+    setTimeout(function () {
+      if (s.parentNode) s.parentNode.removeChild(s);
+    }, 650);
+  }
+
+  // Barre de progression en haut de page pendant un changement de page
+  function barreCharge() {
+    var b = document.getElementById("smCharge");
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "smCharge";
+      document.body.appendChild(b);
+    }
+    b.classList.remove("sm-charge-on");
+    void b.offsetWidth; // force le redémarrage de l'animation
+    b.classList.add("sm-charge-on");
+    setTimeout(function () { b.classList.remove("sm-charge-on"); }, 1600);
+  }
+
+  function lienCharge(e) {
+    var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+    if (!a) return;
+    var h = a.getAttribute("href") || "";
+    if (!h || h.charAt(0) === "#" || a.target === "_blank") return;
+    if (/^(mailto:|tel:|https?:|javascript:)/i.test(h)) return;
+    barreCharge();
+  }
+
+  function animerInterface() {
+    if (animationsPretes) return;
+    animationsPretes = true;
+    preparerAnimations();
+    // Les pages remplissent leurs conteneurs juste après ui.js :
+    // on repasse quelques fois pour rattraper le contenu tardif.
+    setTimeout(preparerAnimations, 600);
+    setTimeout(preparerAnimations, 1600);
+    setTimeout(securiteApparitions, 3000);
+    if (window.addEventListener) {
+      window.addEventListener("load", function () { setTimeout(preparerAnimations, 60); });
+    }
+    if (MOUVEMENT_REDUIT) return;
+    document.addEventListener("click", ondeClic);
+    document.addEventListener("click", lienCharge);
   }
 
   /* ---------- Sélecteur d'établissement (Phase 3 — rattachement) ---------- */
@@ -399,7 +620,7 @@
     }
     var t = document.createElement("div");
     t.className = "toast " + (type || "info");
-    t.innerHTML = '<span class="t-ico">' + ico + "</span><span>" + message + "</span>";
+    t.innerHTML = '<span class="t-ico">' + ico + "</span><span>" + message + "</span><span class=\"t-bar\"></span>";
     container.appendChild(t);
     setTimeout(function () {
       t.classList.add("out");
@@ -422,7 +643,9 @@
     openModal: openModal,
     closeModal: closeModal,
     closeAllModals: closeAllModals,
-    toast: toast
+    toast: toast,
+    animerInterface: animerInterface,
+    preparerAnimations: preparerAnimations
   };
 
   // Lancement

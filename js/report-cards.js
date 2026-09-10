@@ -78,7 +78,7 @@
       }).join("");
 
       html +=
-        '<table>' +
+        '<div class="bulletin-tbl"><table>' +
         "<thead><tr>" +
         '<th style="width:40px">N°</th><th>Matière</th>' +
         '<th style="width:70px;text-align:center">Coef.</th>' +
@@ -91,7 +91,7 @@
         '<td style="text-align:center">' + virgule(m.generale) + " / 20</td>" +
         "<td>" + SM.escapeHtml(app.mention) + "</td>" +
         "</tr>" +
-        "</tbody></table>";
+        "</tbody></table></div>";
 
       html +=
         '<div class="bulletin-info" style="margin-top:16px">' +

@@ -66,3 +66,70 @@
 }
 .quick-btn span { font-size: 22px; }
 .quick-btn:hover { background: var(--primary-050); border-color: var(--primary-200); color: var(--info-text); transform: translateY(-2px); }
+
+
+/* ============================================================
+   V2 « Aurore » — surcharges du tableau de bord
+   ============================================================ */
+
+/* Bandeau d'accueil : dégradé plus profond + halo en mouvement */
+.hero-banner {
+  background:
+    radial-gradient(760px 340px at 88% -30%, rgba(124, 92, 255, 0.5), transparent 62%),
+    radial-gradient(620px 320px at -10% 120%, rgba(6, 182, 212, 0.32), transparent 60%),
+    linear-gradient(120deg, #0a1533 0%, #1b3ba8 62%, #3b5bfd 132%);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+}
+.hero-banner::after {
+  content: "";
+  position: absolute;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.24), transparent 66%);
+  right: -80px;
+  top: -150px;
+  animation: v2Flotte 11s ease-in-out infinite;
+  pointer-events: none;
+}
+.hero-banner > * { position: relative; z-index: 1; }
+.hero-year {
+  background: rgba(255, 255, 255, 0.13);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+}
+
+/* Boutons d'accès rapide */
+.quick-btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfcff, #f2f5fd);
+}
+.quick-btn:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+
+/* Lignes de listes (paiements, annonces) */
+.list-item { transition: background 0.2s ease, transform 0.26s var(--ease); }
+.list-item:hover { background: rgba(59, 91, 253, 0.045); transform: translateX(2px); }
+
+/* Jauges de répartition : apparition en cascade */
+.bars .bar-row:nth-child(2) .bar-fill { animation-delay: 0.12s; }
+.bars .bar-row:nth-child(3) .bar-fill { animation-delay: 0.19s; }
+.bars .bar-row:nth-child(4) .bar-fill { animation-delay: 0.26s; }
+.bars .bar-row:nth-child(5) .bar-fill { animation-delay: 0.33s; }
+.bars .bar-row:nth-child(6) .bar-fill { animation-delay: 0.4s; }
+.bars .bar-row:nth-child(7) .bar-fill { animation-delay: 0.47s; }
+.bars .bar-row:nth-child(8) .bar-fill { animation-delay: 0.54s; }
+.bars .bar-row:nth-child(n+9) .bar-fill { animation-delay: 0.62s; }
+
+/* Annonces compactes */
+.announce-mini { transition: transform 0.26s var(--ease); }
+.list-item:hover .announce-mini { transform: translateX(2px); }
+
+@media (max-width: 720px) {
+  .hero-banner::after { animation: none; opacity: 0.5; }
+  .quick-btn:hover,
+  .list-item:hover { transform: none; }
+}

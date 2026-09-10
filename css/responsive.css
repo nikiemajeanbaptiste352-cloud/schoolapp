@@ -66,3 +66,54 @@
   .info-grid { grid-template-columns: 1fr; }
   .banner-demo { padding: 18px; }
 }
+
+/* ============================================================
+   V2 « Aurore » — adaptations (allègements sur petits écrans)
+   ============================================================ */
+
+@media (max-width: 1100px) {
+  /* La side-bar est un panneau glissant : le halo animé y est superflu. */
+  .sidebar::after { animation: none; opacity: 0.35; }
+  body.sidebar-open .backdrop {
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    animation: v2Voile 0.25s ease both;
+  }
+}
+
+@media (max-width: 720px) {
+  :root { --topbar-h: 60px; }
+  /* Le flou d'arrière-plan coûte cher sur mobile : barre opaque. */
+  .topbar {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.97);
+  }
+  body::before { opacity: 0.85; }
+  /* Pas d'effet de soulèvement au doigt. */
+  .stat-card:hover,
+  .card:hover,
+  .info-cell:hover,
+  .quick-btn:hover,
+  .announce-card:hover,
+  .class-card:hover { transform: none; }
+  .sm-rv { transform: translateY(10px); }
+  .sm-rv.sm-in { transition-duration: 0.45s, 0.5s; }
+
+  /* Bulletin scolaire : mise en page compacte pour tenir sur un téléphone. */
+  .print-area { padding: 16px; }
+  .bulletin-head { gap: 10px; padding-bottom: 12px; margin-bottom: 14px; }
+  .bulletin-head .logo { width: 48px; height: 48px; }
+  .bulletin-head .school-name { font-size: 15px; letter-spacing: 0.2px; }
+  .bulletin-title { font-size: 17px; letter-spacing: 1px; margin: 12px 0 14px; }
+  .bulletin table { font-size: 12.5px; }
+  .bulletin table th,
+  .bulletin table td { padding: 7px 8px; }
+  .bulletin-sign { flex-wrap: wrap; gap: 14px; }
+}
+
+@media (max-width: 420px) {
+  body::before { animation: none; }
+  .btn-primary::before,
+  .btn-success::before { display: none; }
+}
