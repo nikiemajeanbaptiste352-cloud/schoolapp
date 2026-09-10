@@ -3,26 +3,80 @@
 Chaque fonction renvoie des dictionnaires "prêts JSON" dont les clés
 correspondent exactement à celles attendues par le front (window.SD),
 pour une bascule d'intégration sans régression.
+
+Multi-établissements (Phase 2) : toute consultation est scopée par `school_id`.
+Le school_id effectif est, dans l'ordre : paramètre explicite (futur), contexte
+de requête posé par la couche auth (`ecole_courante()`), sinon — repli
+mono-école — la première école de la base.
 """
 
 from __future__ import annotations
 
 import math
+from contextvars import ContextVar
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Annonce,
     Classe,
+    Ecole,
     Eleve,
     Enseignant,
+    EnseignantTaux,
     Matiere,
     Note,
     Paiement,
     Presence,
     classe_matiere,
 )
+
+# ---------------------------------------------------------------------------
+# Contexte école (school_id de la requête courante)
+# ---------------------------------------------------------------------------
+_ECOLE_COURANTE: ContextVar[int | None] = ContextVar(
+    "ecole_courante", default=None
+)
+
+
+def ecole_courante() -> int | None:
+    """school_id posé par la couche auth pour la requête en cours."""
+    return _ECOLE_COURANTE.get()
+
+
+def definir_ecole_courante(school_id: int | None) -> None:
+    """Pose (ou réinitialise) le contexte école de la requête en cours."""
+    _ECOLE_COURANTE.set(school_id)
+
+
+def _sid(db: Session, sid: int | None = None) -> int:
+    """school_id effectif : explicite > contexte requête > 1ʳᵉ école (repli)."""
+    if sid is not None:
+        return sid
+    sid = _ECOLE_COURANTE.get()
+    if sid is not None:
+        return sid
+    e = db.scalar(select(Ecole).order_by(Ecole.id).limit(1))
+    return e.id if e is not None else 1
+
+
+def sid_ecole(db: Session) -> int:
+    """École effective de la requête courante (pour les écritures / lectures).
+
+    Utilisé par les routeurs : école de l'utilisateur authentifié (contexte)
+    sinon première école en base (mode mono-établissement / lectures publiques).
+    """
+    return _sid(db)
+
+
+def get_annonce(db: Session, annonce_id: str, school_id: int | None = None) -> Annonce | None:
+    return db.get(Annonce, (_sid(db, school_id), annonce_id))
+
+
+def get_taux(db: Session, enseignant_id: str, school_id: int | None = None) -> EnseignantTaux | None:
+    return db.get(EnseignantTaux, (_sid(db, school_id), enseignant_id))
 
 # ---------------------------------------------------------------------------
 # Ordres de référence (miroir des tableaux de data.js — pour la stabilité)
@@ -48,32 +102,36 @@ def _arrondi2(x: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Consultations courantes
+# Consultations courantes (scopées par école)
 # ---------------------------------------------------------------------------
-def get_classe(db: Session, classe_id: str) -> Classe | None:
-    return db.get(Classe, classe_id)
+def get_classe(db: Session, classe_id: str, school_id: int | None = None) -> Classe | None:
+    return db.get(Classe, (_sid(db, school_id), classe_id))
 
 
-def get_matiere(db: Session, matiere_id: str) -> Matiere | None:
-    return db.get(Matiere, matiere_id)
+def get_matiere(db: Session, matiere_id: str, school_id: int | None = None) -> Matiere | None:
+    return db.get(Matiere, (_sid(db, school_id), matiere_id))
 
 
-def get_eleve(db: Session, eleve_id: str) -> Eleve | None:
-    return db.get(Eleve, eleve_id)
+def get_eleve(db: Session, eleve_id: str, school_id: int | None = None) -> Eleve | None:
+    return db.get(Eleve, (_sid(db, school_id), eleve_id))
 
 
-def get_enseignant(db: Session, enseignant_id: str) -> Enseignant | None:
-    return db.get(Enseignant, enseignant_id)
+def get_enseignant(db: Session, enseignant_id: str, school_id: int | None = None) -> Enseignant | None:
+    return db.get(Enseignant, (_sid(db, school_id), enseignant_id))
 
 
 def matieres_ids_classe(db: Session, classe_id: str) -> list[str]:
     """Ids ordonnés des matières d'une classe (classe_matiere.ordre)."""
-    cls = get_classe(db, classe_id)
+    sid = _sid(db)
+    cls = get_classe(db, classe_id, sid)
     if cls is None:
         return []
     rows = db.execute(
         select(classe_matiere.c.matiere_id)
-        .where(classe_matiere.c.classe_id == classe_id)
+        .where(
+            classe_matiere.c.school_id == sid,
+            classe_matiere.c.classe_id == classe_id,
+        )
         .order_by(classe_matiere.c.ordre)
     ).all()
     ids = [r[0] for r in rows]
@@ -83,14 +141,24 @@ def matieres_ids_classe(db: Session, classe_id: str) -> list[str]:
 
 def matieres_de_classe(db: Session, classe_id: str) -> list[dict]:
     """Liste des matières d'une classe (objet complet) — ordre du front."""
-    mat = {m.id: m for m in db.execute(select(Matiere)).scalars()}
+    sid = _sid(db)
+    mat = {
+        m.id: m
+        for m in db.execute(
+            select(Matiere).where(Matiere.school_id == sid)
+        ).scalars()
+    }
     return [mat[i] for i in matieres_ids_classe(db, classe_id) if i in mat]
 
 
 def eleves_de_classe(db: Session, classe_id: str) -> list[Eleve]:
     """Élèves d'une classe triés comme le front (nom+prenom, collation fr)."""
+    sid = _sid(db)
     eleves = db.execute(
-        select(Eleve).where(Eleve.classe_id == classe_id)
+        select(Eleve).where(
+            Eleve.school_id == sid,
+            Eleve.classe_id == classe_id,
+        )
     ).scalars().all()
     return sorted(
         eleves,
@@ -102,7 +170,8 @@ def eleves_de_classe(db: Session, classe_id: str) -> list[Eleve]:
 # Notes / moyennes / classements (parité stricte avec data.js)
 # ---------------------------------------------------------------------------
 def notes_eleve(db: Session, eleve_id: str, matiere_id: str | None = None) -> list[Note]:
-    stmt = select(Note).where(Note.eleve_id == eleve_id)
+    sid = _sid(db)
+    stmt = select(Note).where(Note.school_id == sid, Note.eleve_id == eleve_id)
     if matiere_id:
         stmt = stmt.where(Note.matiere_id == matiere_id)
     return list(db.execute(stmt).scalars())
@@ -110,12 +179,13 @@ def notes_eleve(db: Session, eleve_id: str, matiere_id: str | None = None) -> li
 
 def moyennes_eleve(db: Session, eleve_id: str) -> dict:
     """Retourne {parMatiere, generale, totalCoef} — mêmes clés que SD."""
-    eleve = get_eleve(db, eleve_id)
+    sid = _sid(db)
+    eleve = get_eleve(db, eleve_id, sid)
     if eleve is None:
         return {"parMatiere": [], "generale": 0, "totalCoef": 0}
 
     notes = db.execute(
-        select(Note).where(Note.eleve_id == eleve_id)
+        select(Note).where(Note.school_id == sid, Note.eleve_id == eleve_id)
     ).scalars().all()
     par_matiere: list[dict] = []
     for m in matieres_de_classe(db, eleve.classe_id):
@@ -176,8 +246,9 @@ def appreciation(moyenne: float) -> dict:
 # Présences
 # ---------------------------------------------------------------------------
 def taux_presence(db: Session, eleve_id: str) -> int:
+    sid = _sid(db)
     arr = db.execute(
-        select(Presence).where(Presence.eleve_id == eleve_id)
+        select(Presence).where(Presence.school_id == sid, Presence.eleve_id == eleve_id)
     ).scalars().all()
     if not arr:
         return 100
@@ -202,21 +273,32 @@ def statut_paiement(paiement: Paiement) -> str:
 
 
 def paiement_eleve(db: Session, eleve_id: str) -> Paiement | None:
-    return db.scalar(select(Paiement).where(Paiement.eleve_id == eleve_id))
+    sid = _sid(db)
+    return db.scalar(
+        select(Paiement).where(Paiement.school_id == sid, Paiement.eleve_id == eleve_id)
+    )
 
 
 # ---------------------------------------------------------------------------
 # Emploi du temps (parité stricte : même grille que le front)
 # ---------------------------------------------------------------------------
 def emploi_du_temps(db: Session, classe_id: str) -> list[dict]:
-    cls = get_classe(db, classe_id)
+    sid = _sid(db)
+    cls = get_classe(db, classe_id, sid)
     if cls is None:
         return []
     ids = matieres_ids_classe(db, classe_id)
     shift = CLASSES_ORDER.index(classe_id) if classe_id in CLASSES_ORDER else 0
 
-    matieres = {m.id: m for m in db.execute(select(Matiere)).scalars()}
-    enseignants = list(db.execute(select(Enseignant)).scalars())
+    matieres = {
+        m.id: m
+        for m in db.execute(
+            select(Matiere).where(Matiere.school_id == sid)
+        ).scalars()
+    }
+    enseignants = list(db.execute(
+        select(Enseignant).where(Enseignant.school_id == sid)
+    ).scalars())
 
     grid: list[dict] = []
     for j, jour in enumerate(JOURS):
@@ -282,7 +364,12 @@ def classe_to_dict(db: Session, classe: Classe, effectif: bool = True) -> dict:
         "principal": classe.principal_id,
     }
     if effectif:
-        nb = db.scalar(select(func.count(Eleve.id)).where(Eleve.classe_id == classe.id)) or 0
+        nb = db.scalar(
+            select(func.count(Eleve.id)).where(
+                Eleve.school_id == classe.school_id,
+                Eleve.classe_id == classe.id,
+            )
+        ) or 0
         data["effectif"] = nb
     return data
 

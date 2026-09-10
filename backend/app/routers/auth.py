@@ -45,6 +45,7 @@ from app.security import (
     verify_password,
 )
 from app.services import email as email_service
+from app.services import sd
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentification"])
 
@@ -96,7 +97,14 @@ def _verifier_email_unique(db: Session, email: str) -> None:
         )
 
 
-def _creer_user(db: Session, nom: str, email: str, password: str, role: str) -> User:
+def _creer_user(
+    db: Session,
+    nom: str,
+    email: str,
+    password: str,
+    role: str,
+    school_id: int | None = None,
+) -> User:
     """Crée un utilisateur actif avec mot de passe haché (PBKDF2)."""
     nom = nom.strip()
     email = email.strip().lower()
@@ -114,6 +122,7 @@ def _creer_user(db: Session, nom: str, email: str, password: str, role: str) -> 
         role=role,
         nom=nom[:80],
         actif=True,
+        school_id=school_id,
     )
     db.add(user)
     db.commit()
@@ -126,7 +135,9 @@ def _token_pour(user: User, db: Session) -> TokenOut:
         str(user.id),
         extra={"role": user.role, "email": user.email},
     )
-    ecole = db.scalar(select(Ecole).limit(1))
+    # École affichée au front : celle du compte si rattaché, sinon l'école par défaut.
+    sid = user.school_id or sd.sid_ecole(db)
+    ecole = db.scalar(select(Ecole).where(Ecole.id == sid).limit(1))
     return TokenOut(
         access_token=token,
         user=_vers_user_out(user),
@@ -199,7 +210,9 @@ def inscription_etablissement(
             version="1.0.0",
         ))
         db.commit()
-    user = _creer_user(db, body.nom, body.email, body.password, ROLE_ADMIN)
+    # Le compte de direction rejoint l'établissement (existant ou tout juste créé).
+    sid = sd.sid_ecole(db)
+    user = _creer_user(db, body.nom, body.email, body.password, ROLE_ADMIN, school_id=sid)
     return _token_pour(user, db)
 
 
@@ -233,12 +246,17 @@ def creer_compte(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Rôle invalide. Choisissez parmi : " + ", ".join(ROLES_CREABLES) + ".",
         )
-    user = _creer_user(db, body.nom, body.email, body.password, role)
+    user = _creer_user(db, body.nom, body.email, body.password, role, school_id=sd.sid_ecole(db))
     # Lien automatique : si un Professeur est créé avec l'email de la fiche
     # enseignant, le compte est relié à la fiche (accès à l'espace enseignant).
     if role == ROLE_PROF:
         email_l = (body.email or "").strip().lower()
-        ens = db.scalar(select(Enseignant).where(func.lower(Enseignant.email) == email_l))
+        ens = db.scalar(
+            select(Enseignant).where(
+                Enseignant.school_id == sd.sid_ecole(db),
+                func.lower(Enseignant.email) == email_l,
+            )
+        )
         if ens is not None:
             user.enseignant_id = ens.id
             db.commit()

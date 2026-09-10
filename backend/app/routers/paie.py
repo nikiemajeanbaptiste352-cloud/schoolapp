@@ -28,6 +28,7 @@ from app.auth import ROLE_ADMIN, ROLE_PROF, get_current_user, require_roles
 from app.database import get_db
 from app.models import Classe, Ecole, Enseignant, EnseignantTaux, FichePaie, Matiere, Seance, User
 from app.schemas import MoisIn, SeanceIn, StatutFicheIn, TauxIn
+from app.services import sd
 
 router = APIRouter(prefix="/api/v1", tags=["espace enseignant & paie"])
 
@@ -74,7 +75,7 @@ def _heures_seance(debut: str, fin: str) -> float | None:
 
 
 def _devise(db: Session) -> str:
-    ecole = db.scalar(select(Ecole).limit(1))
+    ecole = db.scalar(select(Ecole).where(Ecole.id == sd.sid_ecole(db)).limit(1))
     return (ecole.devise if ecole and ecole.devise else "FCFA")
 
 
@@ -85,16 +86,16 @@ def _enseignant_du_prof(db: Session, user: User) -> Enseignant:
             status_code=403,
             detail="Votre compte n'est pas lié à une fiche enseignant. Contactez l'administration.",
         )
-    ens = db.get(Enseignant, user.enseignant_id)
+    ens = sd.get_enseignant(db, user.enseignant_id)
     if ens is None:
         raise HTTPException(status_code=404, detail="Fiche enseignant introuvable.")
     return ens
 
 
 def _seance_out(db: Session, s: Seance) -> dict:
-    ens = db.get(Enseignant, s.enseignant_id)
-    classe = db.get(Classe, s.classe_id)
-    matiere = db.get(Matiere, s.matiere_id) if s.matiere_id else None
+    ens = sd.get_enseignant(db, s.enseignant_id)
+    classe = sd.get_classe(db, s.classe_id)
+    matiere = sd.get_matiere(db, s.matiere_id) if s.matiere_id else None
     heures = _heures_seance(s.heure_debut, s.heure_fin)
     return {
         "id": s.id,
@@ -113,8 +114,8 @@ def _seance_out(db: Session, s: Seance) -> dict:
 
 
 def _fiche_out(db: Session, f: FichePaie) -> dict:
-    ens = db.get(Enseignant, f.enseignant_id)
-    matiere = db.get(Matiere, ens.matiere_id) if ens and ens.matiere_id else None
+    ens = sd.get_enseignant(db, f.enseignant_id)
+    matiere = sd.get_matiere(db, ens.matiere_id) if ens and ens.matiere_id else None
     return {
         "id": f.id,
         "enseignantId": f.enseignant_id,
@@ -134,6 +135,7 @@ def _verrouille_mois(db: Session, enseignant_id: str, mois: str) -> FichePaie | 
     """Fiche payée existante sur ce mois (verrouille les séances), sinon None."""
     return db.scalar(
         select(FichePaie).where(
+            FichePaie.school_id == sd.sid_ecole(db),
             FichePaie.enseignant_id == enseignant_id,
             FichePaie.mois == mois,
         )
@@ -149,8 +151,8 @@ def profil_enseignant(
     user: User = Depends(require_roles(ROLE_PROF)),
 ) -> dict:
     ens = _enseignant_du_prof(db, user)
-    taux = db.get(EnseignantTaux, ens.id)
-    matiere = db.get(Matiere, ens.matiere_id) if ens.matiere_id else None
+    taux = sd.get_taux(db, ens.id)
+    matiere = sd.get_matiere(db, ens.matiere_id) if ens.matiere_id else None
     return {
         "enseignant": {
             "id": ens.id,
@@ -183,7 +185,12 @@ def mes_seances(
     debut, fin = _bornes_mois(mois)
     rows = db.scalars(
         select(Seance)
-        .where(Seance.enseignant_id == ens.id, Seance.date >= debut, Seance.date <= fin)
+        .where(
+            Seance.school_id == ens.school_id,
+            Seance.enseignant_id == ens.id,
+            Seance.date >= debut,
+            Seance.date <= fin,
+        )
         .order_by(Seance.date, Seance.heure_debut)
     ).all()
     seances = [_seance_out(db, s) for s in rows]
@@ -217,7 +224,7 @@ def signer_seance(
         raise HTTPException(status_code=400, detail="Impossible de signer une séance dans le futur.")
 
     # Classe : l'enseignant ne signe que dans ses classes affectées
-    classe = db.get(Classe, body.classe_id)
+    classe = sd.get_classe(db, body.classe_id)
     if classe is None:
         raise HTTPException(status_code=400, detail="Classe inconnue.")
     if classe not in ens.classes:
@@ -231,7 +238,7 @@ def signer_seance(
     if matiere_id is None:
         matiere_id = ens.matiere_id
     if matiere_id is not None:
-        matiere = db.get(Matiere, matiere_id)
+        matiere = sd.get_matiere(db, matiere_id)
         if matiere is None:
             raise HTTPException(status_code=400, detail="Matière inconnue.")
         if matiere_id != ens.matiere_id:
@@ -257,6 +264,7 @@ def signer_seance(
         )
 
     seance = Seance(
+        school_id=ens.school_id,
         enseignant_id=ens.id,
         date=jour,
         classe_id=classe.id,
@@ -286,7 +294,7 @@ def annuler_seance(
     """Supprime une signature. Le Professeur ne supprime que la sienne ;
     l'administrateur peut corriger n'importe quelle séance."""
     seance = db.get(Seance, seance_id)
-    if seance is None:
+    if seance is None or seance.school_id != sd.sid_ecole(db):
         raise HTTPException(status_code=404, detail="Séance introuvable.")
     if user.role == ROLE_PROF:
         if user.enseignant_id != seance.enseignant_id:
@@ -314,7 +322,10 @@ def mes_fiches(
     ens = _enseignant_du_prof(db, user)
     rows = db.scalars(
         select(FichePaie)
-        .where(FichePaie.enseignant_id == ens.id)
+        .where(
+            FichePaie.school_id == ens.school_id,
+            FichePaie.enseignant_id == ens.id,
+        )
         .order_by(FichePaie.mois.desc())
     ).all()
     return {"fiches": [_fiche_out(db, f) for f in rows], "devise": _devise(db)}
@@ -328,11 +339,14 @@ def enseignants_paie(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    ens_list = db.scalars(select(Enseignant).order_by(Enseignant.id)).all()
+    sid = sd.sid_ecole(db)
+    ens_list = db.scalars(
+        select(Enseignant).where(Enseignant.school_id == sid).order_by(Enseignant.id)
+    ).all()
     result = []
     for ens in ens_list:
-        taux = db.get(EnseignantTaux, ens.id)
-        matiere = db.get(Matiere, ens.matiere_id) if ens.matiere_id else None
+        taux = sd.get_taux(db, ens.id)
+        matiere = sd.get_matiere(db, ens.matiere_id) if ens.matiere_id else None
         result.append(
             {
                 "id": ens.id,
@@ -358,15 +372,17 @@ def maj_taux(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    ens = db.get(Enseignant, enseignant_id)
+    ens = sd.get_enseignant(db, enseignant_id)
     if ens is None:
         raise HTTPException(status_code=404, detail="Enseignant introuvable.")
     taux = body.taux_horaire
     if taux is None or taux < 0:
         raise HTTPException(status_code=400, detail="Taux horaire invalide (≥ 0).")
-    ligne = db.get(EnseignantTaux, enseignant_id)
+    ligne = sd.get_taux(db, enseignant_id)
     if ligne is None:
-        ligne = EnseignantTaux(enseignant_id=enseignant_id, taux_horaire=taux)
+        ligne = EnseignantTaux(
+            school_id=ens.school_id, enseignant_id=enseignant_id, taux_horaire=taux
+        )
         db.add(ligne)
     else:
         ligne.taux_horaire = taux
@@ -385,9 +401,14 @@ def cahier_seances(
 ) -> dict:
     mois = _valider_mois(mois)
     debut, fin = _bornes_mois(mois)
+    sid = sd.sid_ecole(db)
     stmt = (
         select(Seance)
-        .where(Seance.date >= debut, Seance.date <= fin)
+        .where(
+            Seance.school_id == sid,
+            Seance.date >= debut,
+            Seance.date <= fin,
+        )
         .order_by(Seance.date, Seance.heure_debut, Seance.enseignant_id)
     )
     if enseignant_id:
@@ -413,24 +434,33 @@ def recap_paie(
 ) -> dict:
     mois = _valider_mois(mois)
     debut, fin = _bornes_mois(mois)
+    sid = sd.sid_ecole(db)
 
-    seances = db.scalars(select(Seance).where(Seance.date >= debut, Seance.date <= fin)).all()
+    seances = db.scalars(
+        select(Seance).where(
+            Seance.school_id == sid,
+            Seance.date >= debut,
+            Seance.date <= fin,
+        )
+    ).all()
     par_ens: dict[str, list[Seance]] = {}
     for s in seances:
         par_ens.setdefault(s.enseignant_id, []).append(s)
 
-    fiches = db.scalars(select(FichePaie).where(FichePaie.mois == mois)).all()
+    fiches = db.scalars(
+        select(FichePaie).where(FichePaie.school_id == sid, FichePaie.mois == mois)
+    ).all()
     fiche_par_ens = {f.enseignant_id: f for f in fiches}
 
     # Enseignants concernés : ayant signé au moins une séance OU déjà dotés d'une fiche
     concernes = sorted(set(par_ens) | set(fiche_par_ens))
     lignes = []
     for eid in concernes:
-        ens = db.get(Enseignant, eid)
+        ens = sd.get_enseignant(db, eid)
         if ens is None:
             continue
-        matiere = db.get(Matiere, ens.matiere_id) if ens.matiere_id else None
-        taux_row = db.get(EnseignantTaux, eid)
+        matiere = sd.get_matiere(db, ens.matiere_id) if ens.matiere_id else None
+        taux_row = sd.get_taux(db, eid)
         taux = taux_row.taux_horaire if taux_row else 0
         seances_ens = par_ens.get(eid, [])
         heures = round(sum(_heures_seance(s.heure_debut, s.heure_fin) or 0 for s in seances_ens), 2)
@@ -463,19 +493,28 @@ def generer_fiches(
 ) -> dict:
     mois = _valider_mois(body.mois)
     debut, fin = _bornes_mois(mois)
+    sid = sd.sid_ecole(db)
 
-    seances = db.scalars(select(Seance).where(Seance.date >= debut, Seance.date <= fin)).all()
+    seances = db.scalars(
+        select(Seance).where(
+            Seance.school_id == sid,
+            Seance.date >= debut,
+            Seance.date <= fin,
+        )
+    ).all()
     par_ens: dict[str, list[Seance]] = {}
     for s in seances:
         par_ens.setdefault(s.enseignant_id, []).append(s)
 
-    fiches = db.scalars(select(FichePaie).where(FichePaie.mois == mois)).all()
+    fiches = db.scalars(
+        select(FichePaie).where(FichePaie.school_id == sid, FichePaie.mois == mois)
+    ).all()
     fiche_par_ens = {f.enseignant_id: f for f in fiches}
 
     creees, maj, payees_ignorees, sans_taux = 0, 0, 0, []
     for eid, liste in sorted(par_ens.items()):
-        ens = db.get(Enseignant, eid)
-        taux_row = db.get(EnseignantTaux, eid)
+        ens = sd.get_enseignant(db, eid)
+        taux_row = sd.get_taux(db, eid)
         taux = taux_row.taux_horaire if taux_row else 0
         if ens is None:
             continue
@@ -496,6 +535,7 @@ def generer_fiches(
             sans_taux.append(eid)
         db.add(
             FichePaie(
+                school_id=sid,
                 enseignant_id=eid,
                 mois=mois,
                 heures=heures,
@@ -522,7 +562,7 @@ def maj_statut_fiche(
     _admin: User = Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
     fiche = db.get(FichePaie, fiche_id)
-    if fiche is None:
+    if fiche is None or fiche.school_id != sd.sid_ecole(db):
         raise HTTPException(status_code=404, detail="Fiche de paie introuvable.")
     statut = (body.statut or "").strip()
     if statut not in _STATUTS_FICHE:
@@ -541,7 +581,7 @@ def supprimer_fiche(
     _admin: User = Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
     fiche = db.get(FichePaie, fiche_id)
-    if fiche is None:
+    if fiche is None or fiche.school_id != sd.sid_ecole(db):
         raise HTTPException(status_code=404, detail="Fiche de paie introuvable.")
     if fiche.statut == "payee":
         raise HTTPException(

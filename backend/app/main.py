@@ -17,10 +17,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from app.config import FRONT_DIR, settings
 from app.database import SessionLocal, init_db
-from app.models import Annonce, Classe, Ecole, Eleve, Enseignant, Matiere
+from app.models import Annonce, Classe, Ecole, Eleve, Enseignant, Matiere, User
 from app.routers import (
     auth as auth_router,
     dashboard as dashboard_router,
@@ -33,7 +35,9 @@ from app.routers import (
     presences as presences_router,
     referentiel,
 )
+from app.security import decode_token
 from app.seed import seed_all, seed_bootstrap, seed_users
+from app.services import sd
 
 
 @asynccontextmanager
@@ -73,6 +77,44 @@ app.add_middleware(
 )
 
 
+async def _contexte_ecole_par_jeton(request: Request, call_next):
+    """Pose le contexte école (Phase 2) à partir du jeton Bearer.
+
+    Indispensable : les dépendances synchrones (`get_current_user`) et les
+    endpoints synchrones s'exécutent dans des threads de travail distincts ;
+    un ContextVar posé dans la dépendance ne serait pas visible dans le corps
+    de l'endpoint. Ici, le contexte est posé dans la tâche ASGI de la requête,
+    puis copié dans chaque thread de travail lancé ensuite — l'isolation par
+    `school_id` est donc fiable pour toutes les routes (publiques incluses,
+    quand un jeton est fourni).
+
+    Les jetons invalides sont ignorés silencieusement : l'authentification
+    stricte reste gérée par les dépendances des routeurs.
+    """
+    entete = request.headers.get("authorization", "")
+    if entete.lower().startswith("bearer "):
+        jeton = entete[7:].strip()
+        try:
+            sub = decode_token(jeton).get("sub")
+            if sub is not None:
+                db = SessionLocal()
+                try:
+                    utilisateur = db.get(User, int(sub))
+                    if utilisateur is not None:
+                        sd.definir_ecole_courante(utilisateur.school_id)
+                finally:
+                    db.close()
+        except Exception:
+            pass  # jeton illisible → contexte par défaut (première école).
+    try:
+        return await call_next(request)
+    finally:
+        sd.definir_ecole_courante(None)
+
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=_contexte_ecole_par_jeton)
+
+
 # ---------------------------------------------------------------
 # Santé / vérification du seed
 # ---------------------------------------------------------------
@@ -80,15 +122,30 @@ app.add_middleware(
 def health() -> dict:
     db = SessionLocal()
     try:
+        # Multi-établissements (Phase 2) : les compteurs reflètent l'école de
+        # référence (école par défaut quand l'appel est public, comme avant).
+        sid = sd.sid_ecole(db)
         counts = {
             "ecole": db.scalar(select(func.count(Ecole.id))),
-            "classes": db.scalar(select(func.count(Classe.id))),
-            "matieres": db.scalar(select(func.count(Matiere.id))),
-            "enseignants": db.scalar(select(func.count(Enseignant.id))),
-            "eleves": db.scalar(select(func.count(Eleve.id))),
-            "annonces": db.scalar(select(func.count(Annonce.id))),
+            "classes": db.scalar(
+                select(func.count(Classe.id)).where(Classe.school_id == sid)
+            ),
+            "matieres": db.scalar(
+                select(func.count(Matiere.id)).where(Matiere.school_id == sid)
+            ),
+            "enseignants": db.scalar(
+                select(func.count(Enseignant.id)).where(Enseignant.school_id == sid)
+            ),
+            "eleves": db.scalar(
+                select(func.count(Eleve.id)).where(Eleve.school_id == sid)
+            ),
+            "annonces": db.scalar(
+                select(func.count(Annonce.id)).where(Annonce.school_id == sid)
+            ),
         }
-        ecole_nom = db.scalar(select(Ecole.nom).limit(1))
+        ecole_nom = db.scalar(
+            select(Ecole.nom).where(Ecole.id == sid).limit(1)
+        )
     finally:
         db.close()
     return {

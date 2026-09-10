@@ -42,8 +42,10 @@ def etat_complet(
     db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict:
+    sid = sd.sid_ecole(db)
+
     # ----------------------------------------------------------- École
-    ecole = db.scalar(select(Ecole).limit(1))
+    ecole = db.scalar(select(Ecole).where(Ecole.id == sid).limit(1))
     ecole_out: dict = {}
     if ecole is not None:
         ecole_out = {
@@ -59,7 +61,9 @@ def etat_complet(
         }
 
     # --------------------------------------------------------- Classes
-    classes = db.scalars(select(Classe)).all()
+    classes = db.scalars(
+        select(Classe).where(Classe.school_id == sid)
+    ).all()
     classes = sorted(
         classes,
         key=lambda c: CLASSES_ORDER.index(c.id) if c.id in CLASSES_ORDER else 999,
@@ -67,20 +71,28 @@ def etat_complet(
     classes_out = [sd.classe_to_dict(db, c, effectif=True) for c in classes]
 
     # -------------------------------------------------------- Matières
-    matieres = db.scalars(select(Matiere).order_by(Matiere.id)).all()
+    matieres = db.scalars(
+        select(Matiere).where(Matiere.school_id == sid).order_by(Matiere.id)
+    ).all()
     matieres_out = [sd.matiere_to_dict(m) for m in matieres]
 
     # ------------------------------------------------------ Enseignants
-    enseignants = db.scalars(select(Enseignant).order_by(Enseignant.id)).all()
+    enseignants = db.scalars(
+        select(Enseignant).where(Enseignant.school_id == sid).order_by(Enseignant.id)
+    ).all()
     enseignants_out = [sd.enseignant_to_dict(e) for e in enseignants]
 
     # ----------------------------------------------------------- Élèves
-    eleves = db.scalars(select(Eleve).order_by(Eleve.id)).all()
+    eleves = db.scalars(
+        select(Eleve).where(Eleve.school_id == sid).order_by(Eleve.id)
+    ).all()
     eleves_out = [sd.eleve_to_dict(e) for e in eleves]
 
     # ------------------------------------------------------------ Notes
     notes = db.execute(
-        select(Note).order_by(Note.eleve_id, Note.matiere_id)
+        select(Note)
+        .where(Note.school_id == sid)
+        .order_by(Note.eleve_id, Note.matiere_id)
     ).scalars().all()
     notes_out = [
         {
@@ -98,7 +110,9 @@ def etat_complet(
 
     # -------------------------------------------------------- Présences
     presences = db.execute(
-        select(Presence).order_by(Presence.eleve_id, Presence.date)
+        select(Presence)
+        .where(Presence.school_id == sid)
+        .order_by(Presence.eleve_id, Presence.date)
     ).scalars().all()
     presences_out = [
         {
@@ -111,11 +125,15 @@ def etat_complet(
     ]
 
     # --------------------------------------------------------- Paiements
-    paiements = db.scalars(select(Paiement).order_by(Paiement.eleve_id)).all()
+    paiements = db.scalars(
+        select(Paiement).where(Paiement.school_id == sid).order_by(Paiement.eleve_id)
+    ).all()
     paiements_out = [_paiement_out(db, p) for p in paiements]
 
     # --------------------------------------------------------- Annonces
-    annonces = db.scalars(select(Annonce).order_by(Annonce.date)).all()
+    annonces = db.scalars(
+        select(Annonce).where(Annonce.school_id == sid).order_by(Annonce.date)
+    ).all()
     annonces_out = [sd.annonce_to_dict(a) for a in annonces]
 
     return {

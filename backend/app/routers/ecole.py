@@ -12,7 +12,7 @@ from app.auth import ROLE_ADMIN, require_roles
 from app.database import get_db
 from app.models import Annonce, Ecole
 from app.schemas import EcoleOut, MessageOut
-from app.services.sd import annonce_to_dict
+from app.services import sd
 
 router = APIRouter(prefix="/api/v1", tags=["école & annonces"])
 
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1", tags=["école & annonces"])
 # ---------------------------------------------------------------------------
 @router.get("/ecole", response_model=EcoleOut, summary="Informations de l'école")
 def lire_ecole(db: Session = Depends(get_db)) -> Ecole:
-    ecole = db.scalar(select(Ecole).limit(1))
+    ecole = db.scalar(select(Ecole).where(Ecole.id == sd.sid_ecole(db)).limit(1))
     if ecole is None:
         raise HTTPException(status_code=404, detail="École non configurée.")
     return ecole
@@ -65,7 +65,7 @@ def modifier_ecole(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> Ecole:
-    ecole = db.scalar(select(Ecole).limit(1))
+    ecole = db.scalar(select(Ecole).where(Ecole.id == sd.sid_ecole(db)).limit(1))
     if ecole is None:
         raise HTTPException(status_code=404, detail="École non configurée.")
     # Mise à jour partielle : seuls les champs fournis sont modifiés.
@@ -82,8 +82,11 @@ def modifier_ecole(
 # ---------------------------------------------------------------------------
 @router.get("/annonces", summary="Liste des annonces")
 def liste_annonces(db: Session = Depends(get_db)) -> dict:
-    annonces = db.execute(select(Annonce).order_by(Annonce.date)).scalars().all()
-    return {"annonces": [annonce_to_dict(a) for a in annonces]}
+    sid = sd.sid_ecole(db)
+    annonces = db.execute(
+        select(Annonce).where(Annonce.school_id == sid).order_by(Annonce.date)
+    ).scalars().all()
+    return {"annonces": [sd.annonce_to_dict(a) for a in annonces]}
 
 
 @router.post("/annonces", summary="Créer une annonce (admin)")
@@ -93,9 +96,13 @@ def creer_annonce(
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
     # Identifiant auto : A{max+1} (max numérique — A10 > A9 en ordre chaîne)
-    tous = db.execute(select(Annonce.id)).scalars().all()
+    sid = sd.sid_ecole(db)
+    tous = db.execute(
+        select(Annonce.id).where(Annonce.school_id == sid)
+    ).scalars().all()
     num = max((int(a[1:]) for a in tous if a[:1] == "A" and a[1:].isdigit()), default=0) + 1
     annonce = Annonce(
+        school_id=sid,
         id=f"A{num}",
         titre=payload["titre"],
         contenu=payload["contenu"],
@@ -107,7 +114,7 @@ def creer_annonce(
     db.add(annonce)
     db.commit()
     db.refresh(annonce)
-    return annonce_to_dict(annonce)
+    return sd.annonce_to_dict(annonce)
 
 
 @router.put("/annonces/{annonce_id}", summary="Modifier une annonce (admin)")
@@ -117,7 +124,7 @@ def modifier_annonce(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    annonce = db.get(Annonce, annonce_id)
+    annonce = sd.get_annonce(db, annonce_id)
     if annonce is None:
         raise HTTPException(status_code=404, detail="Annonce introuvable.")
     for champ in ("titre", "contenu", "categorie", "auteur"):
@@ -129,7 +136,7 @@ def modifier_annonce(
         annonce.important = bool(payload["important"])
     db.commit()
     db.refresh(annonce)
-    return annonce_to_dict(annonce)
+    return sd.annonce_to_dict(annonce)
 
 
 @router.delete("/annonces/{annonce_id}", response_model=MessageOut, summary="Supprimer une annonce (admin)")
@@ -138,7 +145,7 @@ def supprimer_annonce(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> MessageOut:
-    annonce = db.get(Annonce, annonce_id)
+    annonce = sd.get_annonce(db, annonce_id)
     if annonce is None:
         raise HTTPException(status_code=404, detail="Annonce introuvable.")
     db.delete(annonce)

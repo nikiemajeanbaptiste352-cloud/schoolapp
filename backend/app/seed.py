@@ -208,13 +208,19 @@ def seed_all(db: Session) -> bool:
     # --- Classes & matières ---
     classes = {}
     for cid, nom, cycle, salle, principal in CLASSES:
-        c = Classe(id=cid, nom=nom, cycle=cycle, salle=salle, principal_id=principal)
+        c = Classe(
+            school_id=ECOLE_DEMO_ID, id=cid, nom=nom,
+            cycle=cycle, salle=salle, principal_id=principal,
+        )
         db.add(c)
         classes[cid] = c
 
     matieres = {}
     for mid, nom, coef, icone, couleur in MATIERES:
-        m = Matiere(id=mid, nom=nom, coef=coef, icone=icone, couleur=couleur)
+        m = Matiere(
+            school_id=ECOLE_DEMO_ID, id=mid, nom=nom,
+            coef=coef, icone=icone, couleur=couleur,
+        )
         db.add(m)
         matieres[mid] = m
 
@@ -222,19 +228,23 @@ def seed_all(db: Session) -> bool:
     for cid, _, cycle, _, _ in CLASSES:
         programme = PROGRAMME_LYCEE if cycle == "Lycée" else PROGRAMME_COLLEGE
         for ordre, mid in enumerate(programme):
-            db.execute(classe_matiere.insert().values(classe_id=cid, matiere_id=mid, ordre=ordre))
+            db.execute(classe_matiere.insert().values(
+                school_id=ECOLE_DEMO_ID, classe_id=cid, matiere_id=mid, ordre=ordre,
+            ))
 
     # --- Enseignants ---
     enseignants = {}
     for eid, nom, prenom, sexe, tel, email, mat, clses in ENSEIGNANTS:
         e = Enseignant(
-            id=eid, nom=nom, prenom=prenom, sexe=sexe, tel=tel,
-            email=email, matiere_id=mat, statut="Actif",
+            school_id=ECOLE_DEMO_ID, id=eid, nom=nom, prenom=prenom, sexe=sexe,
+            tel=tel, email=email, matiere_id=mat, statut="Actif",
         )
         db.add(e)
         enseignants[eid] = e
         for cid in clses:
-            db.execute(enseignant_classe.insert().values(enseignant_id=eid, classe_id=cid))
+            db.execute(enseignant_classe.insert().values(
+                school_id=ECOLE_DEMO_ID, enseignant_id=eid, classe_id=cid,
+            ))
 
     # --- Élèves + parents ---
     for i, row in enumerate(ELEVES_BRUTS):
@@ -247,6 +257,7 @@ def seed_all(db: Session) -> bool:
             f"70 {10 + (n * 3) % 40:02d} {11 + (n * 7) % 40:02d} {22 + (n * 5) % 40:02d}"
         )
         parent = Parent(
+            school_id=ECOLE_DEMO_ID,
             nom=f"{prenom_parent} {nom}",
             lien="Père" if i % 2 == 0 else "Mère",
             tel=tel_parent,
@@ -259,7 +270,7 @@ def seed_all(db: Session) -> bool:
 
         inscription = date(2020, 9, 10 + (i % 9))
         db.add(Eleve(
-            id=eid, nom=nom, prenom=prenom, sexe=sexe,
+            school_id=ECOLE_DEMO_ID, id=eid, nom=nom, prenom=prenom, sexe=sexe,
             naissance=date.fromisoformat(naissance),
             classe_id=cid, statut=statut, inscription=inscription,
             parent_id=parent.id,
@@ -281,7 +292,7 @@ def seed_all(db: Session) -> bool:
                 base = 9 + (n % 6)  # 9 à 14
                 note = max(4, min(19.5, js_round((base + r * 5) * 2) / 2))
                 db.add(Note(
-                    eleve_id=eid, matiere_id=mat_id,
+                    school_id=ECOLE_DEMO_ID, eleve_id=eid, matiere_id=mat_id,
                     eval=EVALS[ei], note=note,
                 ))
 
@@ -296,7 +307,8 @@ def seed_all(db: Session) -> bool:
             else:
                 statut = "P"
             db.add(Presence(
-                eleve_id=row[0], date=debut + timedelta(weeks=s), statut=statut,
+                school_id=ECOLE_DEMO_ID, eleve_id=row[0],
+                date=debut + timedelta(weeks=s), statut=statut,
             ))
 
     # --- Paiements + versements (portage de data.js) ---
@@ -307,7 +319,7 @@ def seed_all(db: Session) -> bool:
         total = 200000 if cls[2] == "Lycée" else 150000
         regime = n % 4
         pai = Paiement(
-            eleve_id=eid,
+            school_id=ECOLE_DEMO_ID, eleve_id=eid,
             motif=f"Frais de scolarité {ECOLES['annee']}",
             total=total,
         )
@@ -316,7 +328,7 @@ def seed_all(db: Session) -> bool:
         nb_versements = {0: 3, 1: 2, 2: 1, 3: 0}[regime]
         for j in range(nb_versements):
             db.add(Versement(
-                paiement_id=pai.id,
+                school_id=ECOLE_DEMO_ID, paiement_id=pai.id,
                 montant=MONTANTS[j],
                 date=date.fromisoformat(DATES_PAIEMENT[j]),
                 mode=MODES[j],
@@ -325,9 +337,10 @@ def seed_all(db: Session) -> bool:
     # --- Annonces ---
     for i, a in enumerate(ANNONCES, start=1):
         db.add(Annonce(
-            id=f"A{i}", titre=a["titre"], contenu=a["contenu"],
-            categorie=a["categorie"], date=date.fromisoformat(a["date"]),
-            auteur=a["auteur"], important=a["important"],
+            school_id=ECOLE_DEMO_ID, id=f"A{i}", titre=a["titre"],
+            contenu=a["contenu"], categorie=a["categorie"],
+            date=date.fromisoformat(a["date"]), auteur=a["auteur"],
+            important=a["important"],
         ))
 
     db.commit()
@@ -340,9 +353,14 @@ def seed_all(db: Session) -> bool:
 # Mot de passe unique commun à tous les comptes de démo (documenté).
 PASSWORD_DEMO = "Savoir2026!"
 
+# École de démonstration : l'historique mono-école est rapatrié sous l'école n°1
+# (l'isolation school_id impose `school_id` sur chaque ligne insérée).
+ECOLE_DEMO_ID = 1
+
 
 def _nouvel_user(
     db: Session, email: str, role: str, nom: str,
+    school_id: int | None = None,
     eleve_id: str | None = None,
     enseignant_id: str | None = None,
     parent_id: int | None = None,
@@ -355,6 +373,7 @@ def _nouvel_user(
         role=role,
         nom=nom,
         actif=True,
+        school_id=school_id,
         eleve_id=eleve_id,
         enseignant_id=enseignant_id,
         parent_id=parent_id,
@@ -373,28 +392,31 @@ def seed_users(db: Session) -> bool:
         return False
 
     # 1. Administrateur
-    _nouvel_user(db, "admin@lesavoir.edu", "Administrateur", "Administration")
+    _nouvel_user(db, "admin@lesavoir.edu", "Administrateur", "Administration",
+                 school_id=ECOLE_DEMO_ID)
 
     # 2. Professeurs (liés à leur fiche enseignant)
     for eid, nom, prenom, _sexe, _tel, email, _mat, _clses in ENSEIGNANTS:
-        _nouvel_user(db, email, "Professeur", f"{prenom} {nom}", enseignant_id=eid)
+        _nouvel_user(db, email, "Professeur", f"{prenom} {nom}",
+                     school_id=ECOLE_DEMO_ID, enseignant_id=eid)
 
     # 3. Élèves (liés à leur fiche élève) — email : prenom.nom@lesavoir.edu
     for row in ELEVES_BRUTS:
         eid, nom, prenom = row[0], row[1], row[2]
         _nouvel_user(
             db, f"{norm_email(prenom, nom)}@lesavoir.edu", "Élève",
-            f"{prenom} {nom}", eleve_id=eid,
+            f"{prenom} {nom}", school_id=ECOLE_DEMO_ID, eleve_id=eid,
         )
 
     # 4. Parents (liés à la fiche parent du premier enfant trouvé)
     for row in ELEVES_BRUTS:
-        eleve = db.get(Eleve, row[0])
+        eleve = db.get(Eleve, (ECOLE_DEMO_ID, row[0]))
         if eleve is None or eleve.parent is None:
             continue
         _nouvel_user(
             db, eleve.parent.email, "Parent",
-            eleve.parent.nom, parent_id=eleve.parent.id,
+            eleve.parent.nom, school_id=ECOLE_DEMO_ID,
+            parent_id=eleve.parent.id,
         )
 
     db.commit()

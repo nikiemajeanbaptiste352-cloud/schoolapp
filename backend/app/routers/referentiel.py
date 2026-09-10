@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth import ROLE_ADMIN, require_roles
@@ -35,7 +35,10 @@ router = APIRouter(prefix="/api/v1", tags=["référentiel"])
 # ---------------------------------------------------------------------------
 @router.get("/classes", summary="Liste des classes (avec effectif)")
 def liste_classes(db: Session = Depends(get_db)) -> dict:
-    classes = db.execute(select(Classe)).scalars().all()
+    sid = sd.sid_ecole(db)
+    classes = db.execute(
+        select(Classe).where(Classe.school_id == sid)
+    ).scalars().all()
     # Ordre stable identique à data.js, puis les codes hors programme (ex. 6C)
     # ajoutés depuis l'interface, triés par code.
     par_id = {c.id: c for c in classes}
@@ -57,7 +60,9 @@ def detail_classe(classe_id: str, db: Session = Depends(get_db)) -> dict:
     matieres = sd.matieres_de_classe(db, classe_id)
     # Professeurs intervenant dans cette classe
     profs = db.execute(
-        select(Enseignant).join(Enseignant.classes).where(Classe.id == classe_id)
+        select(Enseignant).join(Enseignant.classes).where(
+            Classe.school_id == sd.sid_ecole(db), Classe.id == classe_id
+        )
     ).scalars().all()
 
     return {
@@ -87,7 +92,10 @@ def emploi_du_temps(classe_id: str, db: Session = Depends(get_db)) -> dict:
 # ---------------------------------------------------------------------------
 @router.get("/matieres", summary="Liste des matières")
 def liste_matieres(db: Session = Depends(get_db)) -> dict:
-    matieres = db.execute(select(Matiere)).scalars().all()
+    sid = sd.sid_ecole(db)
+    matieres = db.execute(
+        select(Matiere).where(Matiere.school_id == sid)
+    ).scalars().all()
     par_id = {m.id: m for m in matieres}
 
     def cle_num(m):
@@ -108,7 +116,10 @@ def liste_matieres(db: Session = Depends(get_db)) -> dict:
 # ---------------------------------------------------------------------------
 @router.get("/enseignants", summary="Liste des enseignants")
 def liste_enseignants(db: Session = Depends(get_db)) -> dict:
-    ens = db.execute(select(Enseignant).order_by(Enseignant.id)).scalars().all()
+    sid = sd.sid_ecole(db)
+    ens = db.execute(
+        select(Enseignant).where(Enseignant.school_id == sid).order_by(Enseignant.id)
+    ).scalars().all()
     return {"enseignants": [sd.enseignant_to_dict(e) for e in ens]}
 
 
@@ -123,8 +134,10 @@ def detail_enseignant(enseignant_id: str, db: Session = Depends(get_db)) -> dict
 # ---------------------------------------------------------------------------
 # Enseignants — gestion (admin) : création / modification / suppression
 # ---------------------------------------------------------------------------
-def _nouvel_id_enseignant(db: Session) -> str:
-    max_id = db.scalar(select(func.max(Enseignant.id)))  # ex : "T012"
+def _nouvel_id_enseignant(db: Session, sid: int) -> str:
+    max_id = db.scalar(
+        select(func.max(Enseignant.id)).where(Enseignant.school_id == sid)
+    )  # ex : "T012"
     num = int(re.sub(r"\D", "", max_id or "T000")) + 1
     return f"T{num:03d}"
 
@@ -151,8 +164,10 @@ def creer_enseignant(
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
     _valider_enseignant(db, payload)
+    sid = sd.sid_ecole(db)
     ens = Enseignant(
-        id=_nouvel_id_enseignant(db),
+        school_id=sid,
+        id=_nouvel_id_enseignant(db, sid),
         nom=(payload.get("nom") or "").strip(),
         prenom=(payload.get("prenom") or "").strip(),
         sexe=payload.get("sexe", "M"),
@@ -202,9 +217,15 @@ def supprimer_enseignant(
     ens = sd.get_enseignant(db, enseignant_id)
     if ens is None:
         raise HTTPException(status_code=404, detail="Enseignant introuvable.")
-    # Délie la fonction de professeur principal sur les classes concernées
-    for cls in db.scalars(select(Classe).where(Classe.principal_id == enseignant_id)):
-        cls.principal_id = None
+    # Délie la fonction de professeur principal sur les classes concernées.
+    # UPDATE SQL direct (avant suppression) : nuller via l'ORM déclencherait un
+    # null-out de la PK composée (school_id + principal_id) — interdit.
+    sid = sd.sid_ecole(db)
+    db.execute(
+        update(Classe)
+        .where(Classe.school_id == sid, Classe.principal_id == enseignant_id)
+        .values(principal_id=None)
+    )
     db.delete(ens)
     db.commit()
     return {"message": f"Enseignant {enseignant_id} supprimé."}
@@ -240,7 +261,7 @@ def creer_classe(
         raise HTTPException(status_code=400, detail="Le code de la classe est obligatoire (ex. 6C, TA).")
     if not re.fullmatch(r"[A-Z0-9]{1,6}", code):
         raise HTTPException(status_code=400, detail="Code invalide : lettres et chiffres uniquement (ex. 6C, TA).")
-    if db.get(Classe, code) is not None:
+    if sd.get_classe(db, code) is not None:
         raise HTTPException(status_code=409, detail=f"Une classe porte déjà le code {code}.")
     cycle = payload.get("cycle") or _inferer_cycle(code)
     if cycle not in _CYCLES:
@@ -249,7 +270,10 @@ def creer_classe(
     principal = _principal_valide(db, payload.get("principal"))
     salle = (str(payload.get("salle") or "")).strip() or "—"
 
-    cls = Classe(id=code, nom=nom, cycle=cycle, salle=salle, principal_id=principal)
+    cls = Classe(
+        school_id=sd.sid_ecole(db),
+        id=code, nom=nom, cycle=cycle, salle=salle, principal_id=principal,
+    )
     db.add(cls)
     db.commit()
     db.refresh(cls)
@@ -263,7 +287,7 @@ def modifier_classe(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    cls = db.get(Classe, classe_id)
+    cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
 
@@ -292,18 +316,32 @@ def supprimer_classe(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    cls = db.get(Classe, classe_id)
+    cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
-    nb = db.scalar(select(func.count(Eleve.id)).where(Eleve.classe_id == classe_id)) or 0
+    sid = sd.sid_ecole(db)
+    nb = db.scalar(
+        select(func.count(Eleve.id)).where(
+            Eleve.school_id == sid, Eleve.classe_id == classe_id
+        )
+    ) or 0
     if nb:
         raise HTTPException(
             status_code=409,
             detail=f"Suppression impossible : {nb} élève(s) encore inscrit(s) dans cette classe.",
         )
     # Retire les liens matière↔classe et enseignant↔classe avant suppression
-    db.execute(classe_matiere.delete().where(classe_matiere.c.classe_id == classe_id))
-    db.execute(enseignant_classe.delete().where(enseignant_classe.c.classe_id == classe_id))
+    db.execute(
+        classe_matiere.delete().where(
+            classe_matiere.c.school_id == sid, classe_matiere.c.classe_id == classe_id
+        )
+    )
+    db.execute(
+        enseignant_classe.delete().where(
+            enseignant_classe.c.school_id == sid,
+            enseignant_classe.c.classe_id == classe_id,
+        )
+    )
     db.delete(cls)
     db.commit()
     return {"message": f"Classe {classe_id} supprimée."}
@@ -312,8 +350,10 @@ def supprimer_classe(
 # ---------------------------------------------------------------------------
 # Matières — gestion (admin) : création / modification / suppression
 # ---------------------------------------------------------------------------
-def _nouvel_id_matiere(db: Session) -> str:
-    max_id = db.scalar(select(func.max(Matiere.id)))  # ex : "S8"
+def _nouvel_id_matiere(db: Session, sid: int) -> str:
+    max_id = db.scalar(
+        select(func.max(Matiere.id)).where(Matiere.school_id == sid)
+    )  # ex : "S8"
     num = int(re.sub(r"\D", "", max_id or "S0")) + 1
     return f"S{num}"
 
@@ -339,8 +379,10 @@ def creer_matiere(
         raise HTTPException(status_code=400, detail="Le nom de la matière est obligatoire.")
     coef = _coef_valide(payload.get("coef", 1))
 
+    sid = sd.sid_ecole(db)
     mat = Matiere(
-        id=_nouvel_id_matiere(db),
+        school_id=sid,
+        id=_nouvel_id_matiere(db, sid),
         nom=nom,
         coef=coef,
         icone=payload.get("icone") or "📘",
@@ -359,7 +401,7 @@ def modifier_matiere(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    mat = db.get(Matiere, matiere_id)
+    mat = sd.get_matiere(db, matiere_id)
     if mat is None:
         raise HTTPException(status_code=404, detail="Matière introuvable.")
 
@@ -386,19 +428,33 @@ def supprimer_matiere(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
-    mat = db.get(Matiere, matiere_id)
+    mat = sd.get_matiere(db, matiere_id)
     if mat is None:
         raise HTTPException(status_code=404, detail="Matière introuvable.")
-    nb_notes = db.scalar(select(func.count(Note.id)).where(Note.matiere_id == matiere_id)) or 0
+    sid = sd.sid_ecole(db)
+    nb_notes = db.scalar(
+        select(func.count(Note.id)).where(
+            Note.school_id == sid, Note.matiere_id == matiere_id
+        )
+    ) or 0
     if nb_notes:
         raise HTTPException(
             status_code=409,
             detail=f"Suppression impossible : {nb_notes} note(s) existent dans cette matière.",
         )
-    # Délie les enseignants rattachés (matiere_id nullable) et les programmes de classes
-    for ens in db.scalars(select(Enseignant).where(Enseignant.matiere_id == matiere_id)):
-        ens.matiere_id = None
-    db.execute(classe_matiere.delete().where(classe_matiere.c.matiere_id == matiere_id))
+    # Délie les enseignants rattachés (matiere_id nullable) et les programmes de classes.
+    # UPDATE SQL direct (avant suppression) : nuller via l'ORM déclencherait un
+    # null-out de la PK composée (school_id + matiere_id) — interdit.
+    db.execute(
+        update(Enseignant)
+        .where(Enseignant.school_id == sid, Enseignant.matiere_id == matiere_id)
+        .values(matiere_id=None)
+    )
+    db.execute(
+        classe_matiere.delete().where(
+            classe_matiere.c.school_id == sid, classe_matiere.c.matiere_id == matiere_id
+        )
+    )
     db.delete(mat)
     db.commit()
     return {"message": f"Matière {matiere_id} supprimée."}

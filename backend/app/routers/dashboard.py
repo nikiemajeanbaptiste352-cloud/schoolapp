@@ -24,20 +24,30 @@ router = APIRouter(prefix="/api/v1", tags=["tableau de bord"])
 
 @router.get("/dashboard", summary="Agrégats du tableau de bord")
 def resume_dashboard(db: Session = Depends(get_db)) -> dict:
+    sid = sd.sid_ecole(db)
     # --- Compteurs généraux ---
-    actifs = db.scalar(select(func.count(Eleve.id)).where(Eleve.statut == "Actif")) or 0
-    enseignants = db.scalar(select(func.count(Enseignant.id))) or 0
-    classes_nb = db.scalar(select(func.count(Classe.id))) or 0
+    actifs = db.scalar(
+        select(func.count(Eleve.id)).where(
+            Eleve.school_id == sid, Eleve.statut == "Actif"
+        )
+    ) or 0
+    enseignants = db.scalar(
+        select(func.count(Enseignant.id)).where(Enseignant.school_id == sid)
+    ) or 0
+    classes_nb = db.scalar(
+        select(func.count(Classe.id)).where(Classe.school_id == sid)
+    ) or 0
 
     # --- Effectifs par classe ---
     lignes = db.execute(
         select(Eleve.classe_id, func.count(Eleve.id))
+        .where(Eleve.school_id == sid)
         .group_by(Eleve.classe_id)
     ).all()
     effectifs = {cid: nb for cid, nb in lignes}
     par_classe = []
     for cls_id in sd.CLASSES_ORDER:
-        cls = db.get(Classe, cls_id)
+        cls = sd.get_classe(db, cls_id)
         if cls:
             par_classe.append({
                 "id": cls.id, "nom": cls.nom, "cycle": cls.cycle,
@@ -45,32 +55,43 @@ def resume_dashboard(db: Session = Depends(get_db)) -> dict:
             })
 
     # --- Présence globale (taux moyen sur les 12 semaines) ---
-    presences = db.execute(select(Presence)).scalars().all()
+    presences = db.execute(
+        select(Presence).where(Presence.school_id == sid)
+    ).scalars().all()
     taux_presence = 100
     if presences:
         absents = sum(1 for p in presences if p.statut == "A")
         taux_presence = round((len(presences) - absents) / len(presences) * 100)
 
     # --- Répartition des statuts de paiement ---
-    paiements = db.execute(select(Paiement)).scalars().all()
+    paiements = db.execute(
+        select(Paiement).where(Paiement.school_id == sid)
+    ).scalars().all()
     statuts = {"Payé": 0, "Partiellement payé": 0, "Impayé": 0}
     for p in paiements:
         s = sd.statut_paiement(p)
         statuts[s] = statuts.get(s, 0) + 1
 
     # --- Moyenne générale de l'établissement ---
-    eleves = db.execute(select(Eleve)).scalars().all()
+    eleves = db.execute(
+        select(Eleve).where(Eleve.school_id == sid)
+    ).scalars().all()
     moyennes = [sd.moyennes_eleve(db, e.id)["generale"] for e in eleves]
     moyenne_etab = round(sum(moyennes) / len(moyennes), 2) if moyennes else 0
 
-    annonces = db.execute(select(Annonce).order_by(Annonce.date.desc()).limit(3)).scalars().all()
+    annonces = db.execute(
+        select(Annonce).where(Annonce.school_id == sid)
+        .order_by(Annonce.date.desc()).limit(3)
+    ).scalars().all()
 
     return {
         "compteurs": {
             "elevesActifs": actifs,
             "enseignants": enseignants,
             "classes": classes_nb,
-            "matieres": db.scalar(select(func.count(Matiere.id))) or 0,
+            "matieres": db.scalar(
+                select(func.count(Matiere.id)).where(Matiere.school_id == sid)
+            ) or 0,
         },
         "tauxPresence": taux_presence,
         "moyenneGenerale": moyenne_etab,

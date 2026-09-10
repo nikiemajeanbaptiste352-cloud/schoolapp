@@ -63,7 +63,8 @@ def liste_eleves(
     user: User = Depends(get_current_user),
 ) -> dict:
     ids = _ids_autorises(db, user)
-    stmt = select(Eleve)
+    sid = sd.sid_ecole(db)
+    stmt = select(Eleve).where(Eleve.school_id == sid)
     if ids is not None:
         stmt = stmt.where(Eleve.id.in_(ids))
     if classe:
@@ -107,7 +108,9 @@ def _construire_fiche(
 ) -> dict:
     cls = eleve.classe
     pres = db.execute(
-        select(sd.Presence).where(sd.Presence.eleve_id == eleve.id).order_by(sd.Presence.date)
+        select(sd.Presence)
+        .where(sd.Presence.school_id == eleve.school_id, sd.Presence.eleve_id == eleve.id)
+        .order_by(sd.Presence.date)
     ).scalars().all()
     nb_abs = sum(1 for p in pres if p.statut == "A")
     nb_ret = sum(1 for p in pres if p.statut == "R")
@@ -164,8 +167,10 @@ def _construire_fiche(
 # ---------------------------------------------------------------------------
 # Création / modification / suppression
 # ---------------------------------------------------------------------------
-def _nouvel_id(db: Session) -> str:
-    max_id = db.scalar(select(func.max(Eleve.id)))  # ex : "EL015"
+def _nouvel_id(db: Session, sid: int) -> str:
+    max_id = db.scalar(
+        select(func.max(Eleve.id)).where(Eleve.school_id == sid)
+    )  # ex : "EL015"
     num = int(re.sub(r"\D", "", max_id or "EL000")) + 1
     return f"EL{num:03d}"
 
@@ -176,6 +181,7 @@ def creer_eleve(
     db: Session = Depends(get_db),
     _admin=Depends(require_roles(ROLE_ADMIN)),
 ) -> dict:
+    sid = sd.sid_ecole(db)
     classe_id = payload["classe"]
     if sd.get_classe(db, classe_id) is None:
         raise HTTPException(status_code=400, detail="Classe inconnue.")
@@ -184,6 +190,7 @@ def creer_eleve(
     parent = None
     if parent_data:
         parent = Parent(
+            school_id=sid,
             nom=parent_data.get("nom", ""),
             lien=parent_data.get("lien", "Père"),
             tel=parent_data.get("tel", ""),
@@ -195,7 +202,8 @@ def creer_eleve(
         db.flush()
 
     eleve = Eleve(
-        id=_nouvel_id(db),
+        school_id=sid,
+        id=_nouvel_id(db, sid),
         nom=payload["nom"],
         prenom=payload["prenom"],
         sexe=payload.get("sexe", "M"),
@@ -236,7 +244,10 @@ def modifier_eleve(
     parent_data = payload.get("parent")
     if parent_data:
         if eleve.parent is None:
-            parent = Parent(nom="", lien="Père", tel="", email="", profession="", adresse="")
+            parent = Parent(
+                school_id=eleve.school_id,
+                nom="", lien="Père", tel="", email="", profession="", adresse="",
+            )
             db.add(parent)
             db.flush()
             eleve.parent_id = parent.id

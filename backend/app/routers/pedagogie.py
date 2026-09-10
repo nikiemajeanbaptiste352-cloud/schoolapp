@@ -6,7 +6,7 @@ Professeurs : accès limité aux notes des matières qu'ils enseignent.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.auth import ROLE_ADMIN, ROLE_PROF, get_current_user, require_roles
@@ -49,8 +49,16 @@ def liste_notes(
 ) -> dict:
     _verifier_acces_notes(db, user)
     mats = _matieres_autorisees(db, user)
+    sid = sd.sid_ecole(db)
 
-    stmt = select(Note, Eleve).join(Eleve, Note.eleve_id == Eleve.id)
+    stmt = (
+        select(Note, Eleve)
+        .join(
+            Eleve,
+            and_(Note.eleve_id == Eleve.id, Note.school_id == Eleve.school_id),
+        )
+        .where(Note.school_id == sid)
+    )
     if classe:
         stmt = stmt.where(Eleve.classe_id == classe)
     if matiere:
@@ -94,6 +102,7 @@ def enregistrer_notes(
 ) -> dict:
     _verifier_acces_notes(db, user)
     mats = _matieres_autorisees(db, user)
+    sid = sd.sid_ecole(db)
     lignes = payload.get("notes", [])
     if not isinstance(lignes, list) or not lignes:
         raise HTTPException(status_code=400, detail="Champ 'notes' attendu (liste non vide).")
@@ -114,6 +123,7 @@ def enregistrer_notes(
 
         existant = db.scalar(
             select(Note).where(
+                Note.school_id == sid,
                 Note.eleve_id == eleve_id,
                 Note.matiere_id == matiere_id,
                 Note.eval == eval_nom,
@@ -123,7 +133,15 @@ def enregistrer_notes(
             existant.note = note
             nb_maj += 1
         else:
-            db.add(Note(eleve_id=eleve_id, matiere_id=matiere_id, eval=eval_nom, note=note))
+            db.add(
+                Note(
+                    school_id=sid,
+                    eleve_id=eleve_id,
+                    matiere_id=matiere_id,
+                    eval=eval_nom,
+                    note=note,
+                )
+            )
             nb_crees += 1
 
     db.commit()
@@ -148,6 +166,7 @@ def supprimer_note(
 
     note = db.scalar(
         select(Note).where(
+            Note.school_id == sd.sid_ecole(db),
             Note.eleve_id == eleveId,
             Note.matiere_id == matiereId,
             Note.eval == eval,

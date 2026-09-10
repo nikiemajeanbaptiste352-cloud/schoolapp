@@ -6,6 +6,8 @@ Rôles utilisés (alignés sur le front) :
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -13,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.security import decode_token
+from app.services.sd import definir_ecole_courante
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -34,8 +37,13 @@ def _erreur_401(detail: str = "Authentification requise.") -> HTTPException:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> User:
-    """Résout l'utilisateur courant à partir du jeton Bearer."""
+) -> Iterator[User]:
+    """Résout l'utilisateur courant à partir du jeton Bearer.
+
+    Dépendance génératrice : pose le contexte école (Phase 2) le temps de la
+    requête, puis le réinitialise systématiquement (pas de fuite entre deux
+    requêtes successives).
+    """
     if credentials is None:
         raise _erreur_401()
     try:
@@ -50,7 +58,14 @@ def get_current_user(
         raise _erreur_401("Utilisateur introuvable.")
     if not user.actif:
         raise _erreur_401("Compte désactivé.")
-    return user
+    # Phase 2 — isolation school_id : l'école de la requête est celle de
+    # l'utilisateur. Les comptes non rattachés retombent sur l'école par
+    # défaut dans sd.py (comportement mono-établissement préservé).
+    definir_ecole_courante(user.school_id)
+    try:
+        yield user
+    finally:
+        definir_ecole_courante(None)
 
 
 def require_roles(*roles: str):

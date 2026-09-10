@@ -1,10 +1,15 @@
 """Modèles SQLAlchemy — miroir relationnel de `js/data.js` (window.SD).
 
-Conventions de parité avec le front :
-- `classes.id`, `matieres.id`, `enseignants.id`, `eleves.id`, `annonces.id`
-  conservent les codes métier exacts ("3A", "S1", "T001", "EL001", "A1"…).
-- `notes`, `presences`, `paiements`, `versements`, `parents`, `users`
-  utilisent des identifiants entiers auto-générés.
+Multi-établissements (Phase 2 — isolation school_id) :
+- `ecole` devient le registre des établissements ; chaque école a un `id`
+  entier (clé de locataire → `school_id` sur toutes les tables de domaine).
+- Les tables à codes métier lisibles conservent leurs codes exacts
+  ("3A", "S1", "T001", "EL001", "A1"…) mais leur clé primaire devient
+  composite `(school_id, id)` : le même code peut exister dans deux écoles.
+- `users` reste une identité plateforme ; `users.school_id` est un
+  rattachement transitoire en attendant la table `memberships` (Phase 3).
+- `notes`, `presences`, `paiements`, `versements`, `parents`, `seances`…
+  gardent des PK entières auto-générées + colonne `school_id`.
 """
 
 from __future__ import annotations
@@ -18,7 +23,9 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
+    PrimaryKeyConstraint,
     String,
     Table,
     Text,
@@ -35,16 +42,34 @@ from app.database import Base
 classe_matiere = Table(
     "classe_matiere",
     Base.metadata,
-    Column("classe_id", ForeignKey("classes.id"), primary_key=True),
-    Column("matiere_id", ForeignKey("matieres.id"), primary_key=True),
+    Column("school_id", ForeignKey("ecole.id"), primary_key=True),
+    Column("classe_id", String(6), primary_key=True),
+    Column("matiere_id", String(6), primary_key=True),
     Column("ordre", Integer, default=0),  # ordre d'affichage
+    ForeignKeyConstraint(
+        ["school_id", "classe_id"],
+        ["classes.school_id", "classes.id"],
+    ),
+    ForeignKeyConstraint(
+        ["school_id", "matiere_id"],
+        ["matieres.school_id", "matieres.id"],
+    ),
 )
 
 enseignant_classe = Table(
     "enseignant_classe",
     Base.metadata,
-    Column("enseignant_id", ForeignKey("enseignants.id"), primary_key=True),
-    Column("classe_id", ForeignKey("classes.id"), primary_key=True),
+    Column("school_id", ForeignKey("ecole.id"), primary_key=True),
+    Column("enseignant_id", String(6), primary_key=True),
+    Column("classe_id", String(6), primary_key=True),
+    ForeignKeyConstraint(
+        ["school_id", "enseignant_id"],
+        ["enseignants.school_id", "enseignants.id"],
+    ),
+    ForeignKeyConstraint(
+        ["school_id", "classe_id"],
+        ["classes.school_id", "classes.id"],
+    ),
 )
 
 
@@ -67,11 +92,14 @@ class Ecole(Base):
 
 
 # ---------------------------------------------------------------
-# Matières
+# Matières — PK (school_id, id)
 # ---------------------------------------------------------------
 class Matiere(Base):
     __tablename__ = "matieres"
 
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), primary_key=True
+    )
     id: Mapped[str] = mapped_column(String(6), primary_key=True)   # "S1"…
     nom: Mapped[str] = mapped_column(String(60))
     coef: Mapped[int] = mapped_column(Integer)
@@ -80,30 +108,40 @@ class Matiere(Base):
 
     enseignants: Mapped[list["Enseignant"]] = relationship(back_populates="matiere")
     classes: Mapped[list["Classe"]] = relationship(
-        secondary=classe_matiere, back_populates="matieres"
+        secondary=classe_matiere, back_populates="matieres",
+        order_by=classe_matiere.c.ordre,
     )
 
 
 # ---------------------------------------------------------------
-# Classes
+# Classes — PK (school_id, id)
 # ---------------------------------------------------------------
 class Classe(Base):
     __tablename__ = "classes"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "principal_id"],
+            ["enseignants.school_id", "enseignants.id"],
+        ),
+    )
 
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), primary_key=True
+    )
     id: Mapped[str] = mapped_column(String(6), primary_key=True)   # "6A", "3B"…
     nom: Mapped[str] = mapped_column(String(20))
     cycle: Mapped[str] = mapped_column(String(10))                  # Collège / Lycée
     salle: Mapped[str] = mapped_column(String(20))
-    principal_id: Mapped[str | None] = mapped_column(
-        ForeignKey("enseignants.id"), nullable=True
-    )
+    principal_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
 
     principal: Mapped["Enseignant | None"] = relationship(
-        foreign_keys=[principal_id], back_populates="classes_principales"
+        foreign_keys="[Classe.school_id, Classe.principal_id]",
+        back_populates="classes_principales",
     )
     eleves: Mapped[list["Eleve"]] = relationship(back_populates="classe")
     matieres: Mapped[list[Matiere]] = relationship(
-        secondary=classe_matiere, back_populates="classes", order_by=classe_matiere.c.ordre
+        secondary=classe_matiere, back_populates="classes",
+        order_by=classe_matiere.c.ordre,
     )
     enseignants: Mapped[list["Enseignant"]] = relationship(
         secondary=enseignant_classe, back_populates="classes"
@@ -111,20 +149,27 @@ class Classe(Base):
 
 
 # ---------------------------------------------------------------
-# Enseignants
+# Enseignants — PK (school_id, id)
 # ---------------------------------------------------------------
 class Enseignant(Base):
     __tablename__ = "enseignants"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "matiere_id"],
+            ["matieres.school_id", "matieres.id"],
+        ),
+    )
 
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), primary_key=True
+    )
     id: Mapped[str] = mapped_column(String(6), primary_key=True)    # "T001"…
     nom: Mapped[str] = mapped_column(String(40))
     prenom: Mapped[str] = mapped_column(String(40))
     sexe: Mapped[str] = mapped_column(String(1))
     tel: Mapped[str] = mapped_column(String(20))
     email: Mapped[str] = mapped_column(String(80))
-    matiere_id: Mapped[str | None] = mapped_column(
-        ForeignKey("matieres.id"), nullable=True
-    )
+    matiere_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
     statut: Mapped[str] = mapped_column(String(10), default="Actif")
 
     matiere: Mapped[Matiere | None] = relationship(back_populates="enseignants")
@@ -132,17 +177,21 @@ class Enseignant(Base):
         secondary=enseignant_classe, back_populates="enseignants"
     )
     classes_principales: Mapped[list[Classe]] = relationship(
-        foreign_keys="Classe.principal_id", back_populates="principal"
+        foreign_keys="[Classe.school_id, Classe.principal_id]",
+        back_populates="principal",
     )
 
 
 # ---------------------------------------------------------------
-# Parents
+# Parents — PK entière (id), scopés par school_id
 # ---------------------------------------------------------------
 class Parent(Base):
     __tablename__ = "parents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
     nom: Mapped[str] = mapped_column(String(80))
     lien: Mapped[str] = mapped_column(String(20))       # Père / Mère…
     tel: Mapped[str] = mapped_column(String(20))
@@ -154,17 +203,26 @@ class Parent(Base):
 
 
 # ---------------------------------------------------------------
-# Élèves
+# Élèves — PK (school_id, id)
 # ---------------------------------------------------------------
 class Eleve(Base):
     __tablename__ = "eleves"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "classe_id"],
+            ["classes.school_id", "classes.id"],
+        ),
+    )
 
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), primary_key=True
+    )
     id: Mapped[str] = mapped_column(String(6), primary_key=True)    # "EL001"…
     nom: Mapped[str] = mapped_column(String(40))
     prenom: Mapped[str] = mapped_column(String(40))
     sexe: Mapped[str] = mapped_column(String(1))                    # M / F
     naissance: Mapped[date] = mapped_column(Date)
-    classe_id: Mapped[str] = mapped_column(ForeignKey("classes.id"))
+    classe_id: Mapped[str] = mapped_column(String(6))
     statut: Mapped[str] = mapped_column(String(10), default="Actif")
     inscription: Mapped[date] = mapped_column(Date)
     parent_id: Mapped[int | None] = mapped_column(
@@ -185,32 +243,57 @@ class Eleve(Base):
 
 
 # ---------------------------------------------------------------
-# Notes
+# Notes (scopées par school_id)
 # ---------------------------------------------------------------
 class Note(Base):
     __tablename__ = "notes"
     __table_args__ = (
-        UniqueConstraint("eleve_id", "matiere_id", "eval", name="uq_note_eleve_matiere_eval"),
+        ForeignKeyConstraint(
+            ["school_id", "eleve_id"],
+            ["eleves.school_id", "eleves.id"],
+        ),
+        ForeignKeyConstraint(
+            ["school_id", "matiere_id"],
+            ["matieres.school_id", "matieres.id"],
+        ),
+        UniqueConstraint(
+            "school_id", "eleve_id", "matiere_id", "eval",
+            name="uq_note_eleve_matiere_eval",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    eleve_id: Mapped[str] = mapped_column(ForeignKey("eleves.id"))
-    matiere_id: Mapped[str] = mapped_column(ForeignKey("matieres.id"))
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    eleve_id: Mapped[str] = mapped_column(String(6))
+    matiere_id: Mapped[str] = mapped_column(String(6))
     eval: Mapped[str] = mapped_column(String(20))       # Devoir 1 / Devoir 2 / Composition
     note: Mapped[float] = mapped_column(Float)          # 0 → 20, pas de 0,5
 
     eleve: Mapped[Eleve] = relationship(back_populates="notes")
-    matiere: Mapped[Matiere] = relationship()
+    matiere: Mapped[Matiere] = relationship(
+        overlaps="eleve,notes"  # school_id copié par les deux parents → même école
+    )
 
 
 # ---------------------------------------------------------------
-# Présences
+# Présences (scopées par school_id)
 # ---------------------------------------------------------------
 class Presence(Base):
     __tablename__ = "presences"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "eleve_id"],
+            ["eleves.school_id", "eleves.id"],
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    eleve_id: Mapped[str] = mapped_column(ForeignKey("eleves.id"))
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    eleve_id: Mapped[str] = mapped_column(String(6))
     date: Mapped[date] = mapped_column(Date)
     statut: Mapped[str] = mapped_column(String(1))      # P / R / A
 
@@ -218,13 +301,22 @@ class Presence(Base):
 
 
 # ---------------------------------------------------------------
-# Paiements (dossier) + Versements
+# Paiements (dossier) + Versements (scopés par school_id)
 # ---------------------------------------------------------------
 class Paiement(Base):
     __tablename__ = "paiements"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "eleve_id"],
+            ["eleves.school_id", "eleves.id"],
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    eleve_id: Mapped[str] = mapped_column(ForeignKey("eleves.id"))
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    eleve_id: Mapped[str] = mapped_column(String(6))
     motif: Mapped[str] = mapped_column(String(120))
     total: Mapped[int] = mapped_column(Integer)
 
@@ -239,6 +331,9 @@ class Versement(Base):
     __tablename__ = "versements"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
     paiement_id: Mapped[int] = mapped_column(ForeignKey("paiements.id"))
     montant: Mapped[int] = mapped_column(Integer)
     date: Mapped[date] = mapped_column(Date)
@@ -248,11 +343,14 @@ class Versement(Base):
 
 
 # ---------------------------------------------------------------
-# Annonces
+# Annonces — PK (school_id, id)
 # ---------------------------------------------------------------
 class Annonce(Base):
     __tablename__ = "annonces"
 
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), primary_key=True
+    )
     id: Mapped[str] = mapped_column(String(6), primary_key=True)    # "A1"…
     titre: Mapped[str] = mapped_column(String(120))
     contenu: Mapped[str] = mapped_column(Text)
@@ -274,13 +372,14 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20))       # Administrateur / Professeur / Élève / Parent
     nom: Mapped[str] = mapped_column(String(80))
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Liaisons optionnelles vers la personne physique
-    eleve_id: Mapped[str | None] = mapped_column(
-        ForeignKey("eleves.id"), nullable=True
+    # Établissement de rattachement principal
+    # (transitoire : la table `memberships`, Phase 3, remplacera cette colonne)
+    school_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ecole.id"), nullable=True
     )
-    enseignant_id: Mapped[str | None] = mapped_column(
-        ForeignKey("enseignants.id"), nullable=True
-    )
+    # Liaisons optionnelles vers la personne physique (codes de l'école liée)
+    eleve_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    enseignant_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("parents.id"), nullable=True
     )
@@ -327,10 +426,18 @@ class EnseignantTaux(Base):
     """Barème horaire d'un enseignant (FCFA par heure de cours donnée)."""
 
     __tablename__ = "enseignant_taux"
-
-    enseignant_id: Mapped[str] = mapped_column(
-        ForeignKey("enseignants.id"), primary_key=True
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "enseignant_id"],
+            ["enseignants.school_id", "enseignants.id"],
+        ),
+        PrimaryKeyConstraint("school_id", "enseignant_id", name="pk_taux_ens"),
     )
+
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), primary_key=True
+    )
+    enseignant_id: Mapped[str] = mapped_column(String(6), primary_key=True)
     taux_horaire: Mapped[int] = mapped_column(Integer, default=0)
     maj_le: Mapped[datetime] = mapped_column(
         DateTime, default=_maintenant_utc, onupdate=_maintenant_utc
@@ -346,19 +453,32 @@ class Seance(Base):
 
     __tablename__ = "seances"
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "enseignant_id"],
+            ["enseignants.school_id", "enseignants.id"],
+        ),
+        ForeignKeyConstraint(
+            ["school_id", "classe_id"],
+            ["classes.school_id", "classes.id"],
+        ),
+        ForeignKeyConstraint(
+            ["school_id", "matiere_id"],
+            ["matieres.school_id", "matieres.id"],
+        ),
         UniqueConstraint(
-            "enseignant_id", "date", "classe_id", "heure_debut",
+            "school_id", "enseignant_id", "date", "classe_id", "heure_debut",
             name="uq_seance_ens_classe_debut",
         ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    enseignant_id: Mapped[str] = mapped_column(ForeignKey("enseignants.id"))
-    date: Mapped[date] = mapped_column(Date)
-    classe_id: Mapped[str] = mapped_column(ForeignKey("classes.id"))
-    matiere_id: Mapped[str | None] = mapped_column(
-        ForeignKey("matieres.id"), nullable=True
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
     )
+    enseignant_id: Mapped[str] = mapped_column(String(6))
+    date: Mapped[date] = mapped_column(Date)
+    classe_id: Mapped[str] = mapped_column(String(6))
+    matiere_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
     heure_debut: Mapped[str] = mapped_column(String(5))     # "08:00"
     heure_fin: Mapped[str] = mapped_column(String(5))       # "10:00"
     cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
@@ -369,11 +489,21 @@ class FichePaie(Base):
 
     __tablename__ = "fiches_paie"
     __table_args__ = (
-        UniqueConstraint("enseignant_id", "mois", name="uq_fiche_ens_mois"),
+        ForeignKeyConstraint(
+            ["school_id", "enseignant_id"],
+            ["enseignants.school_id", "enseignants.id"],
+        ),
+        UniqueConstraint(
+            "school_id", "enseignant_id", "mois",
+            name="uq_fiche_ens_mois",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    enseignant_id: Mapped[str] = mapped_column(ForeignKey("enseignants.id"))
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    enseignant_id: Mapped[str] = mapped_column(String(6))
     mois: Mapped[str] = mapped_column(String(7))            # "2026-09"
     heures: Mapped[float] = mapped_column(Float, default=0.0)
     taux_horaire: Mapped[int] = mapped_column(Integer, default=0)

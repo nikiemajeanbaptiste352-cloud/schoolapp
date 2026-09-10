@@ -41,7 +41,7 @@ def presences_eleve(
 
     rows = db.execute(
         select(Presence)
-        .where(Presence.eleve_id == eleve_id)
+        .where(Presence.school_id == sd.sid_ecole(db), Presence.eleve_id == eleve_id)
         .order_by(Presence.date)
     ).scalars().all()
     return {
@@ -69,6 +69,7 @@ def pointer_presences(
     jour = date.fromisoformat(payload["date"])
     statuts = payload.get("statuts", {})  # {eleveId: "P"|"R"|"A"}
 
+    sid = sd.sid_ecole(db)
     if sd.get_classe(db, classe) is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
 
@@ -78,13 +79,14 @@ def pointer_presences(
             raise HTTPException(status_code=400, detail=f"Statut invalide : {statut}")
         existant = db.scalar(
             select(Presence).where(
-                Presence.eleve_id == eleve_id, Presence.date == jour
+                Presence.school_id == sid, Presence.eleve_id == eleve_id,
+                Presence.date == jour,
             )
         )
         if existant:
             existant.statut = statut
         else:
-            db.add(Presence(eleve_id=eleve_id, date=jour, statut=statut))
+            db.add(Presence(school_id=sid, eleve_id=eleve_id, date=jour, statut=statut))
         nb += 1
     db.commit()
     return {"message": f"{nb} présence(s) enregistrée(s) le {jour.isoformat()}."}
