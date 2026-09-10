@@ -791,6 +791,33 @@ table.data tbody tr:last-child td { border-bottom: none; }
 .dropdown-sep { height: 1px; background: var(--border); margin: 6px 4px; }
 .dropdown-head { padding: 10px 12px 6px; font-size: 12px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
 
+/* ============ Sélecteur d'établissement (topbar) ============ */
+.ecole-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ecole-chip:hover { border-color: var(--primary); background: var(--primary-050); color: var(--info-text); }
+.ecole-chip .ecole-nom { overflow: hidden; text-overflow: ellipsis; }
+.ecole-chip .ecole-chev { font-size: 10px; color: var(--text-muted); }
+.ecole-item .ecole-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ecole-item .ecole-n { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ecole-item .ecole-r { font-size: 11px; color: var(--text-muted); }
+.ecole-item.actif { background: var(--primary-050); color: var(--info-text); }
+.ecole-item .coche { margin-left: auto; color: var(--success-text, var(--info-text)); }
+.ecole-item:disabled { opacity: 0.55; cursor: not-allowed; }
+.ecole-item:disabled:hover { background: none; color: var(--text-soft); }
+
 .user-chip {
   display: flex;
   align-items: center;

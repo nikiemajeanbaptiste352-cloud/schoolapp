@@ -252,6 +252,56 @@
 
     profil: function () { return get("/auth/me"); },
 
+    /* --- Rattachement (Phase 3) : membres, invitations, établissements --- */
+    // Membres de l'établissement du jeton (actifs, invités, suspendus).
+    membres: function () { return get("/membres"); },
+    // Invitations non encore validées (statut « invite » ou « expire »).
+    invitationsMembres: function () { return get("/membres/invitations"); },
+    // Invite / rattache une adresse : { email, role, nom? } → code par email.
+    inviterMembre: function (corps) { return post("/membres", corps); },
+    // Regénère et renvoie un code pour un rattachement en attente.
+    renvoyerInvitation: function (membreId) { return post("/membres/" + enc(membreId) + "/invitation"); },
+    // Révoque une invitation non encore acceptée.
+    reverInvitation: function (invitationId) { return del("/membres/invitations/" + enc(invitationId)); },
+    // Change le rôle d'un membre : PUT /membres/{id}/role.
+    changerRoleMembre: function (membreId, role) {
+      return put("/membres/" + enc(membreId) + "/role", { role: role });
+    },
+    // Suspend / réactive : PUT /membres/{id}/statut (actif | suspendu).
+    changerStatutMembre: function (membreId, statut) {
+      return put("/membres/" + enc(membreId) + "/statut", { statut: statut });
+    },
+    // Retire définitivement le rattachement de l'établissement.
+    retirerMembre: function (membreId) { return del("/membres/" + enc(membreId)); },
+
+    /* --- Rattachement public : acceptation d'une invitation --- */
+    // Valide le code reçu par email puis connecte (crée le compte si besoin).
+    validerInvitation: function (corps) {
+      return post("/membres/invitations/valider", corps, { jeton: false })
+        .then(function (data) {
+          if (data && data.access_token) {
+            memoriserJeton(data.access_token);
+            memoriserUtilisateur(data.user || null);
+          }
+          return data;
+        });
+    },
+
+    /* --- Mes établissements (sélecteur multi-écoles) --- */
+    // Rattachements du compte connecté, avec l'école active.
+    mesEcoles: function () { return get("/mon-espace/ecoles"); },
+    // Bascule d'établissement : renvoie un NOUVEAU jeton (rôle de l'école visée).
+    basculerEcole: function (schoolId) {
+      return post("/mon-espace/ecole-active", { school_id: schoolId })
+        .then(function (data) {
+          if (data && data.access_token) {
+            memoriserJeton(data.access_token);
+            memoriserUtilisateur(data.user || null);
+          }
+          return data;
+        });
+    },
+
     /* --- Référentiel --- */
     ecole: function () { return get("/ecole"); },
     // Crée la fiche école (POST /ecole) : base vide non encore configurée.

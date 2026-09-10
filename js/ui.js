@@ -21,10 +21,11 @@
     { key: "payments", lien: "payments.html", icone: "💰", titre: "Paiements", groupe: "Finance" },
     { key: "paie", lien: "paie.html", icone: "💶", titre: "Rémunérations", groupe: "Finance", roles: ["Administrateur"] },
     { key: "announcements", lien: "announcements.html", icone: "📢", titre: "Annonces", groupe: "Communication" },
+    { key: "utilisateurs", lien: "utilisateurs.html", icone: "👥", titre: "Utilisateurs", groupe: "Système", roles: ["Administrateur"] },
     { key: "settings", lien: "settings.html", icone: "⚙️", titre: "Paramètres", groupe: "Système" }
   ];
 
-  var ROLE_EMOJI = { Administrateur: "👨‍💼", Professeur: "👨‍🏫", Élève: "👨‍🎓", Parent: "👨‍👩‍👧" };
+  var ROLE_EMOJI = { Administrateur: "👨‍💼", Professeur: "👨‍🏫", Surveillant: "📋", Élève: "👨‍🎓", Parent: "👨‍👩‍👧" };
 
   /* ---------- Session ---------- */
   function getSession() {
@@ -106,6 +107,12 @@
         "</div>" +
         '<div class="topbar-right">' +
         (chipMode() ? '  <span class="demo-chip">' + chipMode() + "</span>" : "") +
+        '  <div class="dropdown" id="dropEcole" style="display:none">' +
+        '    <button class="ecole-chip" id="btnEcole" title="Changer d\u2019établissement">' +
+        '      <span>🏫</span><span class="ecole-nom" id="ecoleNom">' + escapeHtml(ecoleCourante()) + '</span><span class="ecole-chev">▼</span>' +
+        "    </button>" +
+        '    <div class="dropdown-menu" id="menuEcole"></div>' +
+        "  </div>" +
         '  <div class="dropdown">' +
         '    <button class="btn-icon" id="btnNotif" title="Notifications">🔔<span class="notif-dot"></span></button>' +
         '    <div class="dropdown-menu" id="menuNotif">' +
@@ -136,6 +143,9 @@
       if (btnNotif) btnNotif.addEventListener("click", function (e) { e.stopPropagation(); toggleDropdown("menuNotif"); });
       var btnUser = document.getElementById("btnUser");
       if (btnUser) btnUser.addEventListener("click", function (e) { e.stopPropagation(); toggleDropdown("menuUser"); });
+      var btnEcole = document.getElementById("btnEcole");
+      if (btnEcole) btnEcole.addEventListener("click", function (e) { e.stopPropagation(); toggleDropdown("menuEcole"); });
+      chargerEcoles();
       var btnLogout = document.getElementById("btnLogout");
       if (btnLogout) btnLogout.addEventListener("click", function () {
         // Déconnexion : efface le jeton API (si présent) puis la session
@@ -157,6 +167,105 @@
         });
       });
     }
+
+    // Message différé (ex. bascule d'établissement) : la bascule recharge la
+    // page, le message est donc affiché au chargement suivant.
+    var flash = null;
+    try {
+      flash = sessionStorage.getItem("sm_flash");
+      if (flash) sessionStorage.removeItem("sm_flash");
+    } catch (e) { /* stockage indisponible */ }
+    if (flash) toast(escapeHtml(flash), "success");
+  }
+
+  /* ---------- Sélecteur d'établissement (Phase 3 — rattachement) ---------- */
+  // École affichée : mémorisée à la bascule, sinon celle du bootstrap SD.
+  function ecoleCourante() {
+    var s = getSession();
+    if (s && s.ecole) return s.ecole;
+    if (window.SD && SD.ecole) return SD.ecole.sigle || SD.ecole.nom || "";
+    return "";
+  }
+
+  // La page courante est-elle visible pour ce rôle ? (propriété « roles » de
+  // PAGES : les pages sans restriction restent accessibles à tous.)
+  function pageAutorisee(cle, role) {
+    for (var i = 0; i < PAGES.length; i++) {
+      if (PAGES[i].key === cle) {
+        return !PAGES[i].roles || PAGES[i].roles.indexOf(role) !== -1;
+      }
+    }
+    return true; // page hors menu (ex. fiche élève) : aucune restriction
+  }
+
+  // Récupère les rattachements du compte. Le sélecteur n'apparaît que si le
+  // compte est rattaché à plusieurs établissements (sinon inutile).
+  function chargerEcoles() {
+    if (!window.API || !window.API.mesEcoles) return;
+    window.API.mesEcoles().then(function (liste) {
+      var ecoles = liste || [];
+      if (ecoles.length <= 1) return; // un seul établissement : rien à basculer
+      var menu = document.getElementById("menuEcole");
+      var drop = document.getElementById("dropEcole");
+      var nom = document.getElementById("ecoleNom");
+      if (!menu || !drop) return;
+      if (nom) nom.textContent = ecoleCourante();
+
+      var html = '<div class="dropdown-head">Mes établissements</div>';
+      ecoles.forEach(function (e) {
+        var libelle = e.sigle || e.nom || ("École " + e.school_id);
+        var bloque = e.statut !== "actif";
+        var sous = bloque
+          ? (e.statut === "invite" ? "Invitation en attente" : "Rattaché (suspendu)")
+          : e.role + (e.active ? " • école affichée" : "");
+        html +=
+          '<button class="dropdown-item ecole-item' + (e.active ? " actif" : "") + '"' +
+          ' data-ecole="' + e.school_id + '"' + (bloque ? " disabled" : "") + ">" +
+          "<span>🏫</span>" +
+          '<span class="ecole-txt"><span class="ecole-n">' + escapeHtml(libelle) + "</span>" +
+          '<span class="ecole-r">' + escapeHtml(sous) + "</span></span>" +
+          (e.active ? '<span class="coche">✓</span>' : "") +
+          "</button>";
+      });
+      menu.innerHTML = html;
+
+      menu.querySelectorAll("[data-ecole]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          basculerVers(parseInt(b.getAttribute("data-ecole"), 10));
+        });
+      });
+      drop.style.display = "";
+    }).catch(function () {
+      // Serveur injoignable ou compte non rattaché : sélecteur masqué.
+    });
+  }
+
+  // Bascule : le backend renvoie un NOUVEAU jeton (rôle de l'école visée) ;
+  // api.js l'a déjà mémorisé, on met à jour sm_session puis on recharge.
+  function basculerVers(schoolId) {
+    if (!schoolId || !window.API || !window.API.basculerEcole) return;
+    window.API.basculerEcole(schoolId).then(function (data) {
+      var s = getSession() || {};
+      var u = (data && data.user) || {};
+      if (u.role) s.role = u.role;
+      if (u.nom) s.nom = u.nom;
+      if (u.email) s.email = u.email;
+      if (data && data.ecole) s.ecole = data.ecole;
+      try { sessionStorage.setItem("sm_session", JSON.stringify(s)); } catch (e) { /* stockage indisponible */ }
+      if (data && data.ecole) {
+        try { sessionStorage.setItem("sm_flash", "Établissement : " + data.ecole); } catch (e2) { /* stockage indisponible */ }
+      }
+      setTimeout(function () {
+        // La page ouverte peut être réservée au rôle précédent (ex. l'espace
+        // enseignant) : on revient au tableau de bord plutôt que de laisser
+        // la garde de cette page renvoyer l'utilisateur à la connexion.
+        var cle = document.body.getAttribute("data-page");
+        if (cle && !pageAutorisee(cle, s.role)) window.location.href = "dashboard.html";
+        else window.location.reload();
+      }, 500);
+    }).catch(function (err) {
+      toast(escapeHtml((err && err.detail) || "Bascule d'établissement impossible."), "error");
+    });
   }
 
   /* ---------- Menus déroulants ---------- */
@@ -216,8 +325,13 @@
     "Retard": "badge-warning",
     "Administrateur": "badge-info",
     "Professeur": "badge-neutral",
+    "Surveillant": "badge-neutral",
     "Élève": "badge-info",
     "Parent": "badge-warning",
+    // Statuts de rattachement (Phase 3 — membres)
+    "actif": "badge-success",
+    "invite": "badge-warning",
+    "suspendu": "badge-danger",
     "Information": "badge-info",
     "Réunion": "badge-warning",
     "Concours": "badge-neutral",

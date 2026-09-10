@@ -542,3 +542,50 @@ def test_retrait_membre_et_repli_ecole(client, admin_token, token_dir2, ecole2):
     bloque = client.get("/api/v1/auth/me", headers=h(t))
     assert bloque.status_code == 403
     assert _compte_db(EMAIL_MULTI) is not None
+
+
+# ---------------------------------------------------------------------------
+# Annulation d'une invitation (suppression du code)
+# ---------------------------------------------------------------------------
+def test_annulation_invitation(client, admin_token, token_dir2, monkeypatch):
+    """`DELETE /membres/invitations/{id}` révoque le code, sans fuite inter-écoles."""
+    envois = _activer_email(monkeypatch)
+
+    email = "invite.annule@lesavoir.edu"
+    r = _inviter(client, admin_token, email, "Surveillant")
+    assert r.status_code == 201, r.text
+    id_invitation = r.json()["id"]
+    assert _membre_db(email, 1) is not None
+
+    # Une autre école ne peut pas annuler l'invitation : même 404 (pas de fuite).
+    intrus = client.delete(
+        f"/api/v1/membres/invitations/{id_invitation}", headers=h(token_dir2)
+    )
+    assert intrus.status_code == 404
+    assert _membre_db(email, 1) is not None
+
+    # 404 aussi pour un identifiant inexistant.
+    assert client.delete(
+        "/api/v1/membres/invitations/999999", headers=h(admin_token)
+    ).status_code == 404
+
+    # L'annulation par la bonne école supprime le code…
+    ok = client.delete(
+        f"/api/v1/membres/invitations/{id_invitation}", headers=h(admin_token)
+    )
+    assert ok.status_code == 200, ok.text
+    assert email in ok.json()["message"]
+    assert _membre_db(email, 1) is None
+
+    # … et la validation du code devient impossible.
+    assert _valider(client, email, CODE_FIXE, nom="Invité Annulé").status_code == 401
+    assert _compte_db(email) is None
+
+    # Le rattachement resté en attente est révoqué lui aussi.
+    r2 = client.get("/api/v1/membres", headers=h(admin_token))
+    assert email not in [m["email"] for m in r2.json()]
+
+    # Un nouveau cycle d'invitation reste possible (l'anti-spam est reparti).
+    encore = _inviter(client, admin_token, email, "Parent")
+    assert encore.status_code == 201, encore.text
+    assert len(envois) >= 2

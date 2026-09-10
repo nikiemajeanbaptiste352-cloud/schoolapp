@@ -355,6 +355,49 @@ def renvoyer_invitation(
     )
 
 
+@router.delete(
+    "/membres/invitations/{invitation_id}",
+    response_model=dict,
+    summary="Annuler une invitation en attente",
+)
+def annuler_invitation(
+    invitation_id: int,
+    _admin: User = Depends(require_roles(ROLE_ADMIN)),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Révoque un code d'invitation (l'adresse redevient une inconnue).
+
+    L'annulation remet l'établissement dans l'état antérieur :
+
+    - le code est supprimé (il ne peut plus être validé) ;
+    - un rattachement resté **en attente** (`invite`) pour la même adresse
+      dans cette école est retiré, sauf si l'école est le contexte actif du
+      compte (`users.school_id`) — dans ce cas la ligne est conservée pour ne
+      pas casser le repli `users.role` / `users.school_id`.
+
+    Un identifiant inconnu **ou** d'une autre école produit le même `404`.
+    """
+    sid = sd.sid_ecole(db)
+    ligne = db.get(InvitationMembre, invitation_id)
+    if ligne is None or ligne.school_id != sid:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invitation introuvable dans cet établissement.",
+        )
+    # Les attributs sont lus AVANT la suppression : jamais après `commit()`.
+    email = ligne.email
+    db.delete(ligne)
+
+    user = db.scalar(select(User).where(User.email == email))
+    if user is not None and user.school_id != sid:
+        membre = membre_ecole(db, user.id, sid)
+        if membre is not None and membre.statut == "invite":
+            db.delete(membre)
+
+    db.commit()
+    return {"message": f"Invitation de {email} annulée."}
+
+
 @router.post(
     "/membres/invitations/valider",
     response_model=TokenOut,

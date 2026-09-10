@@ -56,18 +56,22 @@
   var vueInscription = document.getElementById("vueInscription");
   var vueInscriptionEtab = document.getElementById("vueInscriptionEtab");
   var vueCode = document.getElementById("vueCode");
+  var vueInvitation = document.getElementById("vueInvitation");
   var linkInscription = document.getElementById("linkInscription");
   var linkRetourConnexion = document.getElementById("linkRetourConnexion");
   var linkInscriptionEtab = document.getElementById("linkInscriptionEtab");
   var linkRetourEtab = document.getElementById("linkRetourEtab");
   var linkCode = document.getElementById("linkCode");
   var linkRetourCode = document.getElementById("linkRetourCode");
+  var linkInvitation = document.getElementById("linkInvitation");
+  var linkRetourInvitation = document.getElementById("linkRetourInvitation");
 
   function cacherVues() {
     if (vueConnexion) vueConnexion.style.display = "none";
     if (vueInscription) vueInscription.style.display = "none";
     if (vueInscriptionEtab) vueInscriptionEtab.style.display = "none";
     if (vueCode) vueCode.style.display = "none";
+    if (vueInvitation) vueInvitation.style.display = "none";
   }
   function montrerConnexion() {
     cacherVues();
@@ -91,6 +95,24 @@
     reinitialiserVueCode(true);
     var email = document.getElementById("emailCode");
     if (email) email.focus();
+  }
+  // Vue « Valider mon invitation » : l'invité saisit le code reçu par email,
+  // choisit son mot de passe et son compte est activé dans l'établissement.
+  function montrerInvitation(preEmail, preCode) {
+    cacherVues();
+    if (vueInvitation) vueInvitation.style.display = "";
+    var zone = document.getElementById("errInvitationGlobal");
+    if (zone) zone.classList.remove("show");
+    var email = document.getElementById("emailInvitation");
+    var code = document.getElementById("codeInvitation");
+    if (email && preEmail) email.value = preEmail;
+    if (code && preCode) code.value = preCode;
+    if (code && preCode) {
+      var nom = document.getElementById("nomInvitation");
+      if (nom) nom.focus();
+    } else if (email) {
+      email.focus();
+    }
   }
 
   /* ---------- Choix du profil d'entrée : « Établissement », « Enseignant » ou « Parent » ---------- */
@@ -205,6 +227,18 @@
   }
   if (linkRetourCode) {
     linkRetourCode.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerConnexion();
+    });
+  }
+  if (linkInvitation) {
+    linkInvitation.addEventListener("click", function (e) {
+      e.preventDefault();
+      montrerInvitation();
+    });
+  }
+  if (linkRetourInvitation) {
+    linkRetourInvitation.addEventListener("click", function (e) {
       e.preventDefault();
       montrerConnexion();
     });
@@ -703,4 +737,125 @@
       }
     });
   }
+
+  /* ---------- Acceptation d'une invitation (Phase 3 — rattachement) ----------
+     Route publique `POST /membres/invitations/valider` : le code reçu par email
+     prouve l'identité, le compte est créé au besoin avec le rôle prévu par
+     l'établissement invitant, puis la session est ouverte. */
+  var formInvitation = document.getElementById("invitationForm");
+  if (formInvitation) {
+    var emailInvitation = document.getElementById("emailInvitation");
+    var codeInvitation = document.getElementById("codeInvitation");
+    var nomInvitation = document.getElementById("nomInvitation");
+    var mdpInvitation = document.getElementById("mdpInvitation");
+    var mdpInvitation2 = document.getElementById("mdpInvitation2");
+    var errEmailInvitation = document.getElementById("errEmailInvitation");
+    var errCodeInvitation = document.getElementById("errCodeInvitation");
+    var errMdpInvitation = document.getElementById("errMdpInvitation");
+    var errMdpInvitation2 = document.getElementById("errMdpInvitation2");
+    var errInvitationGlobal = document.getElementById("errInvitationGlobal");
+    var btnInvitation = document.getElementById("btnInvitation");
+
+    function okInvitation(input, errEl) {
+      if (input) input.classList.remove("invalid");
+      if (errEl) errEl.classList.remove("show");
+    }
+    function invalideInvitation(input, errEl, message) {
+      if (input) input.classList.add("invalid");
+      if (errEl) {
+        errEl.textContent = message || errEl.textContent;
+        errEl.classList.add("show");
+      }
+    }
+
+    emailInvitation.addEventListener("input", function () { okInvitation(emailInvitation, errEmailInvitation); });
+    codeInvitation.addEventListener("input", function () {
+      codeInvitation.value = codeInvitation.value.replace(/\D/g, "").slice(0, 6);
+      okInvitation(codeInvitation, errCodeInvitation);
+    });
+    mdpInvitation.addEventListener("input", function () { okInvitation(mdpInvitation, errMdpInvitation); });
+    mdpInvitation2.addEventListener("input", function () { okInvitation(mdpInvitation2, errMdpInvitation2); });
+
+    function validerInvitationApi(email, code, nom, motDePasse) {
+      btnInvitation.disabled = true;
+      btnInvitation.textContent = "Validation…";
+      if (errInvitationGlobal) errInvitationGlobal.classList.remove("show");
+
+      window.API.validerInvitation({
+        email: email,
+        code: code,
+        nom: nom || null,
+        password: motDePasse
+      }).then(function (data) {
+        var user = data.user || {};
+        sessionStorage.setItem("sm_session", JSON.stringify({
+          role: user.role || "Parent",
+          email: user.email || email,
+          nom: user.nom || nom || ""
+        }));
+        window.location.href = "pages/dashboard.html";
+      }).catch(function (err) {
+        btnInvitation.disabled = false;
+        btnInvitation.textContent = "Valider mon invitation →";
+        var msg = (err && err.detail) || "Validation impossible.";
+        if (err && err.reseau) msg = "Serveur injoignable : démarrez le backend puis réessayez.";
+        if (err && err.statut === 401) {
+          invalideInvitation(codeInvitation, errCodeInvitation, msg);
+        } else {
+          invalideInvitation(null, errInvitationGlobal, msg);
+        }
+      });
+    }
+
+    formInvitation.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var email = emailInvitation.value.trim();
+      var code = codeInvitation.value.trim();
+      var nom = nomInvitation.value.trim();
+      var mdp = mdpInvitation.value;
+      var mdp2 = mdpInvitation2.value;
+      var valide = true;
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        invalideInvitation(emailInvitation, errEmailInvitation, "Veuillez saisir l'adresse email invitée.");
+        valide = false;
+      } else { okInvitation(emailInvitation, errEmailInvitation); }
+
+      if (!/^\d{6}$/.test(code)) {
+        invalideInvitation(codeInvitation, errCodeInvitation, "Saisissez le code à 6 chiffres reçu par email.");
+        valide = false;
+      } else { okInvitation(codeInvitation, errCodeInvitation); }
+
+      if (mdp.length < 6) {
+        invalideInvitation(mdpInvitation, errMdpInvitation, "Le mot de passe doit contenir au moins 6 caractères.");
+        valide = false;
+      } else { okInvitation(mdpInvitation, errMdpInvitation); }
+
+      if (!mdp2) {
+        invalideInvitation(mdpInvitation2, errMdpInvitation2, "Veuillez confirmer votre mot de passe.");
+        valide = false;
+      } else if (mdp2 !== mdp) {
+        invalideInvitation(mdpInvitation2, errMdpInvitation2, "Les deux mots de passe ne correspondent pas.");
+        valide = false;
+      } else { okInvitation(mdpInvitation2, errMdpInvitation2); }
+
+      if (!valide) return;
+      validerInvitationApi(email, code, nom, mdp);
+    });
+  }
+
+  /* ---------- Lien direct vers l'acceptation d'une invitation ----------
+     `index.html?invitation=1&email=…&code=…` ou ancre `#invitation`. */
+  (function ouvrirInvitationDepuisUrl() {
+    var recherche = window.location.search || "";
+    var params = null;
+    try { params = new URLSearchParams(recherche); } catch (e) { params = null; }
+    var ancre = (window.location.hash || "").toLowerCase();
+    var demande = (params && (params.get("invitation") || params.get("code"))) || ancre === "#invitation";
+    if (!demande) return;
+    montrerInvitation(
+      params ? (params.get("email") || "") : "",
+      params ? (params.get("code") || "") : ""
+    );
+  })();
 })();

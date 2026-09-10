@@ -57,6 +57,7 @@
 
   .demo-chip { display: none; }
   .user-chip .u-info { display: none; }
+  .ecole-chip { max-width: 132px; padding: 6px 10px; }
 }
 
 /* ---------- Très petit écran (<= 420px) ---------- */

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Utilisateurs — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%91%A5%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="utilisateurs" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>👥 Utilisateurs</h2>
+                        <div class="subtitle">Rattachez des personnes à votre établissement et gérez leur rôle et leur accès.</div>
+                    </div>
+                    <div class="header-actions">
+                        <div class="search-box">
+                            <span class="ico">🔍</span>
+                            <input type="text" class="input" id="searchInput" placeholder="Rechercher un nom ou un email…">
+                        </div>
+                        <button type="button" class="btn btn-primary" data-open="modalInviter">➕ Inviter une personne</button>
+                    </div>
+                </div>
+
+                <!-- Message si le service email n'est pas configuré -->
+                <div class="alert" id="alerteEmail" style="display:none;color:#92400e;background:#fffbeb;border:1px solid #fde68a;padding:12px 16px;border-radius:10px;margin-bottom:16px">
+                    ⚠️ L'envoi d'emails n'est pas configuré sur ce serveur : les invitations par code sont indisponibles.
+                    Vous pouvez toutefois <b>créer directement un compte</b> dans <a href="settings.html">Paramètres</a>.
+                </div>
+
+                <!-- Compteurs -->
+                <div class="cards-grid mb-16" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))" id="miniCounts"></div>
+
+                <!-- Membres -->
+                <div class="table-wrap mb-16">
+                    <table class="data">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Adresse email</th>
+                                <th>Rôle dans l'établissement</th>
+                                <th>Statut</th>
+                                <th>Rattaché depuis</th>
+                                <th style="text-align:center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                    <div class="table-footer">
+                        <span id="countLabel"></span>
+                        <span class="text-xs">Le rôle est propre à cet établissement : la même personne peut avoir un rôle différent ailleurs.</span>
+                    </div>
+                </div>
+
+                <!-- Invitations en attente -->
+                <div class="card card-pad" id="carteInvitations" style="display:none">
+                    <h3 class="mb-8">✉️ Invitations en attente</h3>
+                    <p class="text-sm text-muted mb-8">Ces adresses ont reçu un code ; le compte sera créé lors de la validation.</p>
+                    <div class="table-wrap">
+                        <table class="data">
+                            <thead>
+                                <tr>
+                                    <th>Adresse email</th>
+                                    <th>Rôle prévu</th>
+                                    <th>Code valable</th>
+                                    <th>État</th>
+                                    <th style="text-align:center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invitationsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale Inviter -->
+    <div class="modal-overlay" id="modalInviter">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>➕ Inviter une personne</h3>
+                <button type="button" class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-muted mb-16">
+                    Un code à 6 chiffres est envoyé par email. Le compte sera créé quand la personne
+                    saisira ce code sur la page <b>Accepter une invitation</b>.
+                </p>
+                <div class="field mb-16">
+                    <label for="invEmail">Adresse email <span class="req">*</span></label>
+                    <input class="input" type="email" id="invEmail" placeholder="prenom.nom@exemple.com" autocomplete="off">
+                    <div class="field-error" id="errInvEmail">Veuillez saisir une adresse email valide.</div>
+                </div>
+                <div class="field mb-16">
+                    <label for="invRole">Rôle dans l'établissement <span class="req">*</span></label>
+                    <select class="input" id="invRole">
+                        <option value="Professeur">👨‍🏫 Professeur</option>
+                        <option value="Surveillant">📋 Surveillant</option>
+                        <option value="Élève">👨‍🎓 Élève</option>
+                        <option value="Parent">👨‍👩‍👧 Parent</option>
+                        <option value="Administrateur">🛡️ Administrateur</option>
+                    </select>
+                </div>
+                <div class="field-error" id="errInvitation" style="margin-top:4px"></div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+                <button type="button" class="btn btn-primary" id="btnInviter">✉️ Envoyer l'invitation</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale Changer le rôle -->
+    <div class="modal-overlay" id="modalRole">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>🔁 Changer le rôle</h3>
+                <button type="button" class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-muted mb-16" id="roleResume"></p>
+                <div class="field">
+                    <label for="roleSelect">Nouveau rôle</label>
+                    <select class="input" id="roleSelect">
+                        <option value="Professeur">👨‍🏫 Professeur</option>
+                        <option value="Surveillant">📋 Surveillant</option>
+                        <option value="Élève">👨‍🎓 Élève</option>
+                        <option value="Parent">👨‍👩‍👧 Parent</option>
+                        <option value="Administrateur">🛡️ Administrateur</option>
+                    </select>
+                </div>
+                <div class="field-error" id="errRole" style="margin-top:10px"></div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+                <button type="button" class="btn btn-primary" id="btnSaveRole">💾 Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale Retirer -->
+    <div class="modal-overlay" id="modalRetirer">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>🗑️ Retirer de l'établissement</h3>
+                <button type="button" class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <p id="retirerResume"></p>
+                <p class="text-sm text-muted mt-8">La personne perd l'accès à cet établissement. Son compte reste
+                    valable ailleurs ; préférez la <b>suspension</b> si vous souhaitez pouvoir la réactiver.</p>
+                <div class="field-error" id="errRetirer" style="margin-top:10px"></div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+                <button type="button" class="btn btn-danger-soft" id="btnConfirmRetirer">Retirer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="utilisateurs.js"></script>
+</body>
+
+</html>

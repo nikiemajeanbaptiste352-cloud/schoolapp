@@ -237,6 +237,9 @@
                     <p class="lien-connexion" id="zoneCode" style="display:none">
                         <a href="#" id="linkCode">Connexion par code email (sans mot de passe)</a>
                     </p>
+                    <p class="lien-connexion" id="zoneInvitation">
+                        <a href="#" id="linkInvitation">✉️ J'ai reçu une invitation (code reçu par email)</a>
+                    </p>
                 </form>
             </div>
 
@@ -368,6 +371,52 @@
                     <div class="or">ou</div>
                     <p style="text-align:center;font-size:13.5px;margin:0">
                         <a href="#" id="linkRetourCode">← Retour à la connexion</a>
+                    </p>
+                </form>
+            </div>
+
+            <!-- Acceptation d'une invitation (code reçu par email) -->
+            <div class="login-card" id="vueInvitation" style="display:none">
+                <h2 class="lc-title">Valider mon invitation ✉️</h2>
+                <p class="lc-sub">Un établissement vous invite à le rejoindre. Saisissez le code à 6 chiffres reçu par email : votre compte sera activé dans cet établissement.</p>
+
+                <form id="invitationForm" novalidate>
+                    <div class="field mb-16">
+                        <label for="emailInvitation">Adresse email invitée <span class="req">*</span></label>
+                        <input class="input" type="email" id="emailInvitation" placeholder="prenom.nom@exemple.com" autocomplete="email">
+                        <div class="field-error" id="errEmailInvitation">Veuillez saisir l'adresse email invitée.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="codeInvitation">Code d'invitation <span class="req">*</span></label>
+                        <input class="input" type="text" id="codeInvitation" placeholder="6 chiffres" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="letter-spacing:6px;font-size:18px;text-align:center">
+                        <div class="field-error" id="errCodeInvitation">Saisissez le code à 6 chiffres reçu par email.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="nomInvitation">Nom complet</label>
+                        <input class="input" type="text" id="nomInvitation" placeholder="Ex. Marie Ouédraogo" autocomplete="name">
+                        <div class="mt-8" style="font-size:12.5px;color:#8892a6">Utile si c'est votre premier accès à SchoolManager.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="mdpInvitation">Créer un mot de passe <span class="req">*</span></label>
+                        <input class="input" type="password" id="mdpInvitation" placeholder="6 caractères minimum" autocomplete="new-password">
+                        <div class="field-error" id="errMdpInvitation">Le mot de passe doit contenir au moins 6 caractères.</div>
+                    </div>
+
+                    <div class="field mb-16">
+                        <label for="mdpInvitation2">Confirmer le mot de passe <span class="req">*</span></label>
+                        <input class="input" type="password" id="mdpInvitation2" placeholder="••••••••" autocomplete="new-password">
+                        <div class="field-error" id="errMdpInvitation2">Les deux mots de passe ne correspondent pas.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block" id="btnInvitation">Valider mon invitation →</button>
+                    <div class="field-error" id="errInvitationGlobal" style="margin-top:10px"></div>
+
+                    <div class="or">ou</div>
+                    <p style="text-align:center;font-size:13.5px;margin:0">
+                        <a href="#" id="linkRetourInvitation">← Retour à la connexion</a>
                     </p>
                 </form>
             </div>
