@@ -36,7 +36,11 @@ remplace des contraintes et crée deux tables.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import sys
+import traceback
 from datetime import datetime
 
 from sqlalchemy import inspect, text
@@ -60,6 +64,14 @@ _VERROU = 8274913042
 
 # Dernier rapport produit par cette instance (diagnostic).
 DERNIER_RAPPORT: dict = {}
+
+# Étape en cours : en cas d'échec, elle désigne l'endroit exact de la panne.
+_ETAPE = "initialisation"
+
+
+def _etape(nom: str) -> None:
+    global _ETAPE
+    _ETAPE = nom
 
 
 def _table_existe(conn, nom: str) -> bool:
@@ -122,14 +134,18 @@ def _basculer_dans_transaction(conn) -> dict:
     transaction (« pooler » Supabase), où le passage par une même connexion
     n'est garanti que le temps d'une transaction.
     """
+    _etape("verrou")
     conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _VERROU})
 
+    _etape("relecture")
     if _colonne_existe(conn, "classes", "school_id"):
         return {"statut": "deja_migre", "raison": "conversion faite par une autre instance"}
 
     # 1. Sauvegarde intégrale, vérifiée AVANT toute modification.
+    _etape("sauvegarde")
     schema = "sauvegarde_" + datetime.now().strftime("%Y%m%d_%H%M%S")
     lignes = _sauvegarder(conn, outils, schema)
+    _etape("controle_sauvegarde")
     ecarts = _controler_sauvegarde(conn, outils, schema, lignes)
     if ecarts:
         raise RuntimeError(
@@ -138,14 +154,20 @@ def _basculer_dans_transaction(conn) -> dict:
         )
 
     # 2. Migration Phase 2 + 3, avec les fonctions déjà éprouvées.
+    _etape("controles_avant")
     presentes = set(inspect(conn).get_table_names())
     cibles = [t for t in outils.TABLES if t in presentes]
+    deja = sorted(t for t in presentes if _colonne_existe(conn, t, "school_id"))
     sid = outils.controles_avant(conn, cibles)
+    _etape("comptage_avant")
     avant = {t: outils.compter(conn, t) for t in cibles}
+    _etape("plan")
     instructions = outils.plan_sql(conn, sid)
+    _etape("execution")
     for requete in instructions:
         if not requete.startswith("--"):
             conn.execute(text(requete))
+    _etape("tables_nouvelles")
     nouvelles = [
         Base.metadata.tables[t]
         for t in outils.TABLES_NOUVELLES
@@ -154,21 +176,25 @@ def _basculer_dans_transaction(conn) -> dict:
     Base.metadata.create_all(bind=conn, tables=nouvelles)
 
     # 3. Contrôles finaux : parité de schéma, parité des lignes, aucun vide.
+    _etape("verification")
     ecarts = outils.verifier_apres(conn, avant)
     if ecarts:
         raise RuntimeError(
             "Contrôle final en échec, transaction annulée :\n  - "
             + "\n  - ".join(ecarts)
         )
+    _etape("comptage_apres")
     apres = {t: outils.compter(conn, t) for t in cibles}
     if apres != avant:
         raise RuntimeError(f"Comptages divergents : {avant} → {apres}")
 
+    _etape("termine")
     return {
         "statut": "migre",
         "sauvegarde": {"schema": schema, "lignes": lignes},
         "etablissement": sid,
         "instructions": len(instructions),
+        "colonnes_school_id_avant": deja,
         "lignes_avant": avant,
         "lignes_apres": apres,
     }
@@ -186,6 +212,15 @@ def executer_si_necessaire() -> dict:
         rapport["fin"] = datetime.now().isoformat(timespec="seconds")
         DERNIER_RAPPORT.clear()
         DERNIER_RAPPORT.update(rapport)
+        # Trace écrite dans le journal de la plateforme : c'est le seul témoin
+        # consultable quand l'application ne parvient pas à démarrer.
+        try:
+            sys.__stdout__.write(
+                "[BASCULE] " + json.dumps(rapport, ensure_ascii=False, default=str) + "\n"
+            )
+            sys.__stdout__.flush()
+        except Exception:  # noqa: BLE001 — le journal ne doit jamais faire échouer
+            pass
         return rapport
 
     if make_url(settings.engine_url).get_backend_name() != "postgresql":
@@ -193,18 +228,35 @@ def executer_si_necessaire() -> dict:
 
     try:
         with engine.connect() as conn:
-            if not _table_existe(conn, "classes"):
+            presentes = sorted(inspect(conn).get_table_names())
+            rapport["tables_presentes"] = presentes
+            if "classes" not in presentes:
                 return _noter(statut="ignore", raison="base neuve : rien à faire")
+            rapport["colonnes_school_id_presentes"] = sorted(
+                t for t in presentes if _colonne_existe(conn, t, "school_id")
+            )
             if _colonne_existe(conn, "classes", "school_id"):
                 return _noter(statut="deja_migre")
     except Exception as erreur:  # noqa: BLE001
         return _noter(statut="echec", erreur=f"{type(erreur).__name__} : {erreur}")
 
+    # `_migrate_school_id_pg._echec` termine par `sys.exit(1)` : c'est un
+    # `BaseException`, que `except Exception` laisse passer. On capture donc
+    # tout (`BaseException`) et l'on conserve ce que le script a écrit, sinon
+    # l'échec serait totalement muet.
+    journal = io.StringIO()
     try:
-        with engine.begin() as conn:
-            rapport.update(_basculer_dans_transaction(conn))
-    except Exception as erreur:  # noqa: BLE001 — consigné, jamais propagé au démarrage
-        rapport.update(statut="echec", erreur=f"{type(erreur).__name__} : {erreur}")
+        with contextlib.redirect_stdout(journal):
+            with engine.begin() as conn:
+                rapport.update(_basculer_dans_transaction(conn))
+    except BaseException as erreur:  # noqa: BLE001 — consigné, jamais propagé
+        rapport.update(
+            statut="echec",
+            etape=_ETAPE,
+            erreur=f"{type(erreur).__name__} : {erreur}",
+            journal=journal.getvalue()[-4000:],
+            trace=traceback.format_exc()[-4000:],
+        )
     return _noter()
 
 
