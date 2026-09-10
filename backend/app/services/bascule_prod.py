@@ -79,7 +79,56 @@ def _table_existe(conn, nom: str) -> bool:
 
 
 def _colonne_existe(conn, table: str, colonne: str) -> bool:
-    return colonne in {c["name"] for c in inspect(conn).get_columns(table)}
+    return colonne in outils.colonnes_du_schema(conn).get(table, [])
+
+
+def _texte_lot(requetes: list[str]) -> str:
+    """Assemble plusieurs instructions en une seule requête.
+
+    Les instructions du plan sont écrites libres de leur point-virgule final :
+    les concaténer demande donc de le rétablir, sans quoi le serveur lit
+    `... SELECT * FROM public."x" ALTER TABLE ...` et refuse la suite
+    (`syntax error`). `rstrip(';')` ne retire que la fin de chaque instruction,
+    un point-virgule interne resterait intact.
+    """
+    return ";\n".join(r.strip().rstrip(";").rstrip() for r in requetes) + ";"
+
+
+def _executer_lots(conn, instructions: list[str]) -> None:
+    """Exécute un plan DDL/DML en un minimum d'allers-retours.
+
+    La latence vers la base hébergée est le facteur limitant (≈ 0,3 s par
+    échange, mesuré depuis la fonction déployée) : envoyer les ~160
+    instructions une par une dépassait le délai maximal de la fonction.
+    `psycopg` accepte plusieurs instructions dans un même envoi dès lors
+    qu'aucun paramètre n'est lié — c'est le cas d'un plan DDL sans valeur.
+
+    En cas d'échec du lot, le même lot est rejoué instruction par instruction
+    (dans des points de sauvegarde, pour désigner précisément la coupable et
+    documenter la panne) ; si même le rejeu réussit, le lot était victime d'un
+    incident passager et l'exécution se poursuit normalement.
+    """
+    requetes = [r for r in instructions if not r.startswith("--")]
+    if not requetes:
+        return
+    try:
+        with conn.begin_nested():
+            conn.exec_driver_sql(_texte_lot(requetes))
+        return
+    except Exception as erreur:  # noqa: BLE001 — rejeu de diagnostic
+        erreur_lot = erreur
+
+    coupable = None
+    for requete in requetes:
+        try:
+            with conn.begin_nested():
+                conn.exec_driver_sql(_texte_lot([requete]))
+        except Exception:  # noqa: BLE001 — on cherche seulement laquelle casse
+            coupable = requete
+            break
+    if coupable is None:
+        return  # incident passager : le rejeu a tout appliqué
+    raise RuntimeError(f"instruction en échec : {coupable}") from erreur_lot
 
 
 def _relations_a_sauvegarder(conn) -> list[str]:
@@ -112,30 +161,37 @@ def _sauvegarder(conn, outils, schema: str) -> tuple[dict[str, int], dict[str, s
 
     `CREATE TABLE ... AS SELECT *` conserve les données sans les interpréter :
     aucune dépendance à pg_dump (indisponible sur une plateforme serverless).
-    Chaque copie passe par un point de sauvegarde : un objet récalcitrant est
-    écarté et signalé, sauf s'il s'agit d'une table de l'application — auquel
-    cas la bascule est abandonnée plutôt que tentée sans filet.
+
+    Les copies partent en **un seul envoi** ; si ce lot échoue, chaque table
+    est reprise isolément dans un point de sauvegarde, ce qui permet d'écarter
+    un objet récalcitrant tout en le signalant. Une table de l'application non
+    copiable fait au contraire abandonner la bascule : mieux vaut ne rien
+    entreprendre que migrer sans filet.
     """
     q = outils._q
     tables = _relations_a_sauvegarder(conn)
     if not tables:
         raise RuntimeError("aucune table lisible dans le schéma public : sauvegarde impossible")
     conn.execute(text(f"CREATE SCHEMA {q(schema)}"))
-    lignes: dict[str, int] = {}
+    copies = {
+        t: f"CREATE TABLE {q(schema)}.{q(t)} AS SELECT * FROM public.{q(t)}"
+        for t in tables
+    }
     non_copiees: dict[str, str] = {}
-    for table in tables:
-        try:
-            with conn.begin_nested():
-                conn.execute(
-                    text(f"CREATE TABLE {q(schema)}.{q(table)} AS "
-                         f"SELECT * FROM public.{q(table)}")
-                )
-        except Exception as erreur:  # noqa: BLE001
-            if table in Base.metadata.tables:
-                raise
-            non_copiees[table] = f"{type(erreur).__name__} : {erreur}"[:200]
-            continue
-        lignes[table] = outils.compter(conn, table)
+    try:
+        with conn.begin_nested():
+            conn.exec_driver_sql(_texte_lot(list(copies.values())))
+    except Exception:  # noqa: BLE001 — reprise table par table
+        for table, requete in copies.items():
+            try:
+                with conn.begin_nested():
+                    conn.exec_driver_sql(_texte_lot([requete]))
+            except Exception as erreur:  # noqa: BLE001
+                if table in Base.metadata.tables:
+                    raise
+                non_copiees[table] = f"{type(erreur).__name__} : {erreur}"[:200]
+    copiees = [t for t in tables if t not in non_copiees]
+    lignes = outils.compter_plusieurs(conn, copiees)
     # Description du schéma d'avant la bascule, conservée pour mémoire.
     conn.execute(
         text(
@@ -152,14 +208,11 @@ def _sauvegarder(conn, outils, schema: str) -> tuple[dict[str, int], dict[str, s
 
 def _controler_sauvegarde(conn, outils, schema: str, lignes: dict[str, int]) -> list[str]:
     """Compare la copie à l'original, table par table. Renvoie les écarts."""
-    q = outils._q
     ecarts = []
+    copie = outils.compter_plusieurs(conn, sorted(lignes), schema=schema)
     for table, attendu in lignes.items():
-        copie = conn.execute(
-            text(f"SELECT count(*) FROM {q(schema)}.{q(table)}")
-        ).scalar()
-        if copie != attendu:
-            ecarts.append(f"{table} : {attendu} lignes d'origine, {copie} copiées")
+        if copie.get(table) != attendu:
+            ecarts.append(f"{table} : {attendu} lignes d'origine, {copie.get(table)} copiées")
     return ecarts
 
 
@@ -174,6 +227,7 @@ def _basculer_dans_transaction(conn) -> dict:
     """
     _etape("verrou")
     conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _VERROU})
+    outils.oublier_releves()  # tout ce qui suit décrit l'état d'avant la bascule
 
     _etape("relecture")
     if _colonne_existe(conn, "classes", "school_id"):
@@ -193,18 +247,16 @@ def _basculer_dans_transaction(conn) -> dict:
 
     # 2. Migration Phase 2 + 3, avec les fonctions déjà éprouvées.
     _etape("controles_avant")
-    presentes = set(inspect(conn).get_table_names())
+    presentes = set(outils.tables_du_schema(conn))
     cibles = [t for t in outils.TABLES if t in presentes]
     deja = sorted(t for t in presentes if _colonne_existe(conn, t, "school_id"))
     sid = outils.controles_avant(conn, cibles)
     _etape("comptage_avant")
-    avant = {t: outils.compter(conn, t) for t in cibles}
+    avant = outils.compter_plusieurs(conn, cibles)
     _etape("plan")
     instructions = outils.plan_sql(conn, sid)
     _etape("execution")
-    for requete in instructions:
-        if not requete.startswith("--"):
-            conn.execute(text(requete))
+    _executer_lots(conn, instructions)
     _etape("tables_nouvelles")
     nouvelles = [
         Base.metadata.tables[t]
@@ -222,11 +274,12 @@ def _basculer_dans_transaction(conn) -> dict:
             + "\n  - ".join(ecarts)
         )
     _etape("comptage_apres")
-    apres = {t: outils.compter(conn, t) for t in cibles}
+    apres = outils.compter_plusieurs(conn, cibles)
     if apres != avant:
         raise RuntimeError(f"Comptages divergents : {avant} → {apres}")
 
     _etape("termine")
+    outils.oublier_releves()  # le schéma a changé
     return {
         "statut": "migre",
         "sauvegarde": {
@@ -270,14 +323,15 @@ def executer_si_necessaire() -> dict:
 
     try:
         with engine.connect() as conn:
-            presentes = sorted(inspect(conn).get_table_names())
+            presentes = sorted(outils.tables_du_schema(conn))
             rapport["tables_presentes"] = presentes
             if "classes" not in presentes:
                 return _noter(statut="ignore", raison="base neuve : rien à faire")
+            colonnes = outils.colonnes_du_schema(conn)
             rapport["colonnes_school_id_presentes"] = sorted(
-                t for t in presentes if _colonne_existe(conn, t, "school_id")
+                t for t in presentes if "school_id" in colonnes.get(t, [])
             )
-            if _colonne_existe(conn, "classes", "school_id"):
+            if "school_id" in colonnes.get("classes", []):
                 return _noter(statut="deja_migre")
     except Exception as erreur:  # noqa: BLE001
         return _noter(statut="echec", erreur=f"{type(erreur).__name__} : {erreur}")
@@ -305,6 +359,7 @@ def executer_si_necessaire() -> dict:
 def resume() -> dict:
     """État constatable de la base, indépendamment de la mémoire de l'instance."""
     informations: dict = {"rapport_instance": dict(DERNIER_RAPPORT)}
+    outils.oublier_releves()  # lecture fraîche : ce diagnostic suit la bascule
     try:
         with engine.connect() as conn:
             inspections = inspect(conn)
@@ -328,7 +383,7 @@ def resume() -> dict:
                 conn.execute(text("SELECT now()")).scalar()
             )
             informations["classes_school_id"] = (
-                _colonne_existe(conn, "classes", "school_id")
+                "school_id" in outils.colonnes_du_schema(conn).get("classes", [])
                 if _table_existe(conn, "classes")
                 else None
             )
@@ -343,11 +398,9 @@ def resume() -> dict:
             informations["sauvegardes"] = list(schemas)
             if schemas:
                 dernier = schemas[-1]
-                informations["lignes_sauvegarde"] = {
-                    table: conn.execute(
-                        text(f'SELECT count(*) FROM "{dernier}"."{table}"')
-                    ).scalar()
-                    for table in sorted(
+                informations["lignes_sauvegarde"] = outils.compter_plusieurs(
+                    conn,
+                    sorted(
                         conn.execute(
                             text(
                                 "SELECT table_name FROM information_schema.tables "
@@ -356,12 +409,12 @@ def resume() -> dict:
                             ),
                             {"s": dernier},
                         ).scalars().all()
-                    )
-                }
-            informations["lignes_actuelles"] = {
-                table: conn.execute(text(f'SELECT count(*) FROM "{table}"')).scalar()
-                for table in sorted(inspections.get_table_names())
-            }
+                    ),
+                    schema=dernier,
+                )
+            informations["lignes_actuelles"] = outils.compter_plusieurs(
+                conn, sorted(inspections.get_table_names())
+            )
     except Exception as erreur:  # noqa: BLE001
         informations["erreur"] = f"{type(erreur).__name__} : {erreur}"
     return informations

@@ -17,7 +17,10 @@ Ce que fait la migration (une seule transaction, annulable) :
      composites `(school_id, id)` : classes, matières, enseignants, élèves,
      annonces, barème, tables de liaison. Les codes métier (« 3A », « S1 »,
      « EL001 »…) sont conservés : le même code peut désormais exister dans
-     deux écoles.
+     deux écoles. Les clés étrangères **extérieures** au périmètre (portées
+     par une table déjà présente en base, comme `membres`) sont retirées puis
+     rétablies à l'identique, sinon PostgreSQL refuse de retirer la clé
+     primaire qu'elles référencent.
   3. Remplace les clés étrangères simples par des clés composites portant le
      `school_id` (aucun croisement entre deux écoles possible).
   4. Remplace les contraintes uniques par leur version scopée
@@ -177,34 +180,109 @@ def uniques_modele(table) -> list:
 
 
 # ------------------------------------------------------------- Lecture base --
+# Chaque aller-retour vers la base hébergée coûte cher (mesuré ≈ 0,3 s depuis
+# la fonction déployée). Les relevés de schéma sont donc lus **en une requête
+# par nature d'information** et mémorisés pour la durée d'une transaction.
+# L'état mémorisé est celui d'AVANT la bascule : après modification, il faut
+# oublier les relevés concernés (`oublier_releves`).
+_RELEVES: dict = {}
+
+
+def _releve(cle: str, fabrique):
+    """Relevé de catalogue mémorisé (une seule requête par nature)."""
+    if cle not in _RELEVES:
+        _RELEVES[cle] = fabrique()
+    return _RELEVES[cle]
+
+
+def _litteral(txt: str) -> str:
+    """Chaîne SQL entre apostrophes (apostrophes internes doublées)."""
+    return "'" + str(txt).replace("'", "''") + "'"
+
+
+def oublier_releves() -> None:
+    """Oublie les relevés mémorisés (schéma modifié, ou nouvelle transaction)."""
+    _RELEVES.clear()
+
+
+def tables_du_schema(conn) -> list[str]:
+    return _releve("tables", lambda: sorted(inspect(conn).get_table_names()))
+
+
+def colonnes_du_schema(conn) -> dict[str, list[str]]:
+    """Colonnes de toutes les tables du schéma, en UNE requête."""
+
+    def lire() -> dict[str, list[str]]:
+        out: dict[str, list[str]] = {}
+        for table, colonne in conn.execute(
+            text(
+                "SELECT table_name, column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "ORDER BY table_name, ordinal_position"
+            )
+        ).fetchall():
+            out.setdefault(table, []).append(colonne)
+        return out
+
+    return _releve("colonnes", lire)
+
+
 def colonnes_reelles(conn, table: str) -> list[str]:
-    rows = conn.execute(
-        text(
-            "SELECT column_name FROM information_schema.columns "
-            "WHERE table_schema = current_schema() AND table_name = :t "
-            "ORDER BY ordinal_position"
-        ),
-        {"t": table},
-    ).fetchall()
-    return [r[0] for r in rows]
+    return colonnes_du_schema(conn).get(table, [])
+
+
+def contraintes_du_schema(conn) -> dict[tuple[str, str], list]:
+    """PK / UNIQUE / FK du schéma avec leurs colonnes (UNE requête).
+
+    Renvoie `{(table, contrainte): [type, colonnes, table_referencee,
+    colonnes_referencees]}`.
+    """
+
+    def lire() -> dict[tuple[str, str], list]:
+        rows = conn.execute(
+            text(
+                "SELECT t.relname, c.conname, c.contype, a.attname, "
+                "       rt.relname, ra.attname "
+                "FROM pg_constraint c "
+                "JOIN pg_class t ON t.oid = c.conrelid "
+                "JOIN pg_namespace n ON n.oid = t.relnamespace "
+                "JOIN unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true "
+                "JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum "
+                "LEFT JOIN pg_class rt ON rt.oid = c.confrelid "
+                "LEFT JOIN unnest(c.confkey) WITH ORDINALITY AS rk(attnum, ord) "
+                "     ON rk.ord = k.ord "
+                "LEFT JOIN pg_attribute ra "
+                "     ON ra.attrelid = c.confrelid AND ra.attnum = rk.attnum "
+                "WHERE n.nspname = current_schema() "
+                "  AND c.contype IN ('p', 'u', 'f') "
+                "ORDER BY t.relname, c.conname, k.ord"
+            )
+        ).fetchall()
+        out: dict[tuple[str, str], list] = {}
+        for table, nom, type_, colonne, table_ref, colonne_ref in rows:
+            entree = out.setdefault((table, nom), [type_, [], None, []])
+            entree[1].append(colonne)
+            if table_ref is not None:
+                entree[2] = table_ref
+                entree[3].append(colonne_ref)
+        return out
+
+    return _releve("contraintes_colonnes", lire)
 
 
 def contraintes(conn, table: str) -> dict[str, list[str]]:
-    """Contraintes PK / FK / UNIQUE d'une table, groupées par type."""
-    rows = conn.execute(
-        text(
-            "SELECT c.conname, c.contype FROM pg_constraint c "
-            "JOIN pg_class t ON t.oid = c.conrelid "
-            "JOIN pg_namespace n ON n.oid = t.relnamespace "
-            "WHERE n.nspname = current_schema() AND t.relname = :t"
-        ),
-        {"t": table},
-    ).fetchall()
-    out: dict[str, list[str]] = {"p": [], "f": [], "u": []}
-    for nom, type_ in rows:
-        if type_ in out:
-            out[type_].append(nom)
-    return out
+    """Noms des contraintes PK / FK / UNIQUE d'une table, groupés par type."""
+
+    def lire() -> dict[str, dict[str, list[str]]]:
+        out: dict[str, dict[str, list[str]]] = {}
+        for (nom_table, nom), (type_, _c, _r, _rc) in contraintes_du_schema(conn).items():
+            if type_ in ("p", "f", "u"):
+                out.setdefault(nom_table, {"p": [], "f": [], "u": []})[type_].append(nom)
+        return out
+
+    return _releve("contraintes_par_table", lire).get(
+        table, {"p": [], "f": [], "u": []}
+    )
 
 
 def compter(conn, table: str) -> int | None:
@@ -214,11 +292,85 @@ def compter(conn, table: str) -> int | None:
         return None
 
 
+def compter_plusieurs(conn, tables, schema: str | None = None) -> dict[str, int | None]:
+    """Nombre de lignes de plusieurs tables en UNE seule requête.
+
+    Réduit la latence : compter 18 tables coûtait 18 allers-retours. En cas
+    d'échec (table absente ou illisible), on repasse table par table pour
+    conserver le comportement tolérant de `compter`.
+    """
+    liste = list(tables)
+    if not liste:
+        return {}
+    prefixe = f"{_q(schema)}." if schema else ""
+    bloc = " UNION ALL ".join(
+        f"SELECT {_litteral(t)} AS nom, count(*) AS n FROM {prefixe}{_q(t)}"
+        for t in liste
+    )
+    try:
+        return {nom: n for nom, n in conn.execute(text(bloc)).fetchall()}
+    except Exception:  # noqa: BLE001 — relevé groupé impossible, repli sûr
+        return {t: compter(conn, t) for t in liste}
+
+
+def fk_a_relacher(conn, cibles: list[str]) -> list[tuple[str, str, str]]:
+    """Clés étrangères portées par une table HORS migration, mais pointant
+    vers une table migrée.
+
+    PostgreSQL refuse de supprimer une clé primaire tant qu'une clé étrangère
+    s'appuie sur son index (`DependentObjectsStillExist`). Or les tables hors
+    migration peuvent déjà exister en base (créées par le `create_all` d'un
+    déploiement antérieur) : c'est le cas de `membres`, dont
+    `membres_user_id_fkey` pointe vers `users.id`.
+
+    Ces contraintes sont donc retirées avant les clés primaires, puis
+    rétablies **à l'identique** : leur définition est relue dans le catalogue
+    (`pg_get_constraintdef`), elle n'est pas reconstruite depuis les modèles
+    (ces tables ne font pas partie du périmètre migré).
+
+    Renvoie des triplets (table, nom de contrainte, définition SQL).
+    """
+    visees = set(cibles) | set(UNIQUES_A_REFAIRE)
+    rows = conn.execute(
+        text(
+            "SELECT t.relname, c.conname, pg_get_constraintdef(c.oid), r.relname "
+            "FROM pg_constraint c "
+            "JOIN pg_class t ON t.oid = c.conrelid "
+            "JOIN pg_namespace n ON n.oid = t.relnamespace "
+            "JOIN pg_class r ON r.oid = c.confrelid "
+            "WHERE n.nspname = current_schema() AND c.contype = 'f' "
+            "ORDER BY t.relname, c.conname"
+        )
+    ).fetchall()
+    return [(t, n, d) for t, n, d, ref in rows if ref in visees and t not in visees]
+
+
 # --------------------------------------------------------------- Contrôles ---
+def lignes_sans_school_id(conn, tables) -> dict[str, int]:
+    """Lignes sans `school_id` pour plusieurs tables, en UNE requête."""
+    liste = list(tables)
+    if not liste:
+        return {}
+    bloc = " UNION ALL ".join(
+        f"SELECT {_litteral(t)} AS nom, count(*) AS n FROM {_q(t)} "
+        f"WHERE {_q(COLONNE)} IS NULL"
+        for t in liste
+    )
+    try:
+        return {nom: n for nom, n in conn.execute(text(bloc)).fetchall()}
+    except Exception:  # noqa: BLE001 — repli table par table
+        return {
+            t: conn.execute(
+                text(f"SELECT COUNT(*) FROM {_q(t)} WHERE {_q(COLONNE)} IS NULL")
+            ).scalar()
+            for t in liste
+        }
+
+
 def controles_avant(conn, cibles: list[str]) -> int:
     """Vérifie l'état initial et renvoie l'identifiant d'école à affecter."""
-    insp = inspect(conn)
-    presentes = set(insp.get_table_names())
+    oublier_releves()  # tout ce qui est lu ici décrit l'état d'AVANT la bascule
+    presentes = set(tables_du_schema(conn))
     absentes = [t for t in cibles if t not in presentes]
     if absentes:
         _echec(f"tables manquantes en base : {', '.join(absentes)}")
@@ -260,14 +412,19 @@ def controles_avant(conn, cibles: list[str]) -> int:
 
 
 def plan_sql(conn, sid: int) -> list[str]:
-    """Construit la liste ordonnée des instructions DDL/DML."""
-    insp = inspect(conn)
+    """Construit la liste ordonnée des instructions DDL/DML.
+
+    Réutilise les relevés mémorisés par `controles_avant` : le même état
+    d'avant bascule, sans nouvelle lecture du catalogue.
+    """
     avant = {t: contraintes(conn, t) for t in TABLES}
+    a_relacher = fk_a_relacher(conn, TABLES)
     sql: list[str] = []
 
     # 0. Nouvelles tables Phase 3 -------------------------------------------
+    presentes = set(tables_du_schema(conn))
     for t in TABLES_NOUVELLES:
-        if t not in insp.get_table_names():
+        if t not in presentes:
             sql.append(f"-- table {t} : créée par les modèles (create_all)")
 
     # 1. Colonne school_id ---------------------------------------------------
@@ -296,6 +453,10 @@ def plan_sql(conn, sid: int) -> list[str]:
     for t in TABLES:
         for nom in sorted(avant[t]["f"]):
             sql.append(f"ALTER TABLE {_q(t)} DROP CONSTRAINT {_q(nom)}")
+    #    …y compris les clés étrangères venues de tables non migrées
+    #    (`membres`), sans quoi la première clé primaire retirée échouerait.
+    for t, nom, _definition in a_relacher:
+        sql.append(f"ALTER TABLE {_q(t)} DROP CONSTRAINT {_q(nom)}")
     for t in sorted(UNIQUES_A_REFAIRE):
         for nom in sorted(avant[t]["u"]):
             sql.append(f"ALTER TABLE {_q(t)} DROP CONSTRAINT {_q(nom)}")
@@ -316,42 +477,61 @@ def plan_sql(conn, sid: int) -> list[str]:
     for t in sorted(UNIQUES_A_REFAIRE):
         for uq in uniques_modele(Base.metadata.tables[t]):
             sql.append(ddl_unique(Base.metadata.tables[t], uq))
+    #    …et enfin les clés étrangères des tables non migrées, rétablies
+    #    à l'identique (elles n'ont pas à changer : elles ne portent pas
+    #    de `school_id`).
+    for t, nom, definition in a_relacher:
+        sql.append(
+            _equilibre(
+                f"ALTER TABLE {_q(t)} ADD CONSTRAINT {_q(nom)} {definition}"
+            )
+        )
 
     return sql
 
 
 def verifier_apres(conn, avant: dict[str, int]) -> list[str]:
-    """Contrôle final : comptages, school_id, parité de schéma. Renvoie les écarts."""
+    """Contrôle final : comptages, school_id, parité de schéma. Renvoie les écarts.
+
+    Toutes les lectures sont groupées — trois requêtes pour l'ensemble du
+    contrôle, au lieu d'une centaine (latence de la base hébergée).
+    """
     ecarts: list[str] = []
-    insp = inspect(conn)
+    # Les relevés mémorisés datent d'avant la bascule : ils ne sont plus valides.
+    _RELEVES.pop("contraintes_colonnes", None)
+    _RELEVES.pop("colonnes", None)
 
+    apres = compter_plusieurs(conn, sorted(avant))
     for t, n in avant.items():
-        apres = compter(conn, t)
-        if apres != n:
-            ecarts.append(f"{t} : {n} lignes avant, {apres} après")
+        if apres.get(t) != n:
+            ecarts.append(f"{t} : {n} lignes avant, {apres.get(t)} après")
 
-    for t in TABLES:
-        nuls = conn.execute(
-            text(f"SELECT COUNT(*) FROM {_q(t)} WHERE {_q(COLONNE)} IS NULL")
-        ).scalar()
-        if t not in TABLES_SCHOOL_ID_NULLABLE and nuls:
+    for t, nuls in lignes_sans_school_id(
+        conn, [x for x in TABLES if x not in TABLES_SCHOOL_ID_NULLABLE]
+    ).items():
+        if nuls:
             ecarts.append(f"{t} : {nuls} ligne(s) sans school_id")
 
-    # Parité PK / FK / UNIQUE avec les modèles.
+    # Parité PK / FK / UNIQUE avec les modèles, relevée dans le catalogue.
+    releves = contraintes_du_schema(conn)
+    pk: dict[str, tuple] = {}
+    uniques: dict[str, set] = {}
+    fks: dict[str, set] = {}
+    for (table, _nom), (type_, cols, table_ref, cols_ref) in releves.items():
+        if type_ == "p":
+            pk[table] = tuple(sorted(cols))
+        elif type_ == "u":
+            uniques.setdefault(table, set()).add(tuple(sorted(cols)))
+        elif type_ == "f":
+            fks.setdefault(table, set()).add(
+                (tuple(sorted(cols)), table_ref, tuple(sorted(cols_ref)))
+            )
+
     for t in TABLES:
         table = Base.metadata.tables[t]
         pk_modele = tuple(sorted(c.name for c in table.primary_key.columns))
-        pk_base = tuple(sorted(insp.get_pk_constraint(t).get("constrained_columns") or []))
-        if pk_modele != pk_base:
-            ecarts.append(f"{t} : PK {pk_base} ≠ modèle {pk_modele}")
-
-        def _fks(source) -> set:
-            return {
-                (tuple(sorted(fk["constrained_columns"])),
-                 fk["referred_table"],
-                 tuple(sorted(fk["referred_columns"])))
-                for fk in source
-            }
+        if pk_modele != pk.get(t):
+            ecarts.append(f"{t} : PK {pk.get(t)} ≠ modèle {pk_modele}")
 
         fk_modele = {
             (tuple(sorted(e.parent.name for e in fk.elements)),
@@ -359,23 +539,19 @@ def verifier_apres(conn, avant: dict[str, int]) -> list[str]:
              tuple(sorted(e.column.name for e in fk.elements)))
             for fk in table.foreign_key_constraints
         }
-        fk_base = _fks(insp.get_foreign_keys(t))
+        fk_base = fks.get(t, set())
         if fk_modele != fk_base:
-            manquants = fk_modele - fk_base
-            inutiles = fk_base - fk_modele
             ecarts.append(
-                f"{t} : FK manquantes {sorted(manquants)} / inattendues {sorted(inutiles)}"
+                f"{t} : FK manquantes {sorted(fk_modele - fk_base)} / "
+                f"inattendues {sorted(fk_base - fk_modele)}"
             )
 
     for t in sorted(UNIQUES_A_REFAIRE):
-        table = Base.metadata.tables[t]
         uq_modele = {
-            tuple(sorted(c.name for c in uq.columns)) for uq in uniques_modele(table)
+            tuple(sorted(c.name for c in uq.columns))
+            for uq in uniques_modele(Base.metadata.tables[t])
         }
-        uq_base = {
-            tuple(sorted(uq.get("column_names") or []))
-            for uq in insp.get_unique_constraints(t)
-        }
+        uq_base = uniques.get(t, set())
         if uq_modele != uq_base:
             ecarts.append(f"{t} : UNIQUE {sorted(uq_base)} ≠ modèle {sorted(uq_modele)}")
 
@@ -406,12 +582,11 @@ def main() -> None:
     print("=" * 72)
 
     with moteur.connect() as conn:
-        insp = inspect(conn)
-        presentes = set(insp.get_table_names())
+        presentes = set(tables_du_schema(conn))
         cibles = [t for t in TABLES if t in presentes]
         sid = controles_avant(conn, cibles)
         print(f"[i] Établissement de rattachement : école n° {sid}")
-        avant = {t: compter(conn, t) for t in cibles}
+        avant = compter_plusieurs(conn, cibles)
         print("[i] Lignes avant :", ", ".join(f"{t}={n}" for t, n in avant.items()))
         sql = plan_sql(conn, sid)
 
@@ -447,10 +622,12 @@ def main() -> None:
             )
 
     # --- Relecture hors transaction (résultat définitif) --------------------
+    oublier_releves()  # le schéma vient de changer : aucun relevé n'est valide
     with moteur.connect() as conn:
         ecarts = verifier_apres(conn, avant)
+        apres = compter_plusieurs(conn, cibles)
         print("[OK] Lignes après :", ", ".join(
-            f"{t}={compter(conn, t)}" for t in cibles
+            f"{t}={apres.get(t)}" for t in cibles
         ))
     if ecarts:
         _echec("écarts constatés après validation : " + " ; ".join(ecarts))
