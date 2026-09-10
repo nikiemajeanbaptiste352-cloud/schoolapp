@@ -293,7 +293,28 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
    domaine (référentiel, élèves, notes, présences, paiements, annonces, paie) ; les routes publiques
    sans auth (classes/matieres en lecture) deviennent scopées par établissement ou documentées.
 3. Tests : suite existante maintenue verte + nouveau `test_multitenant.py` (2 écoles, isolation).
+   ✅ **fait** — suite **82/82 verte** (`test_multitenant.py` = 6 tests, 2 écoles, codes métier identiques).
 4. E2E local sur base de démo à 2 écoles, puis déploiement prod (aucune donnée perdue).
+   ✅ **Étape locale faite (2026-09-10)** — base jetable à 2 écoles, isolation vérifiée en API *et* dans
+   le navigateur (voir § V.1). ⏳ **Déploiement prod = non fait** : la prod PG (« saint collete »,
+   données réelles) n'est **pas** migrée ; les commits Phase 2 restent locaux.
+
+### V.1 État réel de la Phase 2 au 2026-09-10
+
+| Élément | État |
+| --- | --- |
+| Modèles `(school_id, id)` + FKs composites | ✅ codé (commit `dd7de33`) |
+| Routeurs scopés + middleware de contexte école | ✅ codé |
+| `test_multitenant.py` (6 tests) | ✅ vert |
+| Migration des bases SQLite existantes | ✅ script `backend/_migrate_school_id.py` (commit `aeeea82`) — **dev seulement** |
+| Base dev `backend/data/school.db` migrée (école 1) | ✅ counts identiques, `integrity_check ok`, sauvegarde `.bak-20260910-003311` |
+| E2E local 2 écoles (API + navigateur) | ✅ validé |
+| Migration prod PG Supabase | ❌ **non faite** — chemin PG / Alembic à prévoir |
+| `memberships` (Phase 3) | ❌ non commencé |
+| Photos de profil (brique 7) | ❌ non commencé |
+
+> ⚠️ **Ne pas pousser `dd7de33` / `aeeea82` en l'état** : la prod PG n'ayant pas la colonne `school_id`,
+> le déploiement provoquerait `no such column: school_id` sur toutes les routes de domaine.
 
 **Phase 3 — Rattachement** : `memberships`, invitations, `role` par école, UI « 👥 Utilisateurs »
 dans le portail établissement (réutilise `GET/POST /auth/comptes` actuels).
