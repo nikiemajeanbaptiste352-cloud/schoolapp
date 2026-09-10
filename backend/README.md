@@ -91,6 +91,59 @@ ligne perdue, PK/FK/UNIQUE composites conformes, `membres` et
 Il doit être exécuté **avant** le déploiement du code Phase 2 / Phase 3, sinon
 les routes de domaine échouent sur `no such column: school_id`.
 
+### Appliquer au serveur de production (Supabase)
+
+> **Le plan gratuit Supabase ne comporte aucune sauvegarde automatique** :
+> la sauvegarde manuelle ci-dessous est la **seule** marche arrière possible.
+> Elle n'est pas facultative.
+
+Le pilotage se fait par un script qui enchaîne les étapes dans l'ordre imposé —
+sauvegarde, **contrôle de la sauvegarde**, simulation, confirmation, migration —
+et s'arrête au moindre doute :
+
+```powershell
+Set-Location backend
+.\.venv\Scripts\python.exe -X utf8 _migrer_prod_supabase.py
+```
+
+Il demande la chaîne de connexion en saisie masquée (jamais écrite sur le
+disque) ; si `$env:DATABASE_URL` est déjà définie, il la reprend. Pour écrire
+la sauvegarde ailleurs que dans `Documents\sauvegardes-saint-collete` :
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 _migrer_prod_supabase.py --dossier D:\sauvegardes
+```
+
+La migration réelle n'est déclenchée qu'en tapant `MIGRER` en majuscules.
+**Juste après**, déployer sans attendre — l'ancien code reste toutefois
+compatible (les `school_id` créés ont une valeur par défaut), donc il n'y a pas
+d'interruption de service entre les deux.
+
+#### Marche arrière
+
+Les trois fichiers produits par la sauvegarde (`01-schema.sql`,
+`02-donnees.sql`, `03-roles.sql`) se restaurent avec `psql` dans une base
+**vide** — **jamais** par-dessus la base en service :
+
+```powershell
+$d = 'C:\Users\USER\Documents\sauvegardes-saint-collete\<horodatage>'
+psql $env:RESTAURE_URL -v ON_ERROR_STOP=1 -f "$d\01-schema.sql"
+psql $env:RESTAURE_URL -v ON_ERROR_STOP=1 -f "$d\02-donnees.sql"
+```
+
+Deux particularités à connaître :
+
+- le dump de données commence par `SET session_replication_role = replica`, ce
+  qui neutralise les clés étrangères pendant la restauration : l'ordre des
+  tables n'a pas d'importance ;
+- il contient aussi `SET transaction_timeout = 0` (paramètre apparu avec
+  PostgreSQL 17). Sur un serveur **16 ou antérieur**, `psql` s'arrête sur
+  `unrecognized configuration parameter "transaction_timeout"` : retirez cette
+  ligne, ou relancez sans `ON_ERROR_STOP`.
+
+Ces deux points ont été vérifiés sur un bac à sable : sauvegarde de 748 lignes
+sur 20 tables, restaurée à l'identique (codes de sortie 0, comptages égaux).
+
 ## Principaux points d'entrée
 
 | Méthode & chemin | Rôle | Description |

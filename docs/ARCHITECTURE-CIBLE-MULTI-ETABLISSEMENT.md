@@ -442,8 +442,68 @@ hors transaction.
 | Installation neuve (`_init_pg.py` sur base vierge) | ✅ 20 tables (dont `membres`) + compte administrateur initial |
 | Suite complète | ✅ **124 tests verts** |
 
-> Reste à faire : **sauvegarde Supabase**, exécution du script sur la prod, puis déploiement —
-> dans cet ordre, et uniquement après accord explicite du propriétaire.
+> Reste à faire : exécution sur la production, puis déploiement — dans cet ordre, et uniquement
+> après accord explicite du propriétaire. La sauvegarde est désormais outillée et éprouvée (§ V.5).
+
+---
+
+### V.5 Mise en service de la production — sauvegarde et pilotage (2026-09-10)
+
+**Constat déterminant.** Le projet Supabase est sur le **plan gratuit**, et la documentation
+Supabase ne sauvegarde automatiquement que les plans **Pro, Team et Enterprise** ; les projets
+gratuits sont explicitement renvoyés vers `db dump`. **Il n'existe donc aucune sauvegarde
+restaurable côté Supabase** : une sauvegarde manuelle vérifiée est la seule marche arrière
+possible. C'est ce qui a motivé l'écriture du script de pilotage ci-dessous, plutôt qu'une
+succession de commandes manuelles.
+
+**`backend/_migrer_prod_supabase.py`** enchaîne les étapes dans l'ordre imposé et s'arrête au
+moindre doute :
+
+| Étape | Détail | Comportement en cas d'échec |
+| --- | --- | --- |
+| 1. Sauvegarde | `supabase db dump` → `01-schema.sql`, `02-donnees.sql`, `03-roles.sql` dans un dossier horodaté | fichier vide ou sans `CREATE TABLE` / `INSERT` ⇒ **arrêt immédiat** |
+| 2. Simulation | `_migrate_school_id_pg.py` sans `--appliquer` | échec ⇒ arrêt (aucune écriture possible) |
+| 3. Confirmation | il faut taper `MIGRER` en majuscules | toute autre réponse ⇒ annulation |
+| 4. Migration | `_migrate_school_id_pg.py --appliquer` | échec ⇒ transaction annulée, base intacte |
+| 5. Récapitulatif | rappel du déploiement à faire sans attendre | — |
+
+Choix de conception : la chaîne de connexion est demandée en **saisie masquée** (`getpass`) — elle
+n'apparaît donc ni à l'écran, ni dans l'historique du terminal, ni sur le disque ; `DATABASE_URL`
+est reprise si elle est déjà définie. `SEED_DEMO` est retiré de l'environnement de l'enfant pour
+qu'un jeu de démonstration ne puisse jamais atteindre la production.
+
+**Pièges identifiés puis neutralisés** (tous rencontrés pour de vrai, aucun n'aurait été visible
+en production sans cette campagne d'essais) :
+
+1. `supabase.ps1` est **refusé** par la stratégie d'exécution PowerShell (« l'exécution de scripts
+   est désactivée », tous les niveaux à `Undefined`) ⇒ appeler `supabase.cmd`.
+2. `supabase db dump` exécute `pg_dump` **dans un conteneur Docker** : Docker Desktop doit tourner
+   et l'hôte de la base doit être joignable **depuis le conteneur** (`127.0.0.1` désigne le
+   conteneur lui-même ; il faut `host.docker.internal`).
+3. Un dump peut être produit en **0 octet sans erreur visible** (arguments mal transmis) : d'où le
+   contrôle systématique de la taille et du contenu avant toute migration.
+4. Le dump de **rôles** peut être minuscule (un PostgreSQL local n'a que le rôle `postgres`) :
+   pénaliser ce fichier serait un faux positif — il est documentaire, Supabase gérant ses rôles.
+5. Le dump de données contient `SET transaction_timeout = 0` (paramètre **PostgreSQL 17**) : sur un
+   serveur 16 ou antérieur, `psql` s'arrête sur ce paramètre inconnu lors d'une restauration.
+   Sans conséquence sur la sauvegarde elle-même, mais à connaître pour la marche arrière.
+6. Le dump de données commence par `SET session_replication_role = replica` : les clés étrangères
+   sont neutralisées pendant la restauration, l'ordre des tables est donc indifférent.
+
+**Répétition générale du script complet (2026-09-10)** — base de production simulée sur un
+PostgreSQL 16.15 jetable, ancien schéma `dde4cbb` + jeu de démonstration :
+
+| Vérification | Résultat |
+| --- | --- |
+| Sauvegarde produite par le script | 3 fichiers écrits et contrôlés — schéma 16 Kio, données 42 Kio, rôles 123 octets |
+| Simulation | 159 instructions relues, aucune écriture |
+| Garde-fou de confirmation | ✅ refus effectif tant que `MIGRER` n'est pas tapé |
+| Migration réelle | ✅ `[OK] Migration terminée : aucune donnée perdue` |
+| Vérification indépendante (`verify_new.py`) | ✅ tous les contrôles verts (PK/FK/UNIQUE, intégrité, relations composites) |
+| **Restauration de la sauvegarde produite** | ✅ recréée dans une base vide : **748 lignes sur 20 tables, à l'identique** (codes 0) |
+
+> La sauvegarde n'est donc pas seulement *produite*, elle est **prouvée restaurable** — ce qui
+> était le point le plus incertain de tout le plan de bascule.
 
 ---
 
