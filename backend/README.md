@@ -67,13 +67,37 @@ administrateur initial) :
 .venv\Scripts\python.exe -X utf8 _reset_db.py
 ```
 
+## Migrer une base existante (isolation multi-établissements)
+
+Deux scripts selon le moteur — les deux **refusent de s'exécuter deux fois** et
+ne touchent jamais aux identifiants métier (codes `3A`, `S1`, `T001`, `EL001`…).
+
+| Base | Script | Méthode |
+|---|---|---|
+| SQLite (développement) | `_migrate_school_id.py` | reconstruction des tables + sauvegarde `data/school.db.bak-<horodatage>` |
+| PostgreSQL (production) | `_migrate_school_id_pg.py` | **en place**, transaction unique, aucune reconstruction |
+
+```powershell
+# PostgreSQL : simulation d'abord (aucune écriture), puis application réelle
+$env:DATABASE_URL = 'postgresql://utilisateur:motdepasse@hote:5432/base'
+.venv\Scripts\python.exe -X utf8 _migrate_school_id_pg.py
+.venv\Scripts\python.exe -X utf8 _migrate_school_id_pg.py --appliquer
+```
+
+Le script PostgreSQL contrôle la parité de schéma avec les modèles **avant**
+(colonnes, base non déjà migrée) et **après** (comptage table par table, aucune
+ligne perdue, PK/FK/UNIQUE composites conformes, `membres` et
+`membres_invitations` créées) : toute différence annule la transaction.
+Il doit être exécuté **avant** le déploiement du code Phase 2 / Phase 3, sinon
+les routes de domaine échouent sur `no such column: school_id`.
+
 ## Principaux points d'entrée
 
 | Méthode & chemin | Rôle | Description |
 |---|---|---|
 | `POST /api/v1/auth/login` | public | Connexion → jeton JWT |
 | `GET /api/v1/auth/me` | connecté | Profil courant |
-| `GET /api/v1/health` | public | État + compteurs du seed |
+| `GET /api/v1/health` | public | État du service — compteurs et nom d'établissement **uniquement si un jeton valide** est fourni |
 | `GET /api/v1/ecole`, `PUT` | admin | École |
 | `GET /api/v1/classes`, `/classes/{id}` | connecté | Classes + détail |
 | `GET /api/v1/classes/{id}/emploi-du-temps` | connecté | Emploi du temps |

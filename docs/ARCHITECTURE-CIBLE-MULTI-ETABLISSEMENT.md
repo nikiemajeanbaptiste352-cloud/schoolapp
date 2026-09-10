@@ -311,12 +311,17 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 | Migration des bases SQLite existantes | ✅ script `backend/_migrate_school_id.py` (commit `aeeea82`) — **dev seulement** |
 | Base dev `backend/data/school.db` migrée (école 1) | ✅ counts identiques, `integrity_check ok`, sauvegarde `.bak-20260910-003311` |
 | E2E local 2 écoles (API + navigateur) | ✅ validé |
-| Migration prod PG Supabase | ❌ **non faite** — chemin PG / Alembic à prévoir |
+| Script de migration PostgreSQL (prod) | ✅ `backend/_migrate_school_id_pg.py` (2026-09-10) — simulation par défaut, transaction unique, contrôles avant/après |
+| Validation du script PG sur bac à sable | ✅ PostgreSQL 16.15 jetable — 748 lignes migrées, `0` perdue, PK/FK/UNIQUE conformes, API bout en bout OK (§ V.4) |
+| Migration prod PG Supabase | ❌ **non faite** — script prêt et validé ; exécution en attente de l'accord du propriétaire |
 | `memberships` (Phase 3) | ✅ codé + testé (2026-09-10, § V.3) — `membres`, `membres_invitations`, rôle `Surveillant` |
 | Photos de profil (brique 7) | ❌ non commencé |
 
-> ⚠️ **Ne pas pousser `dd7de33` / `aeeea82` en l'état** : la prod PG n'ayant pas la colonne `school_id`,
-> le déploiement provoquerait `no such column: school_id` sur toutes les routes de domaine.
+> ⚠️ **Ne pas déployer les commits Phase 2 / Phase 3 avant la migration de la prod PG** : sans la
+> colonne `school_id`, le déploiement provoquerait `no such column: school_id` sur toutes les routes
+> de domaine (incident du 2026-09-10, résolu par retour d'alias Vercel). L'ordre imposé est donc :
+> **1)** sauvegarde Supabase, **2)** `_migrate_school_id_pg.py --appliquer` sur la prod,
+> **3)** déploiement du nouveau code.
 
 ### V.2 Fermeture de la faille « repli silencieux sur l'école n° 1 » (2026-09-10)
 
@@ -389,7 +394,56 @@ cloisonnement inter-écoles (404 croisés), invitation/anti-spam 60 s/503 sans s
 membre, acceptation (compte créé, rôle, école, mot de passe, usage unique, code expiré),
 suspension puis réactivation (403), protection du dernier administrateur, miroir du rôle,
 sélecteur d'établissement et bascule de jeton, retrait de rattachement.
-**Suite complète : 123 tests verts** (105 + 18).
+**Suite complète : 124 tests verts**.
+
+### V.4 Migration de la production PostgreSQL — `backend/_migrate_school_id_pg.py` (2026-09-10)
+
+**Problème.** `_migrate_school_id.py` **reconstruit** les tables (renommage → `create_all` →
+`INSERT…SELECT`) : acceptable sur SQLite, où le fichier est jetable et sauvegardé
+(`<fichier>.bak-<horodatage>`), **inacceptable** sur la base Supabase qui porte les données réelles
+de l'établissement. Un second script, **en place** et non destructif, a donc été écrit.
+
+**Principe** — aucune reconstruction, aucun code métier perdu :
+
+1. **Simulation par défaut** : rien n'est écrit sans `--appliquer` ; toute cible non PostgreSQL
+   (`DATABASE_URL` absente ou non `postgresql://`) est refusée.
+2. **Transaction unique** : toutes les instructions passent par un seul `BEGIN`/`COMMIT` — la
+   moindre erreur annule l'opération intégralement.
+3. **Découverte des contraintes réelles** (`pg_constraint`) et non des noms supposés : la prod a
+   « dérivé » par rapport aux modèles (deux FK `users.eleve_id` / `users.enseignant_id` que SQLite
+   ignorait, un `uq_seance_ens_classe_debut` absent des modèles). Les `DROP` utilisent les noms
+   constatés, donc rien ne peut être oublié.
+4. **Ordre imposé par PostgreSQL** : ajout et remplissage de `school_id` → **toutes** les FK → les
+   UNIQUE → **toutes** les PK. Une PK ne peut être supprimée tant qu'une FK s'appuie sur son index
+   (bug détecté puis corrigé grâce au bac à sable, avant tout contact avec la production).
+5. **Reconstruction depuis les modèles** : PK / FK / UNIQUE sont régénérées depuis `Base.metadata`
+   (rendu `ddl` SQLAlchemy) — la parité avec le code est garantie, non supposée.
+6. **Compatibilité descendante** : `school_id` conserve `DEFAULT <école>` après migration, l'ancien
+   code (encore déployé) continue donc d'écrire sans erreur pendant la fenêtre entre la migration
+   et le déploiement.
+7. **Phase 3 incluse** : `membres` et `membres_invitations` sont créées par `create_all` dans la
+   même transaction.
+
+**Contrôles.** *Avant* : tables présentes, base non déjà migrée, **parité de colonnes** avec les
+modèles (tout écart inattendu = abandon), détermination de l'établissement de rattachement
+(avertissement s'il y a plusieurs écoles). *Après* : comptage **table par table** (toute différence =
+échec), aucun `school_id` NULL, **parité PK / FK / UNIQUE** et intégrité référentielle re-vérifiées
+hors transaction.
+
+**Validation sur bac à sable (2026-09-10)** — PostgreSQL 16.15 dans un conteneur Docker jetable :
+
+| Étape | Résultat |
+| --- | --- |
+| Schéma « déployé » reconstitué depuis le commit `dde4cbb` + données de démonstration | 748 lignes (10 classes, 15 élèves, 324 notes, 180 présences, 21 versements…) |
+| `_migrate_school_id_pg.py` (simulation) | 159 instructions relues avant toute écriture |
+| `_migrate_school_id_pg.py --appliquer` | ✅ **0** ligne perdue, schéma conforme ; relancé ensuite → **refus** (`classes.school_id` présente) |
+| Contrôles indépendants (`verify_new.py`) | ✅ PK/FK/UNIQUE conformes, aucune note orpheline, relations composites (`Eleve.classe`) résolues |
+| API réelle branchée sur la base migrée | ✅ `/api/v1/health` avec jeton = 10 classes / 8 matières / 7 enseignants / 15 élèves ; `/api/v1/etat` = 15 élèves, 324 notes ; écriture de note puis *upsert* scopé OK |
+| Installation neuve (`_init_pg.py` sur base vierge) | ✅ 20 tables (dont `membres`) + compte administrateur initial |
+| Suite complète | ✅ **124 tests verts** |
+
+> Reste à faire : **sauvegarde Supabase**, exécution du script sur la prod, puis déploiement —
+> dans cet ordre, et uniquement après accord explicite du propriétaire.
 
 ---
 
