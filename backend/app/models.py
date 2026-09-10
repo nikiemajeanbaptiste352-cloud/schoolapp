@@ -18,6 +18,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -383,6 +384,86 @@ class User(Base):
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("parents.id"), nullable=True
     )
+
+
+# ---------------------------------------------------------------
+# Rattachements à un établissement (Phase 3 — « membres »)
+# ---------------------------------------------------------------
+# Modèle aligné sur les trois notions de l'architecture cible :
+#   identité (`users`) / rôle fonctionnel (`membres.role`, **par école**) /
+#   permissions (règles de l'API).
+# Une même identité peut donc être Professeur dans l'école 1 et Parent dans
+# l'école 2 : `user.role`/`user.school_id` restent en base pour la compatibilité
+# mais la source de vérité devient cette table.
+ROLES_MEMBRE = ("Administrateur", "Professeur", "Surveillant", "Élève", "Parent")
+STATUTS_MEMBRE = ("actif", "invite", "suspendu")
+
+
+def _roles_membre_sql() -> str:
+    """Liste SQL des rôles autorisés (portable SQLite / PostgreSQL)."""
+    litteraux = ", ".join(f"'{r}'" for r in ROLES_MEMBRE)
+    return f"role IN ({litteraux})"
+
+
+class Membership(Base):
+    """Rattachement d'une identité à un établissement (`membres`).
+
+    `statut` :
+      - `actif`    → accès autorisé ;
+      - `invite`   → invitation envoyée, en attente d'acceptation ;
+      - `suspendu` → accès refusé (403) mais rattachement conservé.
+    """
+
+    __tablename__ = "membres"
+    __table_args__ = (
+        UniqueConstraint("user_id", "school_id", name="uq_membre_user_ecole"),
+        CheckConstraint(_roles_membre_sql(), name="ck_membre_role"),
+        CheckConstraint(
+            "statut IN ('actif', 'invite', 'suspendu')", name="ck_membre_statut"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True
+    )
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(20))
+    statut: Mapped[str] = mapped_column(String(12), default="actif")
+    cree_le: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    # Compte de l'école qui a émis l'invitation (traçabilité, nullable)
+    invite_par: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class InvitationMembre(Base):
+    """Invitation d'une adresse email à rejoindre une école (`membres_invitations`).
+
+    Miroir de `EmailCode` (code à 6 chiffres haché HMAC, usage unique, délai
+    d'expiration, compteur de tentatives) pour que l'invité valide son
+    rattachement avec le même mécanisme que la connexion par email.
+    """
+
+    __tablename__ = "membres_invitations"
+    __table_args__ = (
+        UniqueConstraint("school_id", "email", name="uq_invitation_ecole_email"),
+        CheckConstraint(_roles_membre_sql(), name="ck_invitation_role"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(ForeignKey("ecole.id"), index=True)
+    email: Mapped[str] = mapped_column(String(80), index=True)
+    role: Mapped[str] = mapped_column(String(20))
+    code_hash: Mapped[str] = mapped_column(String(128))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    tentatives: Mapped[int] = mapped_column(Integer, default=0)
+    invite_par: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 # ---------------------------------------------------------------

@@ -109,6 +109,83 @@ class MessageOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Phase 3 — Rattachement (membres) : rôles par établissement & invitations
+# ---------------------------------------------------------------------------
+class MembreOut(BaseModel):
+    """Rattachement exposé au front : identité + rôle **dans cette école**."""
+
+    id: int                      # id du rattachement (`membres.id`)
+    user_id: int
+    nom: str
+    email: str
+    role: str                    # rôle effectif dans l'école courante
+    statut: str                  # actif / invite / suspendu
+    actif: bool = True           # compte plateforme actif
+    eleve_id: str | None = None
+    enseignant_id: str | None = None
+    cree_le: str | None = None
+
+
+class MembreInvitationIn(BaseModel):
+    """Invitation / rattachement d'une adresse email à l'école courante."""
+
+    email: str
+    role: str
+    nom: str | None = None
+
+
+class MembreInvitationOut(BaseModel):
+    """Résultat d'une invitation (le code n'est **jamais** renvoyé par l'API)."""
+
+    id: int
+    email: str
+    role: str
+    statut: str
+    ecole: str | None = None
+    expire_dans: int | None = None   # secondes avant expiration du code
+    message: str
+    code_envoye: bool = False        # False → aucun service email configuré
+
+
+class MembreInvitationValidationIn(BaseModel):
+    """Acceptation d'une invitation : le code reçu par email rattache le compte."""
+
+    email: str
+    code: str
+    nom: str | None = None
+    password: str | None = None
+
+
+class MembreRoleIn(BaseModel):
+    """Changement de rôle d'un membre (par l'administration de l'école)."""
+
+    role: str
+
+
+class MembreStatutIn(BaseModel):
+    """Suspension / réactivation (actif, suspendu)."""
+
+    statut: str
+
+
+class MonEcoleOut(BaseModel):
+    """Une école vue par le compte connecté (sélecteur d'établissement)."""
+
+    school_id: int
+    nom: str
+    sigle: str
+    role: str
+    statut: str
+    active: bool = False
+
+
+class EcoleActiveIn(BaseModel):
+    """Bascule d'établissement actif : `school_id` du rattachement visé."""
+
+    school_id: int
+
+
+# ---------------------------------------------------------------------------
 # Espace enseignant — cahier de présence (séances) & rémunération
 # ---------------------------------------------------------------------------
 class SeanceIn(BaseModel):

@@ -79,33 +79,92 @@ def _sujet_et_corps(code: str) -> tuple[str, str, str]:
     return sujet, corps_texte, corps_html
 
 
-def envoyer_email_code(destinataire: str, code: str) -> None:
-    """Envoie le code de vérification à l'adresse indiquée.
-
-    Lève EmailNonConfigure si aucun fournisseur n'est prêt, ou une erreur
-    réseau/SMTP en cas d'échec d'envoi.
-    """
-    nom, adr = _adresse_expediteur()
-    if not adr:
-        raise EmailNonConfigure("Aucun expéditeur configuré (EMAIL_FROM).")
-
-    sujet, corps_texte, corps_html = _sujet_et_corps(code)
-
-    message = MIMEMultipart("alternative")
-    message["Subject"] = sujet
-    message["From"] = formataddr((nom, adr)) if nom else adr
-    message["To"] = destinataire
-    message.attach(MIMEText(corps_texte, "plain", "utf-8"))
-    message.attach(MIMEText(corps_html, "html", "utf-8"))
-
+def _expedier(destinataire: str, message: MIMEMultipart, corps_html: str) -> None:
+    """Choisit le fournisseur configuré et expédie le message."""
+    _nom, adr = _adresse_expediteur()
     if settings.resend_api_key:
-        _envoyer_resend(adr, destinataire, sujet, corps_html)
+        _envoyer_resend(adr, destinataire, message["Subject"], corps_html)
     elif settings.smtp_host and settings.smtp_user and settings.smtp_pass:
         _envoyer_smtp(adr, destinataire, message)
     else:
         raise EmailNonConfigure(
             "Aucun service d'envoi configuré (RESEND_API_KEY ou SMTP)."
         )
+
+
+def _assembler(destinataire: str, sujet: str, texte: str, html: str) -> MIMEMultipart:
+    """Construit un message multipart alternative prêt à envoyer."""
+    nom, adr = _adresse_expediteur()
+    message = MIMEMultipart("alternative")
+    message["Subject"] = sujet
+    message["From"] = formataddr((nom, adr)) if nom else adr
+    message["To"] = destinataire
+    message.attach(MIMEText(texte, "plain", "utf-8"))
+    message.attach(MIMEText(html, "html", "utf-8"))
+    return message
+
+
+def envoyer_email_code(destinataire: str, code: str) -> None:
+    """Envoie le code de vérification à l'adresse indiquée.
+
+    Lève EmailNonConfigure si aucun fournisseur n'est prêt, ou une erreur
+    réseau/SMTP en cas d'échec d'envoi.
+    """
+    _nom, adr = _adresse_expediteur()
+    if not adr:
+        raise EmailNonConfigure("Aucun expéditeur configuré (EMAIL_FROM).")
+
+    sujet, corps_texte, corps_html = _sujet_et_corps(code)
+    message = _assembler(destinataire, sujet, corps_texte, corps_html)
+    _expedier(destinataire, message, corps_html)
+
+
+def envoyer_invitation(
+    destinataire: str, code: str, ecole: str, role: str
+) -> None:
+    """Invite une adresse email à rejoindre un établissement (Phase 3).
+
+    Même mécanisme que le code de connexion (code à 6 chiffres, usage unique),
+    mais le message précise l'école et le rôle proposés.
+    """
+    nom, adr = _adresse_expediteur()
+    if not adr:
+        raise EmailNonConfigure("Aucun expéditeur configuré (EMAIL_FROM).")
+
+    minutes = settings.code_expire_minutes
+    sujet = f"Invitation à rejoindre {ecole} — SchoolManager"
+    corps_texte = (
+        f"Bonjour,\n\n"
+        f"{ecole} vous invite à rejoindre son espace SchoolManager avec le "
+        f"rôle « {role} ».\n\n"
+        f"Votre code d'invitation : {code}\n\n"
+        f"Ce code est valable {minutes} minutes. Saisissez-le sur la page de "
+        f"connexion, puis choisissez « Valider mon invitation ».\n\n"
+        f"Si vous n'êtes pas concerné, ignorez cet email."
+    )
+    corps_html = f"""\
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:auto">
+  <h2 style="color:#1e3a8a;margin:0 0 12px">SchoolManager</h2>
+  <p style="color:#333;font-size:15px">Bonjour,</p>
+  <p style="color:#333;font-size:15px">
+    <strong>{ecole}</strong> vous invite à rejoindre son espace avec le rôle
+    <strong>{role}</strong>.
+  </p>
+  <p style="color:#333;font-size:15px">Votre code d'invitation :</p>
+  <p style="font-size:34px;font-weight:bold;letter-spacing:8px;color:#1e3a8a;
+     background:#eef2ff;border-radius:8px;padding:14px;text-align:center">
+    {code}
+  </p>
+  <p style="color:#555;font-size:13px">
+    Ce code est valable <strong>{minutes} minutes</strong> et ne doit être
+    partagé avec personne.
+  </p>
+  <p style="color:#999;font-size:12px;margin-top:24px">
+    Si vous n'êtes pas concerné par cette invitation, ignorez cet email.
+  </p>
+</div>"""
+    message = _assembler(destinataire, sujet, corps_texte, corps_html)
+    _expedier(destinataire, message, corps_html)
 
 
 def _envoyer_resend(expediteur: str, destinataire: str, sujet: str, html: str) -> None:

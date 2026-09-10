@@ -312,7 +312,7 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 | Base dev `backend/data/school.db` migrée (école 1) | ✅ counts identiques, `integrity_check ok`, sauvegarde `.bak-20260910-003311` |
 | E2E local 2 écoles (API + navigateur) | ✅ validé |
 | Migration prod PG Supabase | ❌ **non faite** — chemin PG / Alembic à prévoir |
-| `memberships` (Phase 3) | ❌ non commencé |
+| `memberships` (Phase 3) | ✅ codé + testé (2026-09-10, § V.3) — `membres`, `membres_invitations`, rôle `Surveillant` |
 | Photos de profil (brique 7) | ❌ non commencé |
 
 > ⚠️ **Ne pas pousser `dd7de33` / `aeeea82` en l'état** : la prod PG n'ayant pas la colonne `school_id`,
@@ -345,6 +345,51 @@ Suite complète : **105 tests verts** (82 + 23 nouveaux).
 dans le portail établissement (réutilise `GET/POST /auth/comptes` actuels).
 
 > ⚠️ Décisions à trancher avant implémentation (voir questions posées au propriétaire).
+
+### V.3 Phase 3 « Rattachement » — implémentée et testée (2026-09-10)
+
+**Décisions retenues** (elles tranchent les questions restées ouvertes du § V.2) :
+
+- **Modèle** : table `membres` = rattachement `(user_id, school_id)` + `role` + `statut`
+  (`actif` / `invite` / `suspendu`), clé unique `uq_membre_user_ecole`. Table
+  `membres_invitations` = code d'invitation en attente, clé unique `uq_invitation_ecole_email`.
+  `users.role` / `users.school_id` deviennent **transitoires** (miroir de compatibilité).
+- **Politique de transition (tolérante)** : un rattachement, **s'il existe**, fait foi (rôle **et**
+  statut) ; s'il n'existe pas, on retombe sur `users.role` / `users.school_id`. Cette tolérance évite
+  de casser les bases existantes et sera retirée en Phase 4, une fois le remplissage terminé.
+  Le remplissage est **idempotent** : au démarrage (`lifespan`), sur `GET /auth/comptes`,
+  `GET /membres` et `GET /mon-espace/ecoles`.
+- **Invitation** : la direction saisit une adresse + un rôle ; le **compte n'est créé qu'à
+  l'acceptation** du code à 6 chiffres (l'email vérifié fait foi d'identité — même mécanisme que la
+  connexion par code). Un rôle `Surveillant` est ajouté au catalogue (`ROLES_MEMBRE`).
+- **Cloisonnement** : routes de rattachement toutes scopées sur `sd.sid_ecole(db)` ; un identifiant
+  d'une autre école renvoie **404** (aucune fuite d'existence).
+- **Garde-fou** : impossible de supprimer/suspendre/changer le rôle du **dernier administrateur actif**
+  d'un établissement (400), et retirer le dernier rattachement d'un compte est refusé (400) —
+  la suspension coupe l'accès sans casser le contexte d'école.
+
+**Fichiers** : `app/models.py` (`Membership`, `InvitationMembre`, `ROLES_MEMBRE`, `STATUTS_MEMBRE`),
+`app/services/membres.py`, `app/services/comptes.py` (helpers de compte mutualisés),
+`app/routers/membres.py`, `app/schemas.py`, `app/services/email.py` (`envoyer_invitation`),
+`app/auth.py` (rôle `Surveillant`, `_verifier_rattachement`, `require_roles` par rôle effectif),
+`app/main.py` (routeur + remplissage au démarrage).
+
+**Routes ajoutées** : `GET|POST /membres`, `GET /membres/invitations`,
+`POST /membres/{id}/invitation`, `POST /membres/invitations/valider` (publique),
+`PUT /membres/{id}/role`, `PUT /membres/{id}/statut`, `DELETE /membres/{id}`,
+`GET /mon-espace/ecoles`, `POST /mon-espace/ecole-active` (nouveau jeton).
+
+**Routes corrigées au passage** : `GET /auth/comptes` était **non scopée** (elle listait les comptes
+de toutes les écoles) → filtrée par l'école du jeton ; `POST /auth/code/valider` et
+`/auth/google/callback` créaient un compte Parent avec `school_id = NULL` (inutilisable dès deux
+écoles) → rattachés à l'école de déploiement + rattachement `actif`.
+
+**Tests** : nouveau `backend/tests/test_membres.py` (18 tests) — remplissage automatique,
+cloisonnement inter-écoles (404 croisés), invitation/anti-spam 60 s/503 sans service email/409 déjà
+membre, acceptation (compte créé, rôle, école, mot de passe, usage unique, code expiré),
+suspension puis réactivation (403), protection du dernier administrateur, miroir du rôle,
+sélecteur d'établissement et bascule de jeton, retrait de rattachement.
+**Suite complète : 123 tests verts** (105 + 18).
 
 ---
 

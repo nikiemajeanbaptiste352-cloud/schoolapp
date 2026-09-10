@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
@@ -13,7 +13,7 @@ from urllib.error import HTTPError as UrlHTTPError
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -25,7 +25,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.database import get_db
-from app.models import Ecole, EmailCode, Enseignant, User
+from app.models import Ecole, EmailCode, User
 from app.schemas import (
     CodeDemandeIn,
     CodeValidationIn,
@@ -46,11 +46,24 @@ from app.security import (
 )
 from app.services import email as email_service
 from app.services import sd
+from app.services.comptes import (
+    creer_user as _creer_user,
+    maintenant_utc as _maintenant_utc,
+    token_pour,
+    valider_email as _valider_email,
+    vers_user_out as _vers_user_out,
+)
+from app.services.membres import (
+    assurer_membres,
+    definir_membre,
+    rattacher_fiche,
+    role_effectif,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentification"])
 
 # Rôles acceptés lors de la création d'un compte par un administrateur.
-ROLES_CREABLES = ("Administrateur", "Professeur", "Élève", "Parent")
+ROLES_CREABLES = ("Administrateur", "Professeur", "Surveillant", "Élève", "Parent")
 
 # Endpoints Google OAuth 2.0
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -58,94 +71,8 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 
-def _maintenant_utc() -> datetime:
-    """Horodatage UTC « naïf » (compatible SQLite et PostgreSQL)."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _valider_email(email: str) -> str:
-    """Normalise (minuscules) et valide une adresse email ; 422 sinon."""
-    email = (email or "").strip().lower()
-    if not email or "@" not in email or "." not in email.split("@")[-1]:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Adresse email invalide.",
-        )
-    return email
-
-
-def _vers_user_out(user: User) -> UserOut:
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        role=user.role,
-        nom=user.nom,
-        actif=user.actif,
-        eleve_id=user.eleve_id,
-        enseignant_id=user.enseignant_id,
-        parent_id=user.parent_id,
-    )
-
-
-def _verifier_email_unique(db: Session, email: str) -> None:
-    """Lève 409 si l'email est déjà utilisé (contrôle + contrainte)."""
-    existant = db.scalar(select(User).where(User.email == email))
-    if existant is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Un compte existe déjà avec cette adresse email.",
-        )
-
-
-def _creer_user(
-    db: Session,
-    nom: str,
-    email: str,
-    password: str,
-    role: str,
-    school_id: int | None = None,
-) -> User:
-    """Crée un utilisateur actif avec mot de passe haché (PBKDF2)."""
-    nom = nom.strip()
-    email = email.strip().lower()
-    if not nom:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Le nom est obligatoire.")
-    if len(password) < 6:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Le mot de passe doit contenir au moins 6 caractères.",
-        )
-    _verifier_email_unique(db, email)
-    user = User(
-        email=email,
-        password_hash=hash_password(password),
-        role=role,
-        nom=nom[:80],
-        actif=True,
-        school_id=school_id,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def _token_pour(user: User, db: Session) -> TokenOut:
-    token = create_access_token(
-        str(user.id),
-        extra={"role": user.role, "email": user.email},
-    )
-    # École affichée au front : celle du compte si rattaché, sinon l'école par
-    # défaut du déploiement (résolution non stricte : la connexion ne doit
-    # jamais échouer à cause d'une ambiguïté de contexte).
-    sid = user.school_id or sd.ecole_principale(db)
-    ecole = db.scalar(select(Ecole).where(Ecole.id == sid).limit(1))
-    return TokenOut(
-        access_token=token,
-        user=_vers_user_out(user),
-        ecole=ecole.nom if ecole else None,
-        annee=ecole.annee if ecole else None,
-    )
+    return token_pour(user, db)
 
 
 @router.post("/login", response_model=TokenOut, summary="Connexion (jeton JWT)")
@@ -190,6 +117,9 @@ def inscription(body: InscriptionIn, db: Session = Depends(get_db)) -> TokenOut:
         ROLE_PARENT,
         school_id=sd.ecole_principale(db),
     )
+    # Phase 3 — le rattachement matérialise le rôle dans l'établissement.
+    definir_membre(db, user, user.school_id, ROLE_PARENT, "actif")
+    db.commit()
     return _token_pour(user, db)
 
 
@@ -228,20 +158,33 @@ def inscription_etablissement(
     # Résolution non stricte : route publique, sans contexte école disponible.
     sid = sd.ecole_principale(db)
     user = _creer_user(db, body.nom, body.email, body.password, ROLE_ADMIN, school_id=sid)
+    definir_membre(db, user, sid, ROLE_ADMIN, "actif")
+    db.commit()
     return _token_pour(user, db)
 
 
 @router.get(
     "/comptes",
     response_model=list[UserOut],
-    summary="Liste des comptes (administrateur)",
+    summary="Liste des comptes de l'établissement (administrateur)",
 )
 def lister_comptes(
     _admin: User = Depends(require_roles(ROLE_ADMIN)),
     db: Session = Depends(get_db),
 ) -> list[UserOut]:
-    users = db.scalars(select(User).order_by(User.id)).all()
-    return [_vers_user_out(u) for u in users]
+    """Liste **limitée à l'établissement courant** (Phase 3).
+
+    Avant la Phase 3, cette route renvoyait tous les comptes de la plateforme :
+    un administrateur de l'école 1 voyait donc les comptes de l'école 2.
+    """
+    sid = sd.sid_ecole(db)
+    # Remplissage idempotent : une identité rattachée à cette école mais dont
+    # le rattachement n'a pas encore été matérialisé devient membre.
+    assurer_membres(db, sid)
+    users = db.scalars(
+        select(User).where(User.school_id == sid).order_by(User.id)
+    ).all()
+    return [_vers_user_out(u, role=role_effectif(db, u, sid)) for u in users]
 
 
 @router.post(
@@ -261,21 +204,16 @@ def creer_compte(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Rôle invalide. Choisissez parmi : " + ", ".join(ROLES_CREABLES) + ".",
         )
-    user = _creer_user(db, body.nom, body.email, body.password, role, school_id=sd.sid_ecole(db))
+    sid = sd.sid_ecole(db)
+    user = _creer_user(db, body.nom, body.email, body.password, role, school_id=sid)
+    # Phase 3 — rattachement : le rôle vit désormais dans `membres`.
+    definir_membre(db, user, sid, role, "actif", invite_par=_admin.id)
     # Lien automatique : si un Professeur est créé avec l'email de la fiche
-    # enseignant, le compte est relié à la fiche (accès à l'espace enseignant).
-    if role == ROLE_PROF:
-        email_l = (body.email or "").strip().lower()
-        ens = db.scalar(
-            select(Enseignant).where(
-                Enseignant.school_id == sd.sid_ecole(db),
-                func.lower(Enseignant.email) == email_l,
-            )
-        )
-        if ens is not None:
-            user.enseignant_id = ens.id
-            db.commit()
-    return _vers_user_out(user)
+    # enseignant, le compte est relié à la fiche (accès au cahier de séances).
+    rattacher_fiche(db, user, role)
+    db.commit()
+    db.refresh(user)
+    return _vers_user_out(user, role=role)
 
 
 @router.get(
@@ -394,7 +332,9 @@ def valider_code(body: CodeValidationIn, db: Session = Depends(get_db)) -> Token
 
     user = db.scalar(select(User).where(User.email == email))
     if user is None:
-        # Premier accès avec cette adresse → compte Parent automatique.
+        # Premier accès avec cette adresse → compte Parent automatique,
+        # rattaché à l'établissement du déploiement (sinon le contexte école
+        # est indéterminé dès qu'une seconde école existe → 500).
         nom = (body.nom or "").strip() or "Parent"
         user = User(
             email=email,
@@ -402,10 +342,13 @@ def valider_code(body: CodeValidationIn, db: Session = Depends(get_db)) -> Token
             role=ROLE_PARENT,
             nom=nom[:80],
             actif=True,
+            school_id=sd.ecole_principale(db),
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+        definir_membre(db, user, user.school_id, ROLE_PARENT, "actif")
+        db.commit()
     if not user.actif:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -547,10 +490,14 @@ def google_callback(
             role=ROLE_PARENT,
             nom=nom[:80],
             actif=True,
+            # Rattaché à l'établissement du déploiement (comme /code/valider).
+            school_id=sd.ecole_principale(db),
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+        definir_membre(db, user, user.school_id, ROLE_PARENT, "actif")
+        db.commit()
     if not user.actif:
         return vers_front({"erreur": "compte_desactive"})
 
@@ -559,7 +506,7 @@ def google_callback(
         {
             "token": token.access_token,
             "email": user.email,
-            "role": user.role,
+            "role": token.user.role,
             "nom": user.nom,
             "ecole": token.ecole or "",
             "annee": token.annee or "",
@@ -568,5 +515,8 @@ def google_callback(
 
 
 @router.get("/me", response_model=UserOut, summary="Profil de l'utilisateur courant")
-def me(user: User = Depends(get_current_user)) -> UserOut:
-    return _vers_user_out(user)
+def me(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    return _vers_user_out(user, role=role_effectif(db, user))

@@ -1,7 +1,12 @@
 """Dépendances d'authentification FastAPI — JWT + contrôle des rôles.
 
 Rôles utilisés (alignés sur le front) :
-    Administrateur, Professeur, Élève, Parent
+    Administrateur, Professeur, Surveillant, Élève, Parent
+
+Phase 3 — « Rattachement » : le rôle appliqué est celui du **rattachement
+actif** (`membres.role`) pour l'école de la requête ; `users.role` ne sert
+plus que de repli tant que la table `membres` n'est pas remplie (migration
+progressive, cf. `app/services/membres.py`).
 """
 
 from __future__ import annotations
@@ -13,8 +18,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
+from app.models import Membership, User
 from app.security import decode_token
+from app.services.membres import role_effectif
 from app.services.sd import definir_ecole_courante
 
 _bearer = HTTPBearer(auto_error=False)
@@ -22,6 +28,7 @@ _bearer = HTTPBearer(auto_error=False)
 # Alias de code pour plus de lisibilité
 ROLE_ADMIN = "Administrateur"
 ROLE_PROF = "Professeur"
+ROLE_SURVEILLANT = "Surveillant"
 ROLE_ELEVE = "Élève"
 ROLE_PARENT = "Parent"
 
@@ -31,6 +38,37 @@ def _erreur_401(detail: str = "Authentification requise.") -> HTTPException:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,
         headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _verifier_rattachement(db: Session, user: User) -> None:
+    """Refuse l'accès si le rattachement de l'école courante n'est pas actif.
+
+    - aucun rattachement → toléré (repli `users.role`, migration en cours) ;
+    - `actif`            → autorisé ;
+    - `invite`           → 403 « invitation non validée » ;
+    - `suspendu`         → 403 « rattachement suspendu ».
+    """
+    if user.school_id is None:
+        return
+    membre = (
+        db.query(Membership)
+        .filter(
+            Membership.user_id == user.id,
+            Membership.school_id == user.school_id,
+        )
+        .one_or_none()
+    )
+    if membre is None or membre.statut == "actif":
+        return
+    if membre.statut == "invite":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invitation non validée pour cet établissement.",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Rattachement suspendu pour cet établissement.",
     )
 
 
@@ -63,16 +101,24 @@ def get_current_user(
     # défaut dans sd.py (comportement mono-établissement préservé).
     definir_ecole_courante(user.school_id)
     try:
+        _verifier_rattachement(db, user)
         yield user
     finally:
         definir_ecole_courante(None)
 
 
 def require_roles(*roles: str):
-    """Retourne une dépendance exigeant l'un des rôles indiqués."""
+    """Retourne une dépendance exigeant l'un des rôles indiqués.
 
-    def _verif(user: User = Depends(get_current_user)) -> User:
-        if user.role not in roles:
+    Le rôle comparé est le **rôle effectif** dans l'école courante
+    (`membres.role` s'il existe, sinon `users.role`).
+    """
+
+    def _verif(
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> User:
+        if role_effectif(db, user) not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Droits insuffisants pour cette opération.",

@@ -29,6 +29,7 @@ from app.routers import (
     ecole as ecole_router,
     eleves as eleves_router,
     etat as etat_router,
+    membres as membres_router,
     paiements as paiements_router,
     paie as paie_router,
     pedagogie,
@@ -38,6 +39,7 @@ from app.routers import (
 from app.security import decode_token
 from app.seed import seed_all, seed_bootstrap, seed_users
 from app.services import sd
+from app.services.membres import assurer_membres
 
 
 @asynccontextmanager
@@ -53,6 +55,10 @@ async def lifespan(_: FastAPI):
         else:
             # Mode données réelles : base vierge + compte administrateur initial.
             seed_bootstrap(db)
+        # Phase 3 — rattachement : matérialise `membres` pour les identités
+        # déjà rattachées (`users.school_id`). Idempotent et sans effet si la
+        # table est déjà remplie.
+        assurer_membres(db)
     finally:
         db.close()
     yield
@@ -176,6 +182,7 @@ for _router in (
     dashboard_router.router,
     etat_router.router,
     paie_router.router,
+    membres_router.router,
 ):
     app.include_router(_router)
 
