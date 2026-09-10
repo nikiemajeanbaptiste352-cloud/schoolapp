@@ -24,7 +24,6 @@ from app.config import FRONT_DIR, settings
 from app.database import SessionLocal, init_db
 from app.models import Annonce, Classe, Ecole, Eleve, Enseignant, Matiere, User
 from app.routers import (
-    _bascule_temporaire,
     auth as auth_router,
     dashboard as dashboard_router,
     ecole as ecole_router,
@@ -190,8 +189,6 @@ for _router in (
     etat_router.router,
     paie_router.router,
     membres_router.router,
-    # --- TEMPORAIRE : diagnostic de la bascule, à retirer ensuite ---
-    _bascule_temporaire.router,
 ):
     app.include_router(_router)
 
