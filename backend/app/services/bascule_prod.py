@@ -113,39 +113,60 @@ def _controler_sauvegarde(conn, outils, schema: str, lignes: dict[str, int]) -> 
     return ecarts
 
 
-def _migrer(outils) -> dict:
-    """Applique la migration dans une transaction unique, puis recontrôle."""
-    with engine.begin() as conn:
-        presentes = set(inspect(conn).get_table_names())
-        cibles = [t for t in outils.TABLES if t in presentes]
-        sid = outils.controles_avant(conn, cibles)
-        avant = {t: outils.compter(conn, t) for t in cibles}
-        instructions = outils.plan_sql(conn, sid)
-        for requete in instructions:
-            if requete.startswith("--"):
-                continue
-            conn.execute(text(requete))
-        # Phase 3 : `membres` et `membres_invitations`.
-        nouvelles = [
-            Base.metadata.tables[t]
-            for t in outils.TABLES_NOUVELLES
-            if t in Base.metadata.tables
-        ]
-        Base.metadata.create_all(bind=conn, tables=nouvelles)
-        ecarts = outils.verifier_apres(conn, avant)
-        if ecarts:
-            raise RuntimeError(
-                "Contrôle final en échec, transaction annulée :\n  - "
-                + "\n  - ".join(ecarts)
-            )
+def _basculer_dans_transaction(conn) -> dict:
+    """Sauvegarde, migration et contrôles — dans UNE SEULE transaction.
 
-    # Relecture hors transaction : résultat définitif sur la base.
-    with engine.connect() as conn:
-        apres = {t: outils.compter(conn, t) for t in avant}
-        ecarts = outils.verifier_apres(conn, avant)
+    Le verrou est pris *dans la transaction* (`pg_advisory_xact_lock`) et non
+    en session : il est libéré automatiquement au commit comme à l'annulation,
+    et il reste fiable derrière un répartiteur de connexions en mode
+    transaction (« pooler » Supabase), où le passage par une même connexion
+    n'est garanti que le temps d'une transaction.
+    """
+    conn.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _VERROU})
+
+    if _colonne_existe(conn, "classes", "school_id"):
+        return {"statut": "deja_migre", "raison": "conversion faite par une autre instance"}
+
+    # 1. Sauvegarde intégrale, vérifiée AVANT toute modification.
+    schema = "sauvegarde_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+    lignes = _sauvegarder(conn, outils, schema)
+    ecarts = _controler_sauvegarde(conn, outils, schema, lignes)
     if ecarts:
-        raise RuntimeError("Écarts constatés après validation : " + " ; ".join(ecarts))
+        raise RuntimeError(
+            "Sauvegarde non fiable, aucune modification entreprise :\n  - "
+            + "\n  - ".join(ecarts)
+        )
+
+    # 2. Migration Phase 2 + 3, avec les fonctions déjà éprouvées.
+    presentes = set(inspect(conn).get_table_names())
+    cibles = [t for t in outils.TABLES if t in presentes]
+    sid = outils.controles_avant(conn, cibles)
+    avant = {t: outils.compter(conn, t) for t in cibles}
+    instructions = outils.plan_sql(conn, sid)
+    for requete in instructions:
+        if not requete.startswith("--"):
+            conn.execute(text(requete))
+    nouvelles = [
+        Base.metadata.tables[t]
+        for t in outils.TABLES_NOUVELLES
+        if t in Base.metadata.tables
+    ]
+    Base.metadata.create_all(bind=conn, tables=nouvelles)
+
+    # 3. Contrôles finaux : parité de schéma, parité des lignes, aucun vide.
+    ecarts = outils.verifier_apres(conn, avant)
+    if ecarts:
+        raise RuntimeError(
+            "Contrôle final en échec, transaction annulée :\n  - "
+            + "\n  - ".join(ecarts)
+        )
+    apres = {t: outils.compter(conn, t) for t in cibles}
+    if apres != avant:
+        raise RuntimeError(f"Comptages divergents : {avant} → {apres}")
+
     return {
+        "statut": "migre",
+        "sauvegarde": {"schema": schema, "lignes": lignes},
         "etablissement": sid,
         "instructions": len(instructions),
         "lignes_avant": avant,
@@ -160,63 +181,31 @@ def executer_si_necessaire() -> dict:
         "statut": "inconnu",
     }
 
-    if make_url(settings.engine_url).get_backend_name() != "postgresql":
-        rapport.update(statut="ignore", raison="moteur local (SQLite) : rien à faire")
+    def _noter(**maj) -> dict:
+        rapport.update(maj)
+        rapport["fin"] = datetime.now().isoformat(timespec="seconds")
         DERNIER_RAPPORT.clear()
         DERNIER_RAPPORT.update(rapport)
         return rapport
 
+    if make_url(settings.engine_url).get_backend_name() != "postgresql":
+        return _noter(statut="ignore", raison="moteur local (SQLite) : rien à faire")
+
     try:
         with engine.connect() as conn:
             if not _table_existe(conn, "classes"):
-                rapport.update(statut="ignore", raison="base neuve : rien à faire")
-                DERNIER_RAPPORT.clear()
-                DERNIER_RAPPORT.update(rapport)
-                return rapport
+                return _noter(statut="ignore", raison="base neuve : rien à faire")
             if _colonne_existe(conn, "classes", "school_id"):
-                rapport.update(statut="deja_migre")
-                DERNIER_RAPPORT.clear()
-                DERNIER_RAPPORT.update(rapport)
-                return rapport
+                return _noter(statut="deja_migre")
+    except Exception as erreur:  # noqa: BLE001
+        return _noter(statut="echec", erreur=f"{type(erreur).__name__} : {erreur}")
 
-        # Verrou dédié : une seule instance exécute la bascule.
-        verrou = engine.connect()
-        verrou.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _VERROU})
-        try:
-            with engine.connect() as conn:
-                if _colonne_existe(conn, "classes", "school_id"):
-                    rapport.update(statut="deja_migre", raison="conversion faite par une autre instance")
-                    return rapport
-
-                schema = "sauvegarde_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-                with engine.begin() as conn:
-                    lignes = _sauvegarder(conn, outils, schema)
-                    ecarts = _controler_sauvegarde(conn, outils, schema, lignes)
-
-                if ecarts:
-                    raise RuntimeError(
-                        "Sauvegarde non fiable, aucune modification entreprise :\n  - "
-                        + "\n  - ".join(ecarts)
-                    )
-                rapport["sauvegarde"] = {"schema": schema, "lignes": lignes}
-
-            resultat = _migrer(outils)
-            rapport.update(statut="migre", **resultat)
-
-        finally:
-            verrou.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": _VERROU})
-            verrou.close()
-
-    except Exception as erreur:  # noqa: BLE001 — on consigne au lieu d'interrompre
-        rapport.update(
-            statut="echec",
-            erreur=f"{type(erreur).__name__} : {erreur}",
-        )
-
-    rapport["fin"] = datetime.now().isoformat(timespec="seconds")
-    DERNIER_RAPPORT.clear()
-    DERNIER_RAPPORT.update(rapport)
-    return rapport
+    try:
+        with engine.begin() as conn:
+            rapport.update(_basculer_dans_transaction(conn))
+    except Exception as erreur:  # noqa: BLE001 — consigné, jamais propagé au démarrage
+        rapport.update(statut="echec", erreur=f"{type(erreur).__name__} : {erreur}")
+    return _noter()
 
 
 def resume() -> dict:
@@ -229,6 +218,20 @@ def resume() -> dict:
                 "postgresql"
                 if make_url(settings.engine_url).get_backend_name() == "postgresql"
                 else "locale"
+            )
+            # Caractéristiques de la connexion — SANS le mot de passe : elles
+            # identifient le projet Supabase réellement joint (le nom d'utilisateur
+            # contient sa référence) et le mode de répartition des connexions.
+            url = make_url(settings.engine_url)
+            informations["connexion"] = {
+                "hote": url.host,
+                "port": url.port,
+                "base": url.database,
+                "utilisateur": url.username,
+            }
+            informations["serveur"] = conn.execute(text("SELECT version()")).scalar()
+            informations["date_serveur"] = str(
+                conn.execute(text("SELECT now()")).scalar()
             )
             informations["classes_school_id"] = (
                 _colonne_existe(conn, "classes", "school_id")
