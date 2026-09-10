@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from fastapi import APIRouter, Depends
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models import (
     Annonce,
@@ -16,6 +17,7 @@ from app.models import (
     Matiere,
     Paiement,
     Presence,
+    User,
 )
 from app.services import sd
 
@@ -23,7 +25,10 @@ router = APIRouter(prefix="/api/v1", tags=["tableau de bord"])
 
 
 @router.get("/dashboard", summary="Agrégats du tableau de bord")
-def resume_dashboard(db: Session = Depends(get_db)) -> dict:
+def resume_dashboard(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     sid = sd.sid_ecole(db)
     # --- Compteurs généraux ---
     actifs = db.scalar(

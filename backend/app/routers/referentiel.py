@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.auth import ROLE_ADMIN, require_roles
+from app.auth import ROLE_ADMIN, get_current_user, require_roles
 from app.database import get_db
 from app.models import (
     Classe,
@@ -22,6 +22,7 @@ from app.models import (
     Enseignant,
     Matiere,
     Note,
+    User,
     classe_matiere,
     enseignant_classe,
 )
@@ -34,7 +35,10 @@ router = APIRouter(prefix="/api/v1", tags=["référentiel"])
 # Classes
 # ---------------------------------------------------------------------------
 @router.get("/classes", summary="Liste des classes (avec effectif)")
-def liste_classes(db: Session = Depends(get_db)) -> dict:
+def liste_classes(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     sid = sd.sid_ecole(db)
     classes = db.execute(
         select(Classe).where(Classe.school_id == sid)
@@ -51,7 +55,11 @@ def liste_classes(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/classes/{classe_id}", summary="Détail d'une classe")
-def detail_classe(classe_id: str, db: Session = Depends(get_db)) -> dict:
+def detail_classe(
+    classe_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
@@ -75,7 +83,11 @@ def detail_classe(classe_id: str, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/classes/{classe_id}/emploi-du-temps", summary="Emploi du temps d'une classe")
-def emploi_du_temps(classe_id: str, db: Session = Depends(get_db)) -> dict:
+def emploi_du_temps(
+    classe_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
@@ -91,7 +103,10 @@ def emploi_du_temps(classe_id: str, db: Session = Depends(get_db)) -> dict:
 # Matières
 # ---------------------------------------------------------------------------
 @router.get("/matieres", summary="Liste des matières")
-def liste_matieres(db: Session = Depends(get_db)) -> dict:
+def liste_matieres(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     sid = sd.sid_ecole(db)
     matieres = db.execute(
         select(Matiere).where(Matiere.school_id == sid)
@@ -115,7 +130,10 @@ def liste_matieres(db: Session = Depends(get_db)) -> dict:
 # Enseignants
 # ---------------------------------------------------------------------------
 @router.get("/enseignants", summary="Liste des enseignants")
-def liste_enseignants(db: Session = Depends(get_db)) -> dict:
+def liste_enseignants(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     sid = sd.sid_ecole(db)
     ens = db.execute(
         select(Enseignant).where(Enseignant.school_id == sid).order_by(Enseignant.id)
@@ -124,7 +142,11 @@ def liste_enseignants(db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/enseignants/{enseignant_id}", summary="Détail d'un enseignant")
-def detail_enseignant(enseignant_id: str, db: Session = Depends(get_db)) -> dict:
+def detail_enseignant(
+    enseignant_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     ens = sd.get_enseignant(db, enseignant_id)
     if ens is None:
         raise HTTPException(status_code=404, detail="Enseignant introuvable.")

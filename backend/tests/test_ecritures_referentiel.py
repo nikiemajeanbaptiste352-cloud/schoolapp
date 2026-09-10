@@ -16,8 +16,8 @@ def _h(client, admin_token):
     return h(admin_token)
 
 
-def _classe_seeded(client, code: str) -> dict:
-    classes = client.get("/api/v1/classes").json()["classes"]
+def _classe_seeded(client, h, code: str) -> dict:
+    classes = client.get("/api/v1/classes", headers=h).json()["classes"]
     for c in classes:
         if c["id"] == code:
             return c
@@ -46,7 +46,7 @@ def test_creer_modifier_supprimer_classe(client, admin_token):
 
     try:
         # Visible dans la liste (les codes hors programme s'ajoutent en fin)
-        liste = client.get("/api/v1/classes").json()["classes"]
+        liste = client.get("/api/v1/classes", headers=h).json()["classes"]
         assert any(c["id"] == "6C" for c in liste)
 
         # Modification (cycle/salle/principal partiels suffisent)
@@ -71,7 +71,7 @@ def test_creer_modifier_supprimer_classe(client, admin_token):
         # Suppression (classe vide) → OK
         sup = client.delete("/api/v1/classes/6C", headers=h)
         assert sup.status_code == 200, sup.text
-        assert client.get("/api/v1/classes/6C").status_code == 404
+        assert client.get("/api/v1/classes/6C", headers=h).status_code == 404
     finally:
         client.delete("/api/v1/classes/6C", headers=h)
 
@@ -88,12 +88,12 @@ def test_classe_dupliquee_refusee(client, admin_token):
 
 def test_suppression_classe_non_vide_refusee(client, admin_token):
     h = _h(client, admin_token)
-    seeded = _classe_seeded(client, "6A")
+    seeded = _classe_seeded(client, h, "6A")
     assert seeded["effectif"] > 0, "La classe 6A du seed devrait avoir des élèves"
     resp = client.delete("/api/v1/classes/6A", headers=h)
     assert resp.status_code == 409
     # La classe existe toujours
-    assert client.get("/api/v1/classes/6A").status_code == 200
+    assert client.get("/api/v1/classes/6A", headers=h).status_code == 200
 
 
 def test_ecriture_classe_reservee_admin(client, admin_token):
@@ -127,7 +127,7 @@ def test_creer_modifier_supprimer_matiere(client, admin_token):
 
     try:
         # Visible dans la liste
-        liste = client.get("/api/v1/matieres").json()["matieres"]
+        liste = client.get("/api/v1/matieres", headers=h).json()["matieres"]
         assert any(m["id"] == mat["id"] for m in liste)
 
         # Modification
@@ -148,7 +148,7 @@ def test_creer_modifier_supprimer_matiere(client, admin_token):
         # Suppression (aucune note ni enseignant rattaché) → OK
         sup = client.delete(f"/api/v1/matieres/{mat['id']}", headers=h)
         assert sup.status_code == 200, sup.text
-        liste2 = client.get("/api/v1/matieres").json()["matieres"]
+        liste2 = client.get("/api/v1/matieres", headers=h).json()["matieres"]
         assert all(m["id"] != mat["id"] for m in liste2)
     finally:
         client.delete(f"/api/v1/matieres/{mat['id']}", headers=h)
@@ -179,7 +179,7 @@ def test_suppression_matiere_detache_enseignants(client, admin_token):
         # Suppression de la matière → l'enseignant est détaché
         sup = client.delete(f"/api/v1/matieres/{mid}", headers=h)
         assert sup.status_code == 200, sup.text
-        detail = client.get(f"/api/v1/enseignants/{ens['id']}").json()
+        detail = client.get(f"/api/v1/enseignants/{ens['id']}", headers=h).json()
         assert detail["matiere"] is None
     finally:
         if ens:
@@ -192,7 +192,7 @@ def test_suppression_matiere_avec_notes_refusee(client, admin_token):
     # S1 est utilisée par les notes du seed (prof T001 rattaché également)
     resp = client.delete("/api/v1/matieres/S1", headers=h)
     assert resp.status_code == 409
-    assert client.get("/api/v1/matieres").status_code == 200
+    assert client.get("/api/v1/matieres", headers=h).status_code == 200
 
 
 def test_ecriture_matiere_reservee_admin(client, admin_token):
@@ -212,7 +212,7 @@ def test_ecriture_matiere_reservee_admin(client, admin_token):
 # ---------------------------------------------------------------------------
 def test_modifier_ecole(client, admin_token):
     h = _h(client, admin_token)
-    avant = client.get("/api/v1/ecole")
+    avant = client.get("/api/v1/ecole", headers=h)
     assert avant.status_code == 200, avant.text
 
     maj = client.put("/api/v1/ecole", headers=h, json={"slogan": "Travail, discipline, réussite"})

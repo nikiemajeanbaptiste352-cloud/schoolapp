@@ -7,7 +7,9 @@ pour une bascule d'intégration sans régression.
 Multi-établissements (Phase 2) : toute consultation est scopée par `school_id`.
 Le school_id effectif est, dans l'ordre : paramètre explicite (futur), contexte
 de requête posé par la couche auth (`ecole_courante()`), sinon — repli
-mono-école — la première école de la base.
+mono-école toléré uniquement s'il est non ambigu, c'est-à-dire s'il n'existe
+qu'une seule école en base. Au-delà, la consultation échoue explicitement
+(`EcoleIndeterminee`) plutôt que de servir les données de l'école n° 1.
 """
 
 from __future__ import annotations
@@ -41,6 +43,15 @@ _ECOLE_COURANTE: ContextVar[int | None] = ContextVar(
 )
 
 
+class EcoleIndeterminee(RuntimeError):
+    """Aucun contexte école exploitable : requête non rattachable à une école.
+
+    Levée dès qu'une consultation sans contexte école (anonyme) survient sur une
+    base contenant plusieurs établissements : mieux vaut un échec explicite
+    qu'une réponse silencieuse avec les données d'une autre école.
+    """
+
+
 def ecole_courante() -> int | None:
     """school_id posé par la couche auth pour la requête en cours."""
     return _ECOLE_COURANTE.get()
@@ -52,23 +63,51 @@ def definir_ecole_courante(school_id: int | None) -> None:
 
 
 def _sid(db: Session, sid: int | None = None) -> int:
-    """school_id effectif : explicite > contexte requête > 1ʳᵉ école (repli)."""
+    """school_id effectif : explicite > contexte requête > repli mono-école.
+
+    Le repli (aucun contexte école : requête anonyme, script, amorçage) n'est
+    admis que s'il est **non ambigu** — au plus une école en base. Dès qu'une
+    seconde école existe, une consultation sans contexte échoue (fail-closed)
+    au lieu de servir silencieusement les données de l'école n° 1.
+    """
     if sid is not None:
         return sid
     sid = _ECOLE_COURANTE.get()
     if sid is not None:
         return sid
-    e = db.scalar(select(Ecole).order_by(Ecole.id).limit(1))
-    return e.id if e is not None else 1
+    ids = db.scalars(select(Ecole.id).order_by(Ecole.id)).all()
+    if len(ids) <= 1:
+        return ids[0] if ids else 1
+    raise EcoleIndeterminee(
+        f"Établissement non identifié ({len(ids)} établissements en base) : "
+        "une requête authentifiée est requise."
+    )
 
 
 def sid_ecole(db: Session) -> int:
     """École effective de la requête courante (pour les écritures / lectures).
 
-    Utilisé par les routeurs : école de l'utilisateur authentifié (contexte)
-    sinon première école en base (mode mono-établissement / lectures publiques).
+    Utilisé par les routeurs : école de l'utilisateur authentifié (contexte),
+    sinon repli toléré seulement en mode mono-établissement. Les routes de
+    domaine exigent toutes un jeton ; ce repli ne sert qu'aux scripts et à
+    l'amorçage d'une base encore vide.
     """
     return _sid(db)
+
+
+def ecole_principale(db: Session) -> int:
+    """École par défaut du déploiement : la première par ordre d'id.
+
+    Résolution volontairement **non stricte** (contrairement à `sid_ecole`) :
+    elle ne sert qu'aux inscriptions publiques, qui ne peuvent pas connaître
+    l'école d'origine du futur compte. Réserver `sid_ecole` aux accès aux
+    données garantit qu'aucune lecture ne retombe silencieusement sur l'école
+    n° 1 ; ici, le rattachement à l'école de déploiement est un choix explicite
+    et documenté, à remplacer par un rattachement par lien quand la Phase 3
+    (« memberships ») sera en place.
+    """
+    e = db.scalar(select(Ecole).order_by(Ecole.id).limit(1))
+    return e.id if e is not None else 1
 
 
 def get_annonce(db: Session, annonce_id: str, school_id: int | None = None) -> Annonce | None:

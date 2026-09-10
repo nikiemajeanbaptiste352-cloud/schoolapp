@@ -292,6 +292,7 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 2. Backend : contexte de requête `{user, membership}` ; filtre `school_id` ajouté aux requêtes de
    domaine (référentiel, élèves, notes, présences, paiements, annonces, paie) ; les routes publiques
    sans auth (classes/matieres en lecture) deviennent scopées par établissement ou documentées.
+   ✅ **fait** — les 10 lectures de domaine exigent un jeton et le repli ambigu est supprimé (§ V.2).
 3. Tests : suite existante maintenue verte + nouveau `test_multitenant.py` (2 écoles, isolation).
    ✅ **fait** — suite **82/82 verte** (`test_multitenant.py` = 6 tests, 2 écoles, codes métier identiques).
 4. E2E local sur base de démo à 2 écoles, puis déploiement prod (aucune donnée perdue).
@@ -305,6 +306,7 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 | --- | --- |
 | Modèles `(school_id, id)` + FKs composites | ✅ codé (commit `dd7de33`) |
 | Routeurs scopés + middleware de contexte école | ✅ codé |
+| Fermeture de la faille « repli silencieux sur l'école n° 1 » | ✅ codé (2026-09-10, § V.2) — 14 → 4 routes non refusées |
 | `test_multitenant.py` (6 tests) | ✅ vert |
 | Migration des bases SQLite existantes | ✅ script `backend/_migrate_school_id.py` (commit `aeeea82`) — **dev seulement** |
 | Base dev `backend/data/school.db` migrée (école 1) | ✅ counts identiques, `integrity_check ok`, sauvegarde `.bak-20260910-003311` |
@@ -315,6 +317,29 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 
 > ⚠️ **Ne pas pousser `dd7de33` / `aeeea82` en l'état** : la prod PG n'ayant pas la colonne `school_id`,
 > le déploiement provoquerait `no such column: school_id` sur toutes les routes de domaine.
+
+### V.2 Fermeture de la faille « repli silencieux sur l'école n° 1 » (2026-09-10)
+
+**Constat (audit automatisé des 44 routes).** 10 lectures de domaine et la sonde `/health`
+répondaient **200 sans jeton** : `GET /classes`, `/classes/{id}`, `/classes/{id}/emploi-du-temps`,
+`/matieres`, `/enseignants`, `/enseignants/{id}`, `/ecole`, `/annonces`, `/dashboard`,
+`/paiements/stats`. Comme `sd._sid()` retombait sur « la première école de la base », un simple appel
+anonyme lisait les données de l'école n° 1 : l'isolation de la Phase 2 devenait **illusoire** dès
+qu'une deuxième école réelle existerait.
+
+| Correctif | Détail |
+| --- | --- |
+| Lectures de domaine protégées | `get_current_user` (tout compte de l'école) sur les 10 routes ci-dessus ; écritures déjà en `require_roles(ROLE_ADMIN)`, inchangées |
+| Repli « école n° 1 » supprimé | `sd._sid()` n'admet plus le repli que s'il est **non ambigu** (au plus une école en base) ; sinon `sd.EcoleIndeterminee` — échec explicite au lieu d'une fuite silencieuse |
+| `/health` assainie | Sans jeton : `counts = null` et `ecole = null` (le nom de l'établissement n'est plus divulgué) |
+| Résolveur non strict dédié | Nouveau `sd.ecole_principale()` pour les **routes publiques** (inscription Parent, inscription établissement, libellé école au login) : rattachement explicite à l'école de déploiement, sans jamais introduire de 500 sur une route publique |
+| Inscription Parent rattachée | `POST /auth/inscription` renseigne désormais `school_id` (auparavant `NULL`, ce qui rendait le compte inutilisable dès la 2ᵉ école avec un contexte fail-closed) |
+| Garde-fou automatisé | Nouveau `backend/tests/test_isolation_routes.py` : 401 sans jeton **et** 200 avec jeton sur les 10 routes, `/health` anonyme vide, priorité du contexte explicite, repli refusé dès 2 écoles |
+
+**Vérification.** Même audit rejoué avant/après sur les 44 routes : **14 → 4** réponses non refusées.
+Les 4 restantes sont publiques **par nature** : `/auth/options`, `/auth/google`,
+`/auth/google/callback` et `/health` (désormais sans aucune donnée d'établissement).
+Suite complète : **105 tests verts** (82 + 23 nouveaux).
 
 **Phase 3 — Rattachement** : `memberships`, invitations, `role` par école, UI « 👥 Utilisateurs »
 dans le portail établissement (réutilise `GET/POST /auth/comptes` actuels).
@@ -350,7 +375,7 @@ la brique « photos de profil » (IV.1-7).
 `pedagogie` (notes), `presences`, `paiements`, `paie` (mon-espace + rémunérations). Front vanilla ES5,
 pages `/pages/*`, état via `GET /etat` → `window.SD` (mode API). Suite pytest : **76 tests verts**.
 
-### A.4 Points d'attention sécurité (à traiter en Phase 2)
+### A.4 Points d'attention sécurité (⚠️ historique — **résolu** le 2026-09-10, voir § V.2)
 
 Endpoints **sans authentification** (seulement `get_db`) à scoper par établissement :
 - `GET /dashboard` (agrégats) et `GET /paiements/stats` (synthèse financière) ;
@@ -358,6 +383,10 @@ Endpoints **sans authentification** (seulement `get_db`) à scoper par établiss
   `GET /matieres`, `GET /enseignants`, `GET /enseignants/{id}`, `GET /ecole`, `GET /annonces`
   (lectures utilisées par le front en mode non connecté — à passer en lecture scopée ou protégée) ;
 - `GET /etat` est au contraire **protégé** (auth requise) ✅.
+
+> **État final (Phase 2)** : ces 10 routes exigent désormais un jeton et `sd._sid()` refuse tout repli
+> ambigu. Seuls restent publics `/auth/*` (connexion / inscription) et `/health` (sans données
+> d'établissement). Détail des correctifs et preuves : § V.2.
 
 Autres points :
 - Codes métier PK (collisions inter-écoles possibles en multi-tenant) — résolu par R4/R5.

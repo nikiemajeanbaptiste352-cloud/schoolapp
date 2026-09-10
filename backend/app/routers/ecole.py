@@ -1,4 +1,5 @@
-"""Routes — école & annonces (lecture publique, écriture admin)."""
+"""Routes — école & annonces (lecture réservée aux comptes de l'école,
+   écriture admin)."""
 
 from __future__ import annotations
 
@@ -8,9 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth import ROLE_ADMIN, require_roles
+from app.auth import ROLE_ADMIN, get_current_user, require_roles
 from app.database import get_db
-from app.models import Annonce, Ecole
+from app.models import Annonce, Ecole, User
 from app.schemas import EcoleOut, MessageOut
 from app.services import sd
 
@@ -21,7 +22,10 @@ router = APIRouter(prefix="/api/v1", tags=["école & annonces"])
 # École
 # ---------------------------------------------------------------------------
 @router.get("/ecole", response_model=EcoleOut, summary="Informations de l'école")
-def lire_ecole(db: Session = Depends(get_db)) -> Ecole:
+def lire_ecole(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> Ecole:
     ecole = db.scalar(select(Ecole).where(Ecole.id == sd.sid_ecole(db)).limit(1))
     if ecole is None:
         raise HTTPException(status_code=404, detail="École non configurée.")
@@ -81,7 +85,10 @@ def modifier_ecole(
 # Annonces
 # ---------------------------------------------------------------------------
 @router.get("/annonces", summary="Liste des annonces")
-def liste_annonces(db: Session = Depends(get_db)) -> dict:
+def liste_annonces(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     sid = sd.sid_ecole(db)
     annonces = db.execute(
         select(Annonce).where(Annonce.school_id == sid).order_by(Annonce.date)

@@ -135,8 +135,10 @@ def _token_pour(user: User, db: Session) -> TokenOut:
         str(user.id),
         extra={"role": user.role, "email": user.email},
     )
-    # École affichée au front : celle du compte si rattaché, sinon l'école par défaut.
-    sid = user.school_id or sd.sid_ecole(db)
+    # École affichée au front : celle du compte si rattaché, sinon l'école par
+    # défaut du déploiement (résolution non stricte : la connexion ne doit
+    # jamais échouer à cause d'une ambiguïté de contexte).
+    sid = user.school_id or sd.ecole_principale(db)
     ecole = db.scalar(select(Ecole).where(Ecole.id == sid).limit(1))
     return TokenOut(
         access_token=token,
@@ -174,8 +176,20 @@ def inscription(body: InscriptionIn, db: Session = Depends(get_db)) -> TokenOut:
 
     L'inscription publique est volontairement limitée au rôle Parent :
     les autres rôles sont créés par l'administration.
+
+    Le compte est rattaché à l'établissement de déploiement dès l'inscription :
+    sans ce rattachement, le repli de contexte école (fail-closed dès qu'une
+    seconde école existe) rendrait le compte inutilisable dès la première
+    requête authentifiée.
     """
-    user = _creer_user(db, body.nom, body.email, body.password, ROLE_PARENT)
+    user = _creer_user(
+        db,
+        body.nom,
+        body.email,
+        body.password,
+        ROLE_PARENT,
+        school_id=sd.ecole_principale(db),
+    )
     return _token_pour(user, db)
 
 
@@ -211,7 +225,8 @@ def inscription_etablissement(
         ))
         db.commit()
     # Le compte de direction rejoint l'établissement (existant ou tout juste créé).
-    sid = sd.sid_ecole(db)
+    # Résolution non stricte : route publique, sans contexte école disponible.
+    sid = sd.ecole_principale(db)
     user = _creer_user(db, body.nom, body.email, body.password, ROLE_ADMIN, school_id=sid)
     return _token_pour(user, db)
 

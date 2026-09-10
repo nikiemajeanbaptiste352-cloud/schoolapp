@@ -9,8 +9,10 @@ tests (effectifs, moyennes du seed).
 from __future__ import annotations
 
 
-def _premiere_classe(client) -> dict:
-    classes = client.get("/api/v1/classes").json()["classes"]
+def _premiere_classe(client, admin_token: str) -> dict:
+    classes = client.get(
+        "/api/v1/classes", headers={"Authorization": f"Bearer {admin_token}"}
+    ).json()["classes"]
     assert classes, "Aucune classe dans le seed de test"
     return classes[0]
 
@@ -38,7 +40,7 @@ def _creer_eleve_jetable(client, admin_token: str, classe: dict) -> str:
 def test_creer_modifier_supprimer_enseignant(client, admin_token):
     from tests.conftest import h
 
-    classes = client.get("/api/v1/classes").json()["classes"]
+    classes = client.get("/api/v1/classes", headers=h(admin_token)).json()["classes"]
     ids = [c["id"] for c in classes[:2]]
 
     # Création
@@ -97,8 +99,10 @@ def test_creer_modifier_supprimer_enseignant(client, admin_token):
         # Suppression
         sup = client.delete(f"/api/v1/enseignants/{ens['id']}", headers=h(admin_token))
         assert sup.status_code == 200, sup.text
-        assert client.get(f"/api/v1/enseignants/{ens['id']}").status_code == 404
-        liste = client.get("/api/v1/enseignants").json()["enseignants"]
+        assert client.get(
+            f"/api/v1/enseignants/{ens['id']}", headers=h(admin_token)
+        ).status_code == 404
+        liste = client.get("/api/v1/enseignants", headers=h(admin_token)).json()["enseignants"]
         assert all(e["id"] != ens["id"] for e in liste)
     finally:
         client.delete(f"/api/v1/enseignants/{ens['id']}", headers=h(admin_token))
@@ -122,10 +126,12 @@ def test_ecriture_enseignant_reservee_admin(client, admin_token):
 def test_supprimer_une_note(client, admin_token):
     from tests.conftest import h
 
-    classe = _premiere_classe(client)
+    classe = _premiere_classe(client, admin_token)
     eid = _creer_eleve_jetable(client, admin_token, classe)
     try:
-        detail = client.get(f"/api/v1/classes/{classe['id']}").json()
+        detail = client.get(
+            f"/api/v1/classes/{classe['id']}", headers=h(admin_token)
+        ).json()
         matiere = detail["matieres"][0]
         mid = matiere["id"]
 
@@ -164,7 +170,7 @@ def test_supprimer_une_note(client, admin_token):
 def test_prof_peut_supprimer_sa_matiere_pas_une_autre(client, admin_token):
     from tests.conftest import auth, h
 
-    classe = _premiere_classe(client)
+    classe = _premiere_classe(client, admin_token)
     eid = _creer_eleve_jetable(client, admin_token, classe)
     t = auth(client, "j.ouedraogo@lesavoir.edu")  # enseigne S1
     try:
@@ -185,7 +191,7 @@ def test_prof_peut_supprimer_sa_matiere_pas_une_autre(client, admin_token):
 def test_versement_cree_dossier_par_defaut(client, admin_token):
     from tests.conftest import h
 
-    classe = _premiere_classe(client)
+    classe = _premiere_classe(client, admin_token)
     attendu = 200000 if classe["cycle"] == "Lycée" else 150000
     eid = _creer_eleve_jetable(client, admin_token, classe)
     try:

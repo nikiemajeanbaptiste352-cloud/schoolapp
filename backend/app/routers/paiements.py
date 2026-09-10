@@ -71,7 +71,10 @@ def liste_paiements(
 
 
 @router.get("/paiements/stats", summary="Synthèse des paiements")
-def stats_paiements(db: Session = Depends(get_db)) -> dict:
+def stats_paiements(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
     sid = sd.sid_ecole(db)
     paiements = db.execute(
         select(Paiement).where(Paiement.school_id == sid)

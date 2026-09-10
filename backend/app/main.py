@@ -105,7 +105,7 @@ async def _contexte_ecole_par_jeton(request: Request, call_next):
                 finally:
                     db.close()
         except Exception:
-            pass  # jeton illisible → contexte par défaut (première école).
+            pass  # jeton illisible → aucun contexte école (fail-closed).
     try:
         return await call_next(request)
     finally:
@@ -120,38 +120,44 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=_contexte_ecole_par_jeton)
 # ---------------------------------------------------------------
 @app.get("/api/v1/health", tags=["système"])
 def health() -> dict:
+    """Sonde de disponibilité.
+
+    Appelée sans jeton, elle n'expose que l'état du service : ni nom
+    d'établissement, ni compteurs (aucune fuite inter-écoles). Les compteurs
+    ne sont renvoyés que si un jeton valide a posé le contexte école.
+    """
     db = SessionLocal()
     try:
-        # Multi-établissements (Phase 2) : les compteurs reflètent l'école de
-        # référence (école par défaut quand l'appel est public, comme avant).
-        sid = sd.sid_ecole(db)
-        counts = {
-            "ecole": db.scalar(select(func.count(Ecole.id))),
-            "classes": db.scalar(
-                select(func.count(Classe.id)).where(Classe.school_id == sid)
-            ),
-            "matieres": db.scalar(
-                select(func.count(Matiere.id)).where(Matiere.school_id == sid)
-            ),
-            "enseignants": db.scalar(
-                select(func.count(Enseignant.id)).where(Enseignant.school_id == sid)
-            ),
-            "eleves": db.scalar(
-                select(func.count(Eleve.id)).where(Eleve.school_id == sid)
-            ),
-            "annonces": db.scalar(
-                select(func.count(Annonce.id)).where(Annonce.school_id == sid)
-            ),
-        }
-        ecole_nom = db.scalar(
-            select(Ecole.nom).where(Ecole.id == sid).limit(1)
-        )
+        sid = sd.ecole_courante()
+        counts = None
+        ecole_nom = None
+        if sid is not None:
+            counts = {
+                "classes": db.scalar(
+                    select(func.count(Classe.id)).where(Classe.school_id == sid)
+                ),
+                "matieres": db.scalar(
+                    select(func.count(Matiere.id)).where(Matiere.school_id == sid)
+                ),
+                "enseignants": db.scalar(
+                    select(func.count(Enseignant.id)).where(Enseignant.school_id == sid)
+                ),
+                "eleves": db.scalar(
+                    select(func.count(Eleve.id)).where(Eleve.school_id == sid)
+                ),
+                "annonces": db.scalar(
+                    select(func.count(Annonce.id)).where(Annonce.school_id == sid)
+                ),
+            }
+            ecole_nom = db.scalar(
+                select(Ecole.nom).where(Ecole.id == sid).limit(1)
+            )
     finally:
         db.close()
     return {
         "status": "ok",
-        "ecole": ecole_nom,
         "base": settings.db_name,
+        "ecole": ecole_nom,
         "counts": counts,
     }
 

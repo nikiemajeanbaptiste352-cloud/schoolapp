@@ -8,8 +8,16 @@ Repères de parité (classe 3e A, 5 élèves : EL001, EL003, EL006, EL014, EL015
 from __future__ import annotations
 
 
-def test_health_compteurs(client):
-    resp = client.get("/api/v1/health")
+def test_health_compteurs(client, admin_token):
+    from tests.conftest import h
+
+    # Sans jeton : la sonde ne divulgue ni nom d'établissement ni compteurs.
+    anon = client.get("/api/v1/health")
+    assert anon.status_code == 200
+    assert anon.json()["counts"] is None
+    assert anon.json()["ecole"] is None
+
+    resp = client.get("/api/v1/health", headers=h(admin_token))
     assert resp.status_code == 200
     counts = resp.json()["counts"]
     assert counts["classes"] == 10
@@ -46,8 +54,10 @@ def test_moyennes_par_matiere_presentes(client, admin_token):
     assert matieres == {"S1", "S2", "S3", "S4", "S5", "S6", "S7"}  # 3e : sans S8
 
 
-def test_emploi_du_temps_3a(client):
-    resp = client.get("/api/v1/classes/3A/emploi-du-temps")
+def test_emploi_du_temps_3a(client, admin_token):
+    from tests.conftest import h
+
+    resp = client.get("/api/v1/classes/3A/emploi-du-temps", headers=h(admin_token))
     assert resp.status_code == 200
     grille = resp.json()["grille"]
     # 6 jours x 4 créneaux - 2 créneaux libres (mercredi + samedi, créneau 3)
