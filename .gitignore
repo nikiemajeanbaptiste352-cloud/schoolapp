@@ -30,6 +30,11 @@ ENV/
 *.sqlite3
 backend/data/
 
+# ===== Supabase CLI : état local de liaison (jamais versionné) =====
+# .temp/pooler-url contient une chaîne de connexion (identifiant masqué).
+supabase/.temp/
+supabase/.branches/
+
 # ===== Node / npm (si un jour utilisé) =====
 node_modules/
 npm-debug.log*

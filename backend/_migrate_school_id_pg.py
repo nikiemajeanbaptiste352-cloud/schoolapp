@@ -42,9 +42,27 @@ Garde-fous :
 
 from __future__ import annotations
 
+import io
 import os
 import sys
 from pathlib import Path
+
+# --- Sortie console : UTF-8 garanti -----------------------------------------
+# La console Windows est souvent réglée sur cp1252 : sans cette enveloppe, la
+# moindre flèche « → » ou le moindre « ≠ » d'un message ferait planter le
+# script au pire moment (UnicodeEncodeError en plein milieu d'une migration).
+# ⚠️ `sys.stdout.reconfigure(encoding="utf-8")` ne suffit PAS : vérifié, le
+# flux annonce alors « utf-8 » mais les octets écrits restent en cp1252. Seul
+# le remplacement du flux par une enveloppe explicite agit réellement.
+for _nom_flux in ("stdout", "stderr"):
+    _flux = getattr(sys, _nom_flux, None)
+    if getattr(_flux, "buffer", None) is None:
+        continue  # flux sans tampon binaire (pythonw, flux déjà remplacé…)
+    try:
+        setattr(sys, _nom_flux, io.TextIOWrapper(
+            _flux.buffer, encoding="utf-8", errors="replace", line_buffering=True))
+    except (ValueError, AttributeError):
+        pass
 
 # --- Environnement : on se place dans backend/ (imports `app.*`) -------------
 BASE = Path(__file__).resolve().parent

@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import io
 import os
 import re
 import shutil
@@ -50,6 +51,22 @@ from urllib.parse import urlsplit
 
 BACKEND_DIR = Path(__file__).resolve().parent
 SCRIPT_MIGRATION = BACKEND_DIR / "_migrate_school_id_pg.py"
+
+# --- Sortie console : UTF-8 garanti -----------------------------------------
+# La console Windows est souvent réglée sur cp1252 : sans cela, un accent ou un
+# tiret long ferait planter le script au pire moment. ⚠️ La méthode évidente,
+# `sys.stdout.reconfigure(encoding="utf-8")`, ne suffit PAS : vérifié, le flux
+# annonce alors « utf-8 » mais les octets écrits restent en cp1252. Seul le
+# remplacement du flux par une enveloppe explicite agit réellement.
+for _nom_flux in ("stdout", "stderr"):
+    _flux = getattr(sys, _nom_flux, None)
+    if getattr(_flux, "buffer", None) is None:
+        continue  # flux sans tampon binaire (pythonw, flux déjà remplacé…)
+    try:
+        setattr(sys, _nom_flux, io.TextIOWrapper(
+            _flux.buffer, encoding="utf-8", errors="replace", line_buffering=True))
+    except (ValueError, AttributeError):
+        pass
 
 # Schémas de la sauvegarde, dans l'ordre de lecture.
 DUMP_SCHEMA = "01-schema.sql"
@@ -131,6 +148,23 @@ def demander_url() -> str:
     return url
 
 
+def reference_projet(url: str) -> str:
+    """Référence du projet Supabase déduite de l'URL (information publique).
+
+    Supabase expose deux formes : « postgres.<ref> » sur le pooler, ou bien
+    l'ancien accès direct « db.<ref>.supabase.co ». Cette référence est visible
+    dans toutes les adresses du projet : ce n'est pas un secret.
+    """
+    parties = urlsplit(url)
+    utilisateur = parties.username or ""
+    if utilisateur.startswith("postgres."):
+        return utilisateur.split(".", 1)[1]
+    hote = parties.hostname or ""
+    if hote.startswith("db.") and hote.endswith(".supabase.co"):
+        return hote[len("db."):-len(".supabase.co")]
+    return ""
+
+
 def decrire_cible(url: str) -> str:
     """Résumé lisible SANS mot de passe, pour vérifier la cible."""
     parties = urlsplit(url)
@@ -138,7 +172,20 @@ def decrire_cible(url: str) -> str:
     port = f":{parties.port}" if parties.port else ""
     base = (parties.path or "/").lstrip("/") or "(défaut)"
     utilisateur = (parties.username or "?").split(":")[0]
-    return f"{hote}{port}/{base}  —  utilisateur {utilisateur}"
+    resume = f"{hote}{port}/{base}  —  utilisateur {utilisateur}"
+    reference = reference_projet(url)
+    if reference:
+        resume += f"\n    Référence du projet Supabase : {reference}"
+    return resume
+
+
+def reference_projet_lie() -> str:
+    """Référence du projet sur lequel la CLI de ce poste est liée (ou "")."""
+    chemin = BACKEND_DIR.parent / "supabase" / ".temp" / "project-ref"
+    try:
+        return chemin.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
 
 
 def controler_url(url: str) -> None:
@@ -296,6 +343,14 @@ def main() -> int:
 
     print()
     print("    Cible détectée : " + decrire_cible(url))
+    lie = reference_projet_lie()
+    if lie and lie != reference_projet(url):
+        print()
+        print(f"    [i] La CLI Supabase de ce poste est liée au projet « {lie} »,")
+        print("        qui n'est PAS celui de l'URL saisie. Ce n'est pas une")
+        print("        erreur (seule l'URL compte), mais confirmez bien dans le")
+        print("        dashboard que le projet saisi contient les données de")
+        print("        l'établissement avant de continuer.")
     print()
     print("    Vérifiez que c'est bien le projet de l'établissement, puis validez.")
     try:
@@ -358,6 +413,12 @@ def main() -> int:
     print()
     print("        Set-Location '" + str(BACKEND_DIR.parent) + "'")
     print("        vercel.cmd --prod --yes")
+    print()
+    print("    ATTENTION : le projet Vercel est relié à GitHub (branche « main »).")
+    print("    Un simple « git push » déclenche donc un déploiement automatique en")
+    print("    production. C'est sans danger MAINTENANT (la base vient d'être")
+    print("    migrée), mais ce serait une panne totale AVANT : ne poussez jamais")
+    print("    ces commits sur une base qui n'a pas encore été migrée.")
     print()
     print("    Puis vérifier le site : page d'accueil, connexion, tableau de bord.")
     print()
