@@ -82,21 +82,59 @@ def _colonne_existe(conn, table: str, colonne: str) -> bool:
     return colonne in {c["name"] for c in inspect(conn).get_columns(table)}
 
 
-def _sauvegarder(conn, outils, schema: str) -> dict[str, int]:
-    """Recopie toutes les tables publiques dans `schema`, puis le décrit.
+def _relations_a_sauvegarder(conn) -> list[str]:
+    """Tables réelles du schéma `public`, hors objets appartenant à une extension.
+
+    La plateforme d'hébergement ajoute ses propres objets dans `public` —
+    `wrappers_fdw_stats` par exemple — qui figurent au catalogue mais que le
+    rôle applicatif ne peut pas lire : les recopier fait échouer la sauvegarde
+    et donc, la transaction étant unique, toute la bascule. On ne retient donc
+    que les tables réelles (`relkind` r ou p) lisibles par le rôle courant et
+    qui n'appartiennent pas à une extension.
+    """
+    return list(
+        conn.execute(
+            text(
+                "SELECT c.relname FROM pg_class c "
+                "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') "
+                "AND NOT EXISTS (SELECT 1 FROM pg_depend d "
+                "                WHERE d.objid = c.oid AND d.deptype = 'e') "
+                "AND has_table_privilege(c.oid, 'SELECT') "
+                "ORDER BY c.relname"
+            )
+        ).scalars().all()
+    )
+
+
+def _sauvegarder(conn, outils, schema: str) -> tuple[dict[str, int], dict[str, str]]:
+    """Recopie les tables publiques dans `schema`, puis décrit leurs colonnes.
 
     `CREATE TABLE ... AS SELECT *` conserve les données sans les interpréter :
     aucune dépendance à pg_dump (indisponible sur une plateforme serverless).
+    Chaque copie passe par un point de sauvegarde : un objet récalcitrant est
+    écarté et signalé, sauf s'il s'agit d'une table de l'application — auquel
+    cas la bascule est abandonnée plutôt que tentée sans filet.
     """
     q = outils._q
-    tables = sorted(inspect(conn).get_table_names())
+    tables = _relations_a_sauvegarder(conn)
+    if not tables:
+        raise RuntimeError("aucune table lisible dans le schéma public : sauvegarde impossible")
     conn.execute(text(f"CREATE SCHEMA {q(schema)}"))
     lignes: dict[str, int] = {}
+    non_copiees: dict[str, str] = {}
     for table in tables:
-        conn.execute(
-            text(f"CREATE TABLE {q(schema)}.{q(table)} AS "
-                 f"SELECT * FROM public.{q(table)}")
-        )
+        try:
+            with conn.begin_nested():
+                conn.execute(
+                    text(f"CREATE TABLE {q(schema)}.{q(table)} AS "
+                         f"SELECT * FROM public.{q(table)}")
+                )
+        except Exception as erreur:  # noqa: BLE001
+            if table in Base.metadata.tables:
+                raise
+            non_copiees[table] = f"{type(erreur).__name__} : {erreur}"[:200]
+            continue
         lignes[table] = outils.compter(conn, table)
     # Description du schéma d'avant la bascule, conservée pour mémoire.
     conn.execute(
@@ -109,7 +147,7 @@ def _sauvegarder(conn, outils, schema: str) -> dict[str, int]:
             "ORDER BY table_name, ordinal_position"
         )
     )
-    return lignes
+    return lignes, non_copiees
 
 
 def _controler_sauvegarde(conn, outils, schema: str, lignes: dict[str, int]) -> list[str]:
@@ -144,7 +182,7 @@ def _basculer_dans_transaction(conn) -> dict:
     # 1. Sauvegarde intégrale, vérifiée AVANT toute modification.
     _etape("sauvegarde")
     schema = "sauvegarde_" + datetime.now().strftime("%Y%m%d_%H%M%S")
-    lignes = _sauvegarder(conn, outils, schema)
+    lignes, non_copiees = _sauvegarder(conn, outils, schema)
     _etape("controle_sauvegarde")
     ecarts = _controler_sauvegarde(conn, outils, schema, lignes)
     if ecarts:
@@ -191,7 +229,11 @@ def _basculer_dans_transaction(conn) -> dict:
     _etape("termine")
     return {
         "statut": "migre",
-        "sauvegarde": {"schema": schema, "lignes": lignes},
+        "sauvegarde": {
+            "schema": schema,
+            "lignes": lignes,
+            "non_copiees": non_copiees,
+        },
         "etablissement": sid,
         "instructions": len(instructions),
         "colonnes_school_id_avant": deja,
