@@ -1,0 +1,23 @@
+# --- Application mobile SchoolManager (Capacitor) ---
+# Le contenu assemblé est régénéré par « npm run www »
+www/
+
+# Dépendances et sorties de compilation (jamais versionnées)
+node_modules/
+android/.gradle/
+android/build/
+android/app/build/
+android/.cxx/
+android/local.properties
+android/key.properties
+android/.idea/
+android/app/release/
+android/app/debug/
+*.iml
+
+# Clés de signature : JAMAIS dans le dépôt
+*.jks
+*.keystore
+keystore/
+*.aab
+*.apk

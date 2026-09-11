@@ -1,0 +1,5 @@
+# Le projet Android / Capacitor vit dans « mobile/ ».
+# Il ne doit JAMAIS etre envoye au deploiement web Vercel :
+# il contient un projet Node separe (package.json, node_modules) que
+# Vercel n'a aucune raison d'analyser ni d'installer.
+mobile/

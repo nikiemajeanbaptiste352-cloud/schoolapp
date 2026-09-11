@@ -51,6 +51,17 @@
     } catch (e) { /* stockage indisponible */ }
   }
 
+  /* ---------- Écran de démarrage de l'application mobile ----------
+     Dans l'application Android, l'écran de démarrage natif est masqué
+     dès que la page est prête (données chargées, ou écran d'erreur
+     affiché). Sur le site web, window.SM_MASQUER_DEMARRAGE n'existe
+     pas : cet appel est sans aucun effet. */
+  function masquerEcranDemarrage() {
+    if (typeof window.SM_MASQUER_DEMARRAGE === "function") {
+      try { window.SM_MASQUER_DEMARRAGE(); } catch (e) { /* aucun effet */ }
+    }
+  }
+
   /* ---------- Normalisation /etat → jeu de données SD ---------- */
   function sansId(obj) {
     if (!obj) return null;
@@ -181,6 +192,7 @@
 
   /* ---------- Écran « serveur indisponible » (plus jamais de données fictives) ---------- */
   function afficherIndisponible(titre, message) {
+    masquerEcranDemarrage(); // mobile : ne pas rester sur l'écran de démarrage
     var masque = document.createElement("div");
     masque.style.cssText =
       "position:fixed;inset:0;z-index:9999;background:#f4f6fb;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif";
@@ -238,6 +250,7 @@
     return;
   }
   window.SM_MODE = "api";
+  masquerEcranDemarrage(); // mobile : données chargées, on affiche l'application
 
   /* ---------- Rafraîchissement après écriture API ---------- */
   // Les scripts de page capturent des références vers les tableaux de
