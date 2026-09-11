@@ -11,6 +11,7 @@ Ordre des routes important : l'API est déclarée AVANT le montage statique "/".
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import mimetypes
 import os
 
 from fastapi import FastAPI
@@ -212,5 +213,12 @@ class FrontStatic(StaticFiles):
             return "", None
         return super().lookup_path(norm)
 
+
+# Téléchargement de l'application Android depuis le site (dossier « telecharger/ »).
+# Sans cette déclaration, le type MIME de « .apk » n'est pas toujours connu du
+# système (surtout sous Linux) : Starlette retomberait sur `text/plain` et le
+# navigateur afficherait des caractères illisibles au lieu de télécharger le
+# fichier. Déclaration explicite = comportement identique partout.
+mimetypes.add_type("application/vnd.android.package-archive", ".apk")
 
 app.mount("/", FrontStatic(directory=str(FRONT_DIR), html=True), name="front")

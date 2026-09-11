@@ -64,3 +64,5 @@ temp/
 *.tmp
 .vercel
 .env*
+# apercu local (QR code de test)
+_apercu-telephone/
