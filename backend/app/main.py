@@ -16,6 +16,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -212,6 +213,19 @@ class FrontStatic(StaticFiles):
         if any(s.startswith(".") for s in segs):
             return "", None
         return super().lookup_path(norm)
+
+
+# ---------------------------------------------------------------
+# Lien court de téléchargement de l'application Android
+# ---------------------------------------------------------------
+@app.get("/app", include_in_schema=False)
+def lien_court_application() -> RedirectResponse:
+    """Lien court, mémorisable : /app -> page de téléchargement.
+
+    Pensé pour être tapé à la main sur un téléphone (moins de fautes de
+    frappe que « /telecharger/ »). 307 conserve la méthode d'origine.
+    """
+    return RedirectResponse(url="/telecharger/", status_code=307)
 
 
 # Téléchargement de l'application Android depuis le site (dossier « telecharger/ »).
