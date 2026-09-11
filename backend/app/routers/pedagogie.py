@@ -1,6 +1,9 @@
 """Routes — pédagogie : notes, statistiques et bulletins de classe.
 
 Professeurs : accès limité aux notes des matières qu'ils enseignent.
+Surveillant : aucun accès aux notes. Élève / Parent : uniquement les leurs.
+
+Le calcul du périmètre appartient à `services/perimetre.py`.
 """
 
 from __future__ import annotations
@@ -9,31 +12,26 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
-from app.auth import ROLE_ADMIN, ROLE_PROF, get_current_user, require_roles
+from app.auth import (
+    ROLE_ADMIN,
+    ROLE_PROF,
+    get_current_user,
+    require_roles,
+)
 from app.database import get_db
 from app.models import Eleve, Note, User
-from app.services import sd
+from app.services import perimetre, sd
 
 router = APIRouter(prefix="/api/v1", tags=["pédagogie"])
 
 
 def _matieres_autorisees(db: Session, user: User) -> set[str] | None:
     """None = toutes les matières ; sinon ensemble des ids autorisés."""
-    if user.role == ROLE_ADMIN:
-        return None
-    if user.role == ROLE_PROF and user.enseignant_id:
-        ens = sd.get_enseignant(db, user.enseignant_id)
-        if ens and ens.matiere_id:
-            return {ens.matiere_id}
-        return set()
-    return set()
+    return perimetre.matieres_autorisees(db, user)
 
 
 def _verifier_acces_notes(db: Session, user: User) -> None:
-    if user.role not in (ROLE_ADMIN, ROLE_PROF):
-        raise HTTPException(status_code=403, detail="Accès réservé au corps enseignant.")
-    if user.role == ROLE_PROF and user.enseignant_id is None:
-        raise HTTPException(status_code=403, detail="Aucune fiche enseignant liée.")
+    perimetre.exiger_acces_notes(db, user)
 
 
 # ---------------------------------------------------------------------------
@@ -189,8 +187,21 @@ def stats_evaluation(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
+    """Grille de notes d'une classe — réservée au personnel habilité.
+
+    Elle expose les moyennes de tous les élèves d'une classe : ni un élève, ni
+    un parent, ni un surveillant ne peut l'obtenir (403).
+    """
+    perimetre.exiger_acces_notes(db, user)
+    if sd.get_classe(db, classe) is None:
+        raise HTTPException(status_code=404, detail="Classe introuvable.")
+
+    mats = perimetre.matieres_notes_lecture(db, user)
+
     eleves = sd.eleves_de_classe(db, classe)
     mat_ids = [m.id for m in sd.matieres_de_classe(db, classe)]
+    if mats is not None:
+        mat_ids = [mid for mid in mat_ids if mid in mats]
 
     resultat = []
     for eleve in eleves:
@@ -217,14 +228,34 @@ def bulletins_classe(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
+    """Bulletins d'une classe, réduits au périmètre du compte.
+
+    Un élève ne reçoit que son bulletin, un parent ceux de ses enfants.
+    Demander la classe d'un autre établissement (ou une classe dont aucun
+    élève n'est visible) renvoie 404 / 403.
+    """
     cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
 
+    ids_eleves = perimetre.ids_eleves_autorises(db, user)
     eleves = sd.eleves_de_classe(db, classe_id)
+    if ids_eleves is not None:
+        eleves = [e for e in eleves if e.id in ids_eleves]
+        if not eleves:
+            raise HTTPException(status_code=403, detail="Accès refusé à cette classe.")
+
+    # Un professeur ne voit que les moyennes des matières qu'il enseigne.
+    mats = perimetre.matieres_notes_lecture(db, user)
+    if mats == set():
+        raise HTTPException(status_code=403, detail="Accès réservé au corps enseignant.")
+
     lignes = []
     for eleve in eleves:
         moy = sd.moyennes_eleve(db, eleve.id)
+        par_matiere = moy["parMatiere"]
+        if mats is not None:
+            par_matiere = [p for p in par_matiere if p["matiereId"] in mats]
         rang = sd.rang_eleve(db, eleve.id)
         app = sd.appreciation(moy["generale"])
         lignes.append({
@@ -236,7 +267,7 @@ def bulletins_classe(
             "mention": app["mention"],
             "appreciation": app["texte"],
             "rang": rang,
-            "parMatiere": moy["parMatiere"],
+            "parMatiere": par_matiere,
         })
     return {
         "classe": sd.classe_to_dict(db, cls),

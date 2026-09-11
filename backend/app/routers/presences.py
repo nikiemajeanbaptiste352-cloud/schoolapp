@@ -1,4 +1,9 @@
-"""Routes — présences (consultation élève/parent, pointage par classe)."""
+"""Routes — présences (consultation élève/parent, pointage par classe).
+
+Périmètre de lecture : Administrateur / Professeur / Surveillant voient tous
+les élèves ; Élève et Parent uniquement les leurs. Le pointage est ouvert au
+personnel de vie scolaire (Administrateur, Professeur, Surveillant).
+"""
 
 from __future__ import annotations
 
@@ -8,23 +13,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth import ROLE_ADMIN, ROLE_PARENT, ROLE_PROF, get_current_user, require_roles
+from app.auth import (
+    ROLE_ADMIN,
+    ROLE_PROF,
+    ROLE_SURVEILLANT,
+    get_current_user,
+    require_roles,
+)
 from app.database import get_db
-from app.models import Parent, Presence, User
-from app.services import sd
+from app.models import Presence, User
+from app.services import perimetre, sd
 
 router = APIRouter(prefix="/api/v1", tags=["présences"])
 
 
 def _peut_voir_eleve(db: Session, user: User, eleve_id: str) -> bool:
-    if user.role in (ROLE_ADMIN, ROLE_PROF):
-        return True
-    if user.role == "Élève":
-        return user.eleve_id == eleve_id
-    if user.role == ROLE_PARENT and user.parent_id:
-        parent = db.get(Parent, user.parent_id)
-        return parent is not None and any(e.id == eleve_id for e in parent.enfants)
-    return False
+    """Délègue au périmètre central (rôle effectif, jamais `user.role`)."""
+    return perimetre.peut_voir_eleve(db, user, eleve_id)
 
 
 @router.get("/eleves/{eleve_id}/presences", summary="Liste des présences d'un élève")
@@ -59,11 +64,11 @@ def presences_eleve(
     }
 
 
-@router.post("/presences", summary="Pointer la présence d'une classe (admin/professeur)")
+@router.post("/presences", summary="Pointer la présence d'une classe (admin/professeur/surveillant)")
 def pointer_presences(
     payload: dict,
     db: Session = Depends(get_db),
-    _user=Depends(require_roles(ROLE_ADMIN, ROLE_PROF)),
+    _user=Depends(require_roles(ROLE_ADMIN, ROLE_PROF, ROLE_SURVEILLANT)),
 ) -> dict:
     classe = payload.get("classe")
     jour = date.fromisoformat(payload["date"])

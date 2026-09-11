@@ -107,6 +107,8 @@
     function rangEleve(eleveId) {
       var el = getEleve(eleveId);
       if (!el) return null;
+      // Vue réduite au périmètre du compte : l'API fournit le rang.
+      if (el.rang) return el.rang;
       var camarades = elevesDeClasse(el.classe)
         .map(function (e) { return { id: e.id, moyenne: moyennesEleve(e.id).generale }; })
         .sort(function (a, b) { return b.moyenne - a.moyenne; });
@@ -541,6 +543,8 @@
   function rangEleve(eleveId) {
     var el = getEleve(eleveId);
     if (!el) return null;
+    // Vue réduite au périmètre du compte : l'API fournit le rang.
+    if (el.rang) return el.rang;
     var camarades = elevesDeClasse(el.classe)
       .map(function (e) { return { id: e.id, moyenne: moyennesEleve(e.id).generale }; })
       .sort(function (a, b) { return b.moyenne - a.moyenne; });

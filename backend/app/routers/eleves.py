@@ -1,9 +1,11 @@
 """Routes — élèves : liste, fiche détaillée, création/modification/suppression.
 
-Périmètre par rôle :
-- Administrateur / Professeur : tous les élèves ;
+Périmètre par rôle (rôle **effectif** de l'établissement courant) :
+- Administrateur / Professeur / Surveillant : tous les élèves ;
 - Élève : uniquement sa propre fiche ;
 - Parent : uniquement ses enfants.
+
+Le périmètre est décidé par `services/perimetre.py` (source de vérité unique).
 """
 
 from __future__ import annotations
@@ -17,29 +19,22 @@ from sqlalchemy.orm import Session
 
 from app.auth import (
     ROLE_ADMIN,
-    ROLE_ELEVE,
-    ROLE_PARENT,
-    ROLE_PROF,
     get_current_user,
     require_roles,
 )
 from app.database import get_db
 from app.models import Eleve, Parent, User
-from app.services import sd
+from app.services import perimetre, sd
 
 router = APIRouter(prefix="/api/v1/eleves", tags=["élèves"])
 
 
 def _ids_autorises(db: Session, user: User) -> set[str] | None:
-    """Retourne l'ensemble des ids accessibles, ou None si aucun filtre (tous)."""
-    if user.role in (ROLE_ADMIN, ROLE_PROF):
-        return None
-    if user.role == ROLE_ELEVE and user.eleve_id:
-        return {user.eleve_id}
-    if user.role == ROLE_PARENT and user.parent_id:
-        parent = db.get(Parent, user.parent_id)
-        return {e.id for e in parent.enfants} if parent else set()
-    return set()
+    """Ensemble des ids accessibles, ou None si aucun filtre (tous).
+
+    Délègue au périmètre central : plus aucune comparaison sur `user.role`.
+    """
+    return perimetre.ids_eleves_autorises(db, user)
 
 
 def _eleve_trouve(db: Session, eleve_id: str, user: User) -> Eleve:

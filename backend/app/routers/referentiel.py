@@ -4,6 +4,13 @@ Classes et matières étaient en lecture seule (programme canonique fourni par
 le seed) ; elles sont désormais gérables par l'administrateur (création /
 modification / suppression) afin de pouvoir bootstraper une base vide depuis
 l'interface. Les enseignants sont également gérables par l'administrateur.
+
+Phase 1 — cloisonnement : les lectures ne sont plus « role-blind ».
+`GET /classes/{id}` ne renvoie que les élèves du périmètre du compte, et les
+coordonnées des enseignants (téléphone / email) sont réservées au personnel
+encadrant (Administrateur, Professeur, Surveillant) via
+`perimetre.peut_voir_annuaire`. Les neuf routes d'écriture restent réservées à
+l'Administrateur (`require_roles(ROLE_ADMIN)`).
 """
 
 from __future__ import annotations
@@ -26,9 +33,22 @@ from app.models import (
     classe_matiere,
     enseignant_classe,
 )
-from app.services import sd
+from app.services import perimetre, sd
 
 router = APIRouter(prefix="/api/v1", tags=["référentiel"])
+
+
+def _enseignant_lisible(db: Session, user: User, ens: Enseignant) -> dict:
+    """Fiche enseignant, coordonnées réservées au personnel encadrant.
+
+    Un élève ou un parent n'a pas à recevoir l'annuaire (téléphone / email) :
+    les clés restent présentes mais vides, pour ne pas casser le front.
+    """
+    data = sd.enseignant_to_dict(ens)
+    if not perimetre.peut_voir_annuaire(db, user):
+        data["tel"] = ""
+        data["email"] = ""
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -58,11 +78,13 @@ def liste_classes(
 def detail_classe(
     classe_id: str,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
+    # Un élève / parent n'accède qu'aux classes où il est inscrit.
+    perimetre.exiger_classe_visible(db, user, classe_id)
 
     principal = cls.principal
     matieres = sd.matieres_de_classe(db, classe_id)
@@ -73,12 +95,19 @@ def detail_classe(
         )
     ).scalars().all()
 
+    # Liste nominative réduite au périmètre : un élève / parent ne reçoit que
+    # sa fiche ou celles de ses enfants, jamais la classe entière.
+    ids_eleves = perimetre.ids_eleves_autorises(db, user)
+    eleves = sd.eleves_de_classe(db, classe_id)
+    if ids_eleves is not None:
+        eleves = [e for e in eleves if e.id in ids_eleves]
+
     return {
         **sd.classe_to_dict(db, cls),
         "principalNom": f"{principal.prenom} {principal.nom}" if principal else None,
         "matieres": [sd.matiere_to_dict(m) for m in matieres],
-        "enseignants": [sd.enseignant_to_dict(p) for p in profs],
-        "eleves": [sd.eleve_to_dict(e) for e in sd.eleves_de_classe(db, classe_id)],
+        "enseignants": [_enseignant_lisible(db, user, p) for p in profs],
+        "eleves": [sd.eleve_to_dict(e) for e in eleves],
     }
 
 
@@ -86,11 +115,13 @@ def detail_classe(
 def emploi_du_temps(
     classe_id: str,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     cls = sd.get_classe(db, classe_id)
     if cls is None:
         raise HTTPException(status_code=404, detail="Classe introuvable.")
+    # Un élève / parent n'accède qu'aux classes où il est inscrit.
+    perimetre.exiger_classe_visible(db, user, classe_id)
     return {
         "classe": sd.classe_to_dict(db, cls, effectif=False),
         "jours": sd.JOURS,
@@ -132,25 +163,25 @@ def liste_matieres(
 @router.get("/enseignants", summary="Liste des enseignants")
 def liste_enseignants(
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     sid = sd.sid_ecole(db)
     ens = db.execute(
         select(Enseignant).where(Enseignant.school_id == sid).order_by(Enseignant.id)
     ).scalars().all()
-    return {"enseignants": [sd.enseignant_to_dict(e) for e in ens]}
+    return {"enseignants": [_enseignant_lisible(db, user, e) for e in ens]}
 
 
 @router.get("/enseignants/{enseignant_id}", summary="Détail d'un enseignant")
 def detail_enseignant(
     enseignant_id: str,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     ens = sd.get_enseignant(db, enseignant_id)
     if ens is None:
         raise HTTPException(status_code=404, detail="Enseignant introuvable.")
-    return sd.enseignant_to_dict(ens)
+    return _enseignant_lisible(db, user, ens)
 
 
 # ---------------------------------------------------------------------------

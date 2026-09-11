@@ -115,7 +115,11 @@
         classe: e.classe,
         statut: e.statut,
         inscription: e.inscription,
-        parent: sansId(e.parent)
+        parent: sansId(e.parent),
+        // Rang fourni par l'API lorsque la vue est réduite au périmètre du
+        // compte (élève / parent) : la classe entière n'est alors pas connue
+        // du navigateur, qui ne peut plus le calculer lui-même.
+        rang: e.rang
       };
     });
 

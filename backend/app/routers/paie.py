@@ -28,7 +28,7 @@ from app.auth import ROLE_ADMIN, ROLE_PROF, get_current_user, require_roles
 from app.database import get_db
 from app.models import Classe, Ecole, Enseignant, EnseignantTaux, FichePaie, Matiere, Seance, User
 from app.schemas import MoisIn, SeanceIn, StatutFicheIn, TauxIn
-from app.services import sd
+from app.services import perimetre, sd
 
 router = APIRouter(prefix="/api/v1", tags=["espace enseignant & paie"])
 
@@ -80,8 +80,12 @@ def _devise(db: Session) -> str:
 
 
 def _enseignant_du_prof(db: Session, user: User) -> Enseignant:
-    """Fiche Enseignant liée au compte Professeur courant (sinon 403/404)."""
-    if user.role != ROLE_PROF or not user.enseignant_id:
+    """Fiche Enseignant liée au compte Professeur courant (sinon 403/404).
+
+    Le rôle lu est le **rôle effectif** de l'établissement courant, jamais la
+    colonne historique `users.role`.
+    """
+    if perimetre.role_courant(db, user) != ROLE_PROF or not user.enseignant_id:
         raise HTTPException(
             status_code=403,
             detail="Votre compte n'est pas lié à une fiche enseignant. Contactez l'administration.",
@@ -296,10 +300,11 @@ def annuler_seance(
     seance = db.get(Seance, seance_id)
     if seance is None or seance.school_id != sd.sid_ecole(db):
         raise HTTPException(status_code=404, detail="Séance introuvable.")
-    if user.role == ROLE_PROF:
+    role = perimetre.role_courant(db, user)
+    if role == ROLE_PROF:
         if user.enseignant_id != seance.enseignant_id:
             raise HTTPException(status_code=403, detail="Cette séance ne vous appartient pas.")
-    elif user.role != ROLE_ADMIN:
+    elif role != ROLE_ADMIN:
         raise HTTPException(status_code=403, detail="Droits insuffisants.")
 
     mois = seance.date.strftime("%Y-%m")

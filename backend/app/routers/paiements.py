@@ -1,17 +1,23 @@
-"""Routes — finance : paiements des élèves et encaissement de versements."""
+"""Routes — finance : paiements des élèves et encaissement de versements.
+
+Lecture : Administrateur = tout l'établissement ; Élève / Parent = leurs
+propres paiements uniquement ; Professeur / Surveillant = aucun accès
+(liste vide, jamais celle des autres).
+Écriture : Administrateur seul.
+"""
 
 from __future__ import annotations
 
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import ROLE_ADMIN, get_current_user, require_roles
 from app.database import get_db
-from app.models import Eleve, Paiement, User, Versement
-from app.services import sd
+from app.models import Paiement, User, Versement
+from app.services import perimetre, sd
 
 router = APIRouter(prefix="/api/v1", tags=["finance"])
 
@@ -42,24 +48,30 @@ def _paiement_out(db: Session, paiement: Paiement) -> dict:
     }
 
 
+def _paiements_du_perimetre(db: Session, user: User) -> list[Paiement]:
+    """Paiements lisibles par le compte (aucun pour Professeur / Surveillant)."""
+    ids = perimetre.ids_eleves_finance(db, user)
+    if ids is not None and not ids:
+        return []
+    stmt = select(Paiement).where(Paiement.school_id == sd.sid_ecole(db))
+    if ids is not None:
+        stmt = stmt.where(Paiement.eleve_id.in_(ids))
+    return list(db.execute(stmt).scalars())
+
+
 @router.get("/paiements", summary="Liste des paiements (filtres classe / statut)")
 def liste_paiements(
     classe: str | None = Query(default=None),
     statut: str | None = Query(default=None, description="Payé | Partiellement payé | Impayé"),
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
-    sid = sd.sid_ecole(db)
-    stmt = select(Paiement).where(Paiement.school_id == sid)
+    paiements = _paiements_du_perimetre(db, user)
     if classe:
-        stmt = stmt.join(
-            Eleve,
-            and_(
-                Paiement.eleve_id == Eleve.id,
-                Paiement.school_id == Eleve.school_id,
-            ),
-        ).where(Eleve.classe_id == classe)
-    paiements = db.execute(stmt).scalars().all()
+        paiements = [
+            p for p in paiements
+            if p.eleve is not None and p.eleve.classe_id == classe
+        ]
 
     resultat = []
     for p in paiements:
@@ -73,12 +85,9 @@ def liste_paiements(
 @router.get("/paiements/stats", summary="Synthèse des paiements")
 def stats_paiements(
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
-    sid = sd.sid_ecole(db)
-    paiements = db.execute(
-        select(Paiement).where(Paiement.school_id == sid)
-    ).scalars().all()
+    paiements = _paiements_du_perimetre(db, user)
     compteurs = {"Payé": 0, "Partiellement payé": 0, "Impayé": 0}
     total_attendu = total_encaisse = 0
     for p in paiements:
