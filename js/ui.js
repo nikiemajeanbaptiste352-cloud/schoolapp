@@ -23,6 +23,7 @@
     { key: "grades", lien: "grades.html", icone: "📝", titre: "Notes", groupe: "Pédagogie", roles: ["Administrateur", "Professeur", "Élève", "Parent"] },
     { key: "report-cards", lien: "report-cards.html", icone: "📊", titre: "Bulletins", groupe: "Pédagogie", roles: ["Administrateur", "Professeur", "Élève", "Parent"] },
     { key: "timetable", lien: "timetable.html", icone: "📅", titre: "Emploi du temps", groupe: "Pédagogie", roles: ROLES_TOUS },
+    { key: "vie-scolaire", lien: "vie-scolaire.html", icone: "📋", titre: "Vie scolaire", groupe: "Pédagogie", roles: ["Administrateur", "Professeur", "Surveillant"] },
     { key: "mes-seances", lien: "mes-seances.html", icone: "✍️", titre: "Ma présence", groupe: "Espace enseignant", roles: ["Professeur"] },
     { key: "ma-paie", lien: "ma-paie.html", icone: "💵", titre: "Ma rémunération", groupe: "Espace enseignant", roles: ["Professeur"] },
     { key: "payments", lien: "payments.html", icone: "💰", titre: "Paiements", groupe: "Finance", roles: ["Administrateur", "Élève", "Parent"] },
@@ -384,6 +385,11 @@
       Surveillant: "Emploi du temps des classes.",
       "Élève": "Votre emploi du temps de la semaine.",
       Parent: "L'emploi du temps de votre enfant."
+    },
+    "vie-scolaire": {
+      Administrateur: "Faites l'appel : présence, retard et absence, classe par classe et jour par jour.",
+      Professeur: "Faites l'appel de vos classes, séance par séance.",
+      Surveillant: "Faites l'appel et suivez les absences des classes dont vous avez la charge."
     },
     payments: {
       Administrateur: "Suivez les frais de scolarité, les encaissements et les impayés.",

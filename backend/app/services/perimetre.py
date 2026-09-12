@@ -267,6 +267,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "grades",
         "report-cards",
         "timetable",
+        "vie-scolaire",
         "payments",
         "paie",
         "announcements",
@@ -282,13 +283,16 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "grades",
         "report-cards",
         "timetable",
+        "vie-scolaire",
         "mes-seances",
         "ma-paie",
         "announcements",
         "settings",
     ),
-    # Vie scolaire : élèves, classes et emplois du temps ; ni notes ni argent.
-    # `GET /notes` et `/classes/{id}/bulletins` refusent ce rôle → pas de page.
+    # Vie scolaire : élèves, classes, emplois du temps et appel des présences ;
+    # ni notes ni argent. `GET /notes` et `/classes/{id}/bulletins` refusent
+    # ce rôle → pas de page. Il garde en revanche `presences.ecrire`, d'où
+    # l'écran d'appel (« vie-scolaire »).
     ROLE_SURVEILLANT: (
         "dashboard",
         "students",
@@ -296,6 +300,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "classes",
         "subjects",
         "timetable",
+        "vie-scolaire",
         "announcements",
         "settings",
     ),

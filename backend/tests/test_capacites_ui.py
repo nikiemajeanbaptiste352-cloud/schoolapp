@@ -309,3 +309,50 @@ def test_aucun_texte_pour_un_role_sans_acces():
         for role in sorted(cites - _roles_autorises(page)):
             intrus.append(f"{page}/{role}")
     assert not intrus, f"textes prévus pour des rôles sans accès : {sorted(intrus)}"
+
+
+# ---------------------------------------------------------------------------
+# 5. Écran d'appel — « vie-scolaire »
+# ---------------------------------------------------------------------------
+def test_page_vie_scolaire_suit_l_operation_presences():
+    """L'écran d'appel n'est ouvert qu'aux rôles qui détiennent l'opération.
+
+    `presences.ecrire` était accordé sans qu'aucune page ne permette de s'en
+    servir : l'écran doit exister exactement là où l'opération existe, ni plus
+    (un profil qui ne peut pas écrire n'a rien à y faire) ni moins.
+    """
+    detenteurs = {r for r, ops in OPERATIONS_PAR_ROLE.items() if "presences.ecrire" in ops}
+    porteurs = {r for r, pages in PAGES_PAR_ROLE.items() if "vie-scolaire" in pages}
+    assert porteurs == detenteurs, (
+        f"sans écran : {sorted(detenteurs - porteurs)} | "
+        f"écran sans opération : {sorted(porteurs - detenteurs)}"
+    )
+    assert ROLE_SURVEILLANT in porteurs
+
+
+def test_page_vie_scolaire_existe_et_est_cablee():
+    """Fichiers présents, page déclarée, script chargé, écriture gardée."""
+    html = (RACINE / "pages" / "vie-scolaire.html").read_text(encoding="utf-8")
+    assert 'data-page="vie-scolaire"' in html
+    assert 'data-auth="true"' in html
+    assert 'data-page-js="vie-scolaire.js"' in html
+    # La garde d'écriture porte sur l'opération exacte du serveur.
+    assert 'data-cap="presences.ecrire"' in html
+
+    script = (RACINE / "js" / "vie-scolaire.js").read_text(encoding="utf-8")
+    assert 'SM.pageAutorisee("vie-scolaire"' in script
+    assert "API.pointerPresence(" in script
+    # Les trois statuts acceptés par `POST /api/v1/presences` (P|R|A).
+    assert 'var LIB = { P: "Présent", R: "Retard", A: "Absent" }' in script
+    assert 'var ORDRE = ["P", "R", "A"]' in script
+    # Le payload doit porter les trois clés attendues par la route.
+    assert "classe: classeSel" in script
+    assert "date: jourSel" in script
+
+
+def test_ecran_d_appel_accessible_aux_detenteurs(client, admin_token, prof_token, surveillant_token):
+    """Le serveur publie la page aux trois rôles d'encadrement."""
+    for token in (admin_token, prof_token, surveillant_token):
+        cap = _etat(client, token)["capacites"]
+        assert "vie-scolaire" in cap["pages"], f"{cap['role']} sans écran d'appel"
+        assert "presences.ecrire" in cap["operations"], f"{cap['role']} sans droit de pointage"
