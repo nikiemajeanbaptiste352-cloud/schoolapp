@@ -24,7 +24,7 @@
                         <div class="subtitle">Enregistrez les notes d'une évaluation par classe et par matière.</div>
                     </div>
                     <div class="header-actions">
-                        <button class="btn btn-primary" id="btnSave">💾 Enregistrer les notes</button>
+                        <button class="btn btn-primary" id="btnSave" data-cap="notes.ecrire">💾 Enregistrer les notes</button>
                     </div>
                 </div>
 
@@ -71,7 +71,20 @@
 
                     <!-- Statistiques & classement -->
                     <div style="min-width:280px;max-width:340px;width:100%">
-                        <div class="card card-pad mb-16">
+                        <!-- Synthèse personnelle : profils à périmètre réduit (élève, parent) -->
+                        <div class="card card-pad mb-16" id="cartePerso" style="display:none">
+                            <h3 class="mb-16" style="font-size:15px" id="titrePerso">📊 Synthèse de l'élève</h3>
+                            <div class="info-grid" style="grid-template-columns:1fr 1fr;gap:10px">
+                                <div class="info-cell" style="text-align:center;grid-column:1/-1">
+                                    <div class="k">Moyenne générale</div>
+                                    <div class="v" id="persoMoyenne" style="font-size:32px;color:var(--primary)">—</div>
+                                </div>
+                                <div class="info-cell"><div class="k">🏅 Rang</div><div class="v" id="persoRang">—</div></div>
+                                <div class="info-cell"><div class="k">💬 Mention</div><div class="v" id="persoMention">—</div></div>
+                            </div>
+                            <p class="text-xs text-muted mt-8">Choisissez une matière et une évaluation pour consulter le détail des notes.</p>
+                        </div>
+                        <div class="card card-pad mb-16" id="carteStatsEval">
                             <h3 class="mb-16" style="font-size:15px">📊 Statistiques de l'évaluation</h3>
                             <div class="info-grid" style="grid-template-columns:1fr 1fr;gap:10px">
                                 <div class="info-cell" style="text-align:center;grid-column:1/-1">
@@ -83,7 +96,7 @@
                                 <div class="info-cell" style="grid-column:1/-1"><div class="k">Élèves notés</div><div class="v" id="statCompteur">0</div></div>
                             </div>
                         </div>
-                        <div class="card card-pad">
+                        <div class="card card-pad" id="carteClassement">
                             <h3 class="mb-8" style="font-size:15px">🏆 Classement provisoire</h3>
                             <p class="text-xs text-muted mb-8">Basé sur la note saisie ci-contre.</p>
                             <div id="listeRangs"></div>

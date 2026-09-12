@@ -50,12 +50,16 @@
   var ecoleConfiguree = !!(SD.ecole && SD.ecole.nom);
 
   /* ---------- Session ---------- */
+  // Identité : le serveur fait foi (`moi` + `capacites.role`), le stockage
+  // local n'est qu'un repli d'affichage.
   var sess = SM.getSession() || {};
-  var roleLabel = { Administrateur: "🛡️ Administrateur", Professeur: "👨‍🏫 Professeur", Élève: "👨‍🎓 Élève", Parent: "👨‍👩‍👧 Parent" };
+  var moi = window.SM_MOI || {};
+  var roleCourant = SM.roleCourant() || sess.role || "";
+  var roleLabel = { Administrateur: "🛡️ Administrateur", Professeur: "👨‍🏫 Professeur", Surveillant: "📋 Surveillant", Élève: "👨‍🎓 Élève", Parent: "👨‍👩‍👧 Parent" };
   el("sessionRows").innerHTML = lignes([
-    ["Connecté en tant que", SM.escapeHtml(sess.nom || "—")],
-    ["Adresse email", SM.escapeHtml(sess.email || "—")],
-    ["Rôle", roleLabel[sess.role] || SM.escapeHtml(sess.role || "—")]
+    ["Connecté en tant que", SM.escapeHtml(moi.nom || sess.nom || "—")],
+    ["Adresse email", SM.escapeHtml(moi.email || sess.email || "—")],
+    ["Rôle", roleLabel[roleCourant] || SM.escapeHtml(roleCourant || "—")]
   ]);
 
   /* ---------- Comptes utilisateurs (réservé admin) ---------- */
@@ -104,7 +108,7 @@
     });
   }
 
-  if (sess && sess.role === "Administrateur") {
+  if (SM.peut("membres.ecrire")) {
     var comptesCard = el("comptesCard");
     if (comptesCard) comptesCard.style.display = "";
     chargerComptes();
@@ -181,7 +185,7 @@
   }
 
   /* ---------- Modification de l'établissement (admin) ---------- */
-  if (sess && sess.role === "Administrateur") {
+  if (SM.peut("ecole.ecrire")) {
     var btnEditEcole = el("btnEditEcole");
     if (btnEditEcole) btnEditEcole.style.display = "";
 

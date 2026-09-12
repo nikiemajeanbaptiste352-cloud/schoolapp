@@ -10,8 +10,24 @@
 
   function el(id) { return document.getElementById(id); }
 
-  var sess = SM.getSession() || {};
-  var estAdmin = sess.role === "Administrateur";
+  // Droit d'écriture décidé par le serveur (capacités de GET /api/v1/etat),
+  // et non plus par le rôle mémorisé dans le navigateur : ce dernier est
+  // modifiable à la main et seule l'API reste juge, mais l'interface doit
+  // refléter la même règle (voir backend/app/services/perimetre.py).
+  var estAdmin = SM.peut("classes.ecrire");
+  var role = SM.roleCourant();
+  var estProf = role === "Professeur";
+  var peutSaisirNotes = SM.peut("notes.ecrire");
+  // Un lien n'est proposé que si la page cible fait partie des pages du rôle
+  // (ex. le surveillant n'ouvre pas la saisie des notes) : voir
+  // perimetre.PAGES_PAR_ROLE côté serveur.
+  var peutNotes = SM.pageAutorisee("grades", role);
+  var peutEdt = SM.pageAutorisee("timetable", role);
+  // Fiche enseignant du compte connecté : sert uniquement à signaler « mes
+  // classes » dans les compteurs, sans retirer la vue complète accordée par
+  // le serveur (les professeurs et surveillants voient toutes les classes).
+  var maFiche = estProf ? SM.monEnseignant(SD) : null;
+  var mesClasses = maFiche ? maFiche.classes : [];
   var editId = null;   // code de la classe en édition (null = création)
   var deleteId = null;
 
@@ -32,6 +48,17 @@
   function compteurs() {
     var nbCollege = SD.classes.filter(function (c) { return c.cycle === "Collège"; }).length;
     var nbLycee = SD.classes.filter(function (c) { return c.cycle === "Lycée"; }).length;
+    if (estProf && maFiche) {
+      // Le professeur garde la vue complète, mais son propre volume de service
+      // est mis en avant : c'est ce qu'il vient chercher ici.
+      el("miniCounts").innerHTML =
+        '<div class="mini-stat"><div class="v">' + mesClasses.length + '</div><div class="l">Mes classes</div></div>' +
+        '<div class="mini-stat"><div class="v">' + SD.classes.length + '</div><div class="l">Classes</div></div>' +
+        '<div class="mini-stat"><div class="v">' + nbCollege + '</div><div class="l">Collège</div></div>' +
+        '<div class="mini-stat"><div class="v">' + nbLycee + '</div><div class="l">Lycée</div></div>';
+      el("countBadge").textContent = "Année scolaire " + (SD.ecole && SD.ecole.annee ? SD.ecole.annee : "—");
+      return;
+    }
     el("miniCounts").innerHTML =
       '<div class="mini-stat"><div class="v">' + SD.classes.length + '</div><div class="l">Classes</div></div>' +
       '<div class="mini-stat"><div class="v">' + nbCollege + '</div><div class="l">Collège</div></div>' +
@@ -47,21 +74,30 @@
       var effectif = SD.elevesDeClasse(c.id).length;
       var principal = SD.getEnseignant(c.principal);
       var nbM = SD.matieresDeClasse(c.id).length;
+      var mienne = mesClasses.indexOf(c.id) !== -1;
       var badgeCycle = c.cycle === "Lycée"
         ? '<span class="badge badge-warning">Lycée</span>'
         : '<span class="badge badge-info">Collège</span>';
+      var badgeMienne = mienne ? '<span class="badge badge-success">Ma classe</span>' : "";
       var btnAdmin = estAdmin
         ? '<button class="btn-icon primary-h" title="Modifier" data-edit="' + c.id + '">✏️</button>' +
           '<button class="btn-icon danger" title="Supprimer" data-del="' + c.id + '">🗑️</button>'
         : "";
+      var lienNotes = peutNotes
+        ? '<a class="btn btn-outline btn-sm" href="grades.html?classe=' + c.id + '" title="' +
+          (peutSaisirNotes ? "Saisir les notes" : "Consulter les notes") + '">📝 Notes</a>'
+        : "";
+      var lienEdt = peutEdt
+        ? '<a class="btn btn-ghost btn-sm" href="timetable.html?classe=' + c.id + '" title="Emploi du temps">📅 EDT</a>'
+        : "";
       return (
-        '<div class="card class-card">' +
+        '<div class="card class-card"' + (mienne ? ' style="border-color:var(--success)"' : "") + ">" +
         '  <div class="c-top">' +
         "    <div>" +
         '      <div class="c-name">' + SM.escapeHtml(c.nom) + "</div>" +
         '      <div class="text-sm text-muted mt-4">Salle ' + SM.escapeHtml(c.salle || "—") + "</div>" +
         "    </div>" +
-        "    " + badgeCycle +
+        "    " + badgeMienne + badgeCycle +
         "  </div>" +
         '  <div class="c-counts">' +
         '    <span class="chip">👨‍🎓 ' + effectif + " élève" + (effectif > 1 ? "s" : "") + "</span>" +
@@ -74,13 +110,18 @@
         "  </div>" +
         '  <div class="flex" style="gap:8px;flex-wrap:wrap;margin-top:4px">' +
         '    <button class="btn btn-outline btn-sm" data-detail="' + c.id + '">👥 Détails</button>' +
-        '    <a class="btn btn-outline btn-sm" href="grades.html?classe=' + c.id + '" title="Saisir les notes">📝 Notes</a>' +
-        '    <a class="btn btn-ghost btn-sm" href="timetable.html?classe=' + c.id + '" title="Emploi du temps">📅 EDT</a>' +
+        lienNotes +
+        lienEdt +
         btnAdmin +
         "  </div>" +
         "</div>"
       );
     }).join("");
+    if (!SD.classes.length) {
+      el("classesGrid").innerHTML =
+        '<div class="empty-state" style="grid-column:1/-1"><div class="e-ico">🏫</div><h4>Aucune classe</h4>' +
+        "<p>Aucune classe n'est rattachée à cet établissement.</p></div>";
+    }
   }
   render();
 

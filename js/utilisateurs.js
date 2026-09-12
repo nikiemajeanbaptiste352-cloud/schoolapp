@@ -47,11 +47,11 @@
     suspendu: { libelle: "Suspendu", classe: "badge-danger" }
   };
 
-  /* ---------- Garde : page réservée à la direction ---------- */
-  var session = SM.getSession();
-  if (!session || session.role !== "Administrateur") {
-    if (window.API) window.API.deconnexion();
-    try { sessionStorage.removeItem("sm_session"); } catch (e) { /* ignore */ }
+  /* ---------- Garde : page réservée à la direction ----------
+     Décision du serveur (capacités de GET /api/v1/etat). Auparavant tout
+     autre profil était DÉCONNECTÉ ; on se contente désormais de le renvoyer
+     au tableau de bord, sa session restant valable. */
+  if (!SM.peut("membres.ecrire")) {
     window.location.replace("dashboard.html");
     return;
   }

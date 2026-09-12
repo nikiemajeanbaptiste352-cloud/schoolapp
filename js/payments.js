@@ -8,6 +8,14 @@
   var SM = window.SM;
   var SD = window.SD;
 
+  // Droit d'encaissement décidé par le serveur (capacités de GET /api/v1/etat) :
+  // un élève ou un parent consulte ses paiements, il n'encaisse pas.
+  var peutEncaisser = SM.peut("finance.ecrire");
+  // Périmètre réduit (élève, parent) : les totaux parlent d'un dossier
+  // personnel de scolarité, pas de la caisse de l'établissement.
+  var estFamille = SM.porteeEleves() !== "tous";
+  var role = SM.roleCourant();
+
   function el(id) { return document.getElementById(id); }
 
   /* ---------- Remplissage sélecteur d'élèves ---------- */
@@ -41,18 +49,31 @@
     });
     var reste = attendu - encaisse;
     var taux = attendu ? Math.round((encaisse / attendu) * 100) : 0;
+    var libelles = estFamille
+      ? {
+        attendu: role === "Parent" ? "Frais de scolarité" : "Mes frais de scolarité",
+        encaisse: "Déjà versé",
+        reste: role === "Parent" ? "Solde à payer" : "Mon solde à payer",
+        taux: "Progression"
+      }
+      : { attendu: "Total attendu", encaisse: "Total encaissé", reste: "Reste à recouvrer", taux: "Taux de recouvrement" };
     el("summaryCards").innerHTML =
-      '<div class="stat-card"><div class="stat-ico blue">📋</div><div><div class="stat-value">' + SM.formatFCFA(attendu) + '</div><div class="stat-label">Total attendu</div></div></div>' +
-      '<div class="stat-card"><div class="stat-ico green">💵</div><div><div class="stat-value">' + SM.formatFCFA(encaisse) + '</div><div class="stat-label">Total encaissé</div></div></div>' +
-      '<div class="stat-card"><div class="stat-ico red">⏳</div><div><div class="stat-value">' + SM.formatFCFA(reste) + '</div><div class="stat-label">Reste à recouvrer</div></div></div>' +
-      '<div class="stat-card"><div class="stat-ico orange">📈</div><div><div class="stat-value">' + taux + '%</div><div class="stat-label">Taux de recouvrement</div></div></div>';
+      '<div class="stat-card"><div class="stat-ico blue">📋</div><div><div class="stat-value">' + SM.formatFCFA(attendu) + '</div><div class="stat-label">' + libelles.attendu + '</div></div></div>' +
+      '<div class="stat-card"><div class="stat-ico green">💵</div><div><div class="stat-value">' + SM.formatFCFA(encaisse) + '</div><div class="stat-label">' + libelles.encaisse + '</div></div></div>' +
+      '<div class="stat-card"><div class="stat-ico red">⏳</div><div><div class="stat-value">' + SM.formatFCFA(reste) + '</div><div class="stat-label">' + libelles.reste + '</div></div></div>' +
+      '<div class="stat-card"><div class="stat-ico orange">📈</div><div><div class="stat-value">' + taux + '%</div><div class="stat-label">' + libelles.taux + '</div></div></div>';
   }
 
   /* ---------- Rendu tableau ---------- */
   function render(liste) {
     var tbody = el("tableBody");
+    // Colonnes retirées de l'écran : « Élève » quand un seul dossier est
+    // visible, « Action » quand on n'a pas le droit d'encaisser.
+    var masquerEleve = estFamille;
+    var masquerAction = !peutEncaisser;
+    var nbCols = 9 - (masquerEleve ? 1 : 0) - (masquerAction ? 1 : 0);
     if (!liste.length) {
-      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="e-ico">💰</div><h4>Aucun dossier trouvé</h4></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="' + nbCols + '"><div class="empty-state"><div class="e-ico">💰</div><h4>Aucun dossier trouvé</h4></div></td></tr>';
       el("countLabel").textContent = "0 dossier";
       return;
     }
@@ -81,11 +102,23 @@
         '  <td class="text-sm">' + (dernier
           ? SM.fmtDate(dernier.date) + " · " + SM.formatFCFA(dernier.montant)
           : '<span class="text-muted">—</span>') + "</td>" +
-        '  <td style="text-align:center"><button class="btn-icon primary-h" title="Encaisser" data-pay="' + e.id + '">💵</button></td>' +
+        '  <td style="text-align:center">' + (peutEncaisser
+          ? '<button class="btn-icon primary-h" title="Encaisser" data-pay="' + e.id + '">💵</button>'
+          : '<span class="text-muted">—</span>') + "</td>" +
         "</tr>"
       );
     }).join("");
     el("countLabel").textContent = liste.length + " dossier" + (liste.length > 1 ? "s" : "") + " de paiement";
+
+    var ths = document.querySelectorAll("table.data thead th");
+    if (masquerEleve && ths.length > 0) ths[0].style.display = "none";
+    if (masquerAction && ths.length > 8) ths[8].style.display = "none";
+    var tds = tbody.querySelectorAll("tr > td");
+    for (var i = 0; i < tds.length; i++) {
+      var pos = i % 9;
+      if (masquerEleve && pos === 0) tds[i].style.display = "none";
+      if (masquerAction && pos === 8) tds[i].style.display = "none";
+    }
   }
 
   function actualiser() {
@@ -124,6 +157,7 @@
   document.addEventListener("click", function (e) {
     var btn = e.target.closest('[data-open="modalPay"]');
     if (btn) {
+      if (!peutEncaisser) { SM.toast("Consultation seule : vous n'avez pas le droit d'encaisser.", "warning"); return; }
       el("fEleve").value = SD.eleves.length ? SD.eleves[0].id : "";
       ouvrirPay(el("fEleve").value);
     }
@@ -136,11 +170,20 @@
 
   el("tableBody").addEventListener("click", function (e) {
     var btn = e.target.closest("[data-pay]");
-    if (btn) ouvrirPay(btn.getAttribute("data-pay"));
+    if (btn) {
+      if (!peutEncaisser) { SM.toast("Consultation seule : vous n'avez pas le droit d'encaisser.", "warning"); return; }
+      ouvrirPay(btn.getAttribute("data-pay"));
+    }
   });
 
   /* ---------- Enregistrement d'un versement ---------- */
   el("btnSavePay").addEventListener("click", function () {
+    // Encaissement réservé aux profils disposant de « finance.ecrire »
+    // (décision du serveur, voir perimetre.py).
+    if (!peutEncaisser) {
+      SM.toast("Consultation seule : vous n'avez pas le droit d'encaisser.", "warning");
+      return;
+    }
     var eleveId = el("fEleve").value;
     var montant = parseInt(el("fMontant").value, 10);
     var date = el("fDate").value;

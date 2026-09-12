@@ -24,6 +24,13 @@
   });
   if (params.get("eleve")) selEleve.value = params.get("eleve");
 
+  /* Périmètre réduit (élève, parent) : un seul bulletin consultable →
+     le sélecteur d'élève disparaît, le bulletin s'affiche directement.
+     Aucun élève visible (périmètre vide) : le sélecteur reste caché. */
+  var estFamille = SM.porteeEleves() !== "tous";
+  if (estFamille && selEleve.parentNode) selEleve.parentNode.style.display = "none";
+  if (!selEleve.value && SD.eleves.length) selEleve.value = SD.eleves[0].id;
+
   function virgule(n) { return n.toFixed(2).replace(".", ","); }
 
   /* ---------- Génération du bulletin ---------- */

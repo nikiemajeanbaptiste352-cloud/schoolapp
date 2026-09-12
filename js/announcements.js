@@ -12,13 +12,19 @@
   var deleteId = null;
 
   /* ---------- Rendu ---------- */
+  // Suppression réservée aux profils disposant de « annonces.ecrire » :
+  // le bouton 🗑️ n'est même pas généré pour les autres rôles.
+  var peutEcrireAnnonce = SM.peut("annonces.ecrire");
+
   function render() {
     var liste = SD.annonces.slice().sort(function (a, b) {
       return (a.date < b.date) ? 1 : (a.date > b.date ? -1 : 0);
     });
     if (!liste.length) {
       el("listAnnounces").innerHTML = '<div class="empty-state"><div class="e-ico">📢</div><h4>Aucune annonce publiée</h4>' +
-        "<p>Cliquez sur « Publier une annonce » pour créer la première.</p></div>";
+        "<p>" + (peutEcrireAnnonce
+          ? "Cliquez sur « Publier une annonce » pour créer la première."
+          : "Aucune communication n'a encore été publiée par l'établissement.") + "</p></div>";
       return;
     }
     el("listAnnounces").innerHTML = liste.map(function (a) {
@@ -29,7 +35,9 @@
         '  <div class="a-title">' +
         (a.important ? '<span class="badge badge-danger">🔥 Important</span>' : "") +
         '    <span>' + SM.escapeHtml(a.titre) + "</span>" +
-        '    <button class="btn-icon danger" style="margin-left:auto" title="Supprimer" data-del="' + a.id + '">🗑️</button>' +
+        (peutEcrireAnnonce
+          ? '    <button class="btn-icon danger" style="margin-left:auto" title="Supprimer" data-del="' + a.id + '">🗑️</button>'
+          : "") +
         "  </div>" +
         '  <div class="a-body">' + SM.escapeHtml(a.contenu) + "</div>" +
         '  <div class="a-meta">' +
@@ -68,7 +76,14 @@
     if (!contenu) { el("fContenu").classList.add("invalid"); el("errContenu").classList.add("show"); ok = false; }
     if (!ok) { SM.toast("Veuillez compléter les champs obligatoires.", "error"); return; }
 
-    var sess = SM.getSession();
+    // Publication réservée aux profils disposant de « annonces.ecrire » :
+    // décision du serveur, répercutée aussi sur le bouton (data-cap).
+    if (!SM.peut("annonces.ecrire")) {
+      SM.toast("Consultation seule : vous n'avez pas le droit de publier.", "warning");
+      return;
+    }
+
+    var moi = window.SM_MOI || {};
     var bouton = el("btnSaveAnnounce");
     bouton.disabled = true;
     bouton.textContent = "Publication…";
@@ -77,7 +92,7 @@
       contenu: contenu,
       categorie: el("fCategorie").value,
       date: new Date().toISOString().slice(0, 10),
-      auteur: sess && sess.nom ? sess.nom : "Administration",
+      auteur: moi.nom || "Administration",
       important: el("fImportant").checked
     }).then(function (annonce) {
       SD.annonces.push(annonce);

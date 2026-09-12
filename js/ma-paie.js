@@ -11,9 +11,10 @@
   var SM = window.SM;
   var API = window.API;
 
-  var sess = SM.getSession();
-  if (!sess || sess.role !== "Professeur") {
-    window.location.replace("../index.html");
+  // Accès décidé par le serveur (capacités de GET /api/v1/etat) : le rôle
+  // mémorisé dans le navigateur n'est plus la référence.
+  if (!SM.pageAutorisee("ma-paie", SM.roleCourant())) {
+    window.location.replace("dashboard.html");
     return;
   }
 

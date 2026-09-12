@@ -11,6 +11,17 @@
   var editId = null;
   var deleteId = null;
 
+  // Droit d'écriture décidé par le serveur (capacités de GET /api/v1/etat).
+  var peutEcrire = SM.peut("enseignants.ecrire");
+
+  // Un professeur retrouve sa propre fiche dans l'annuaire : on la signale au
+  // lieu de la lui laisser chercher. La liste complète est conservée (le
+  // serveur accorde l'annuaire au personnel encadrant).
+  var role = SM.roleCourant();
+  var estProf = role === "Professeur";
+  var maFiche = estProf ? SM.monEnseignant(SD) : null;
+  var monId = maFiche ? maFiche.id : null;
+
   function el(id) { return document.getElementById(id); }
 
   /* ---------- Remplissage matière + classes ---------- */
@@ -48,6 +59,19 @@
     var actifs = profs.filter(function (p) { return p.statut === "Actif"; }).length;
     var matieres = {};
     profs.forEach(function (p) { matieres[p.matiere] = true; });
+    // Un professeur suit ses propres classes : les compteurs parlent de lui,
+    // pas de la gestion administrative de l'établissement.
+    if (estProf && maFiche) {
+      var mesEleves = maFiche.classes.reduce(function (n, cid) {
+        return n + SD.elevesDeClasse(cid).length;
+      }, 0);
+      el("miniCounts").innerHTML =
+        '<div class="mini-stat"><div class="v">' + profs.length + '</div><div class="l">Enseignants</div></div>' +
+        '<div class="mini-stat"><div class="v">' + maFiche.classes.length + '</div><div class="l">Mes classes</div></div>' +
+        '<div class="mini-stat"><div class="v">' + mesEleves + '</div><div class="l">Mes élèves</div></div>' +
+        '<div class="mini-stat"><div class="v">' + Object.keys(matieres).length + '</div><div class="l">Matières couvertes</div></div>';
+      return;
+    }
     el("miniCounts").innerHTML =
       '<div class="mini-stat"><div class="v">' + profs.length + '</div><div class="l">Enseignants</div></div>' +
       '<div class="mini-stat"><div class="v">' + actifs + '</div><div class="l">Actifs</div></div>' +
@@ -60,7 +84,7 @@
     var tbody = el("tableBody");
     if (!liste.length) {
       tbody.innerHTML =
-        '<tr><td colspan="7"><div class="empty-state"><div class="e-ico">🔍</div><h4>Aucun enseignant trouvé</h4>' +
+        '<tr><td colspan="' + (peutEcrire ? 7 : 6) + '"><div class="empty-state"><div class="e-ico">🔍</div><h4>Aucun enseignant trouvé</h4>' +
         "<p>Ajustez votre recherche ou ajoutez un nouvel enseignant.</p></div></td></tr>";
       el("countLabel").textContent = "0 enseignant";
       return;
@@ -74,24 +98,33 @@
             return '<span class="chip-plain">' + SM.escapeHtml(c ? c.nom : cid) + "</span>";
           }).join(" ")
         : '<span class="text-muted text-sm">—</span>';
+      // Actions d'écriture : uniquement si le serveur les accorde.
+      var actions = peutEcrire
+        ? '    <button class="btn-icon primary-h" title="Modifier" data-edit="' + p.id + '">✏️</button>' +
+          '    <button class="btn-icon danger" title="Supprimer" data-del="' + p.id + '">🗑️</button>'
+        : '<span class="text-muted text-sm">—</span>';
+      var badgeMoi = p.id === monId ? ' <span class="badge badge-success">Vous</span>' : "";
       return (
         "<tr>" +
         '  <td class="fw-600">' + SM.escapeHtml(p.id) + "</td>" +
         "  <td><div class='cell-user'>" + SM.avatarHTML(nomC, "sm") +
-        '    <div><div class="names">' + SM.escapeHtml(p.nom) + " " + SM.escapeHtml(p.prenom) +
+        '    <div><div class="names">' + SM.escapeHtml(p.nom) + " " + SM.escapeHtml(p.prenom) + badgeMoi +
         '      </div><div class="sub">' + SM.escapeHtml(p.email) + "</div></div></div></td>" +
         '  <td><div class="flex-center" style="justify-content:flex-start">' + (m ? m.icone + ' <span class="fw-600">' + SM.escapeHtml(m.nom) + "</span>" : "—") + "</div></td>" +
         '  <td><div class="c-counts" style="gap:4px">' + chipsCls + "</div></td>" +
         "  <td>" + SM.escapeHtml(p.tel) + "</td>" +
         "  <td>" + SM.badgeStatut(p.statut) + "</td>" +
         '  <td><div class="row-actions" style="justify-content:center">' +
-        '    <button class="btn-icon primary-h" title="Modifier" data-edit="' + p.id + '">✏️</button>' +
-        '    <button class="btn-icon danger" title="Supprimer" data-del="' + p.id + '">🗑️</button>' +
+        actions +
         "  </div></td>" +
         "</tr>"
       );
     }).join("");
     el("countLabel").textContent = liste.length + " enseignant" + (liste.length > 1 ? "s" : "") + " affiché" + (liste.length > 1 ? "s" : "");
+    // Sans droit d'écriture, la colonne « Actions » n'afficherait qu'un
+    // tiret : on la masque avec ses cellules pour ne pas décaler le tableau.
+    var tdsActions = tbody.querySelectorAll("tr > td:nth-child(7)");
+    for (var j = 0; j < tdsActions.length; j++) tdsActions[j].style.display = peutEcrire ? "" : "none";
   }
 
   function actualiser() {
@@ -108,6 +141,10 @@
     });
     render(filtre);
   }
+
+  // En-tête « Actions » : la page le masque par défaut, on ne le montre que
+  // si le serveur accorde l'écriture (l'annuaire peut être servi en lecture).
+  if (el("thActions")) el("thActions").style.display = peutEcrire ? "" : "none";
 
   compteurs();
   render(profs);

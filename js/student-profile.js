@@ -8,11 +8,15 @@
   var SM = window.SM;
   var SD = window.SD;
 
-  /* ---------- Identification de l'élève ---------- */
+  /* ---------- Identification de l'élève ----------
+     `?id=` vient d'une liste déjà filtrée par le serveur. Sans identifiant
+     (ou identifiant hors périmètre) on retombe sur le PREMIER élève visible
+     — pour un parent, c'est son enfant ; l'ancien repli codé en dur sur
+     « EL001 » désignait un élève qui n'est pas forcément dans son périmètre. */
   var params = new URLSearchParams(window.location.search);
-  var eleve = SD.getEleve(params.get("id")) || SD.getEleve("EL001");
+  var eleve = SD.getEleve(params.get("id")) || SD.eleves[0] || null;
   if (!eleve) {
-    document.getElementById("profileHead").innerHTML = '<div class="alert alert-danger">Élève introuvable.</div>';
+    document.getElementById("profileHead").innerHTML = '<div class="alert alert-danger">Aucun élève accessible avec votre profil.</div>';
     return;
   }
 
@@ -60,6 +64,61 @@
       document.getElementById("pane-" + o).classList.toggle("active", o === cible);
     });
   });
+
+  /* ---------- Onglets autorisés pour ce rôle ----------
+     Le serveur ne transmet que les données du périmètre (voir
+     backend/app/services/perimetre.py) : un onglet qui n'aurait rien à
+     afficher est masqué. Un Surveillant n'a par exemple ni notes ni
+     paiements, un élève n'a pas accès à l'annuaire des parents. */
+  var roleFiche = SM.roleCourant();
+  var ACCES_ONGLETS = {
+    notes: ["Administrateur", "Professeur", "Élève", "Parent"],
+    bulletins: ["Administrateur", "Professeur", "Élève", "Parent"],
+    paiements: ["Administrateur", "Élève", "Parent"],
+    presences: ["Administrateur", "Professeur", "Surveillant", "Élève", "Parent"],
+    parent: ["Administrateur", "Professeur", "Surveillant"]
+  };
+  function ongletAutorise(o) {
+    var liste = ACCES_ONGLETS[o];
+    return !liste || liste.indexOf(roleFiche) !== -1;
+  }
+  var premierOnglet = null;
+  onglets.forEach(function (o) {
+    var ong = document.querySelector('.tab[data-tab="' + o + '"]');
+    var pane = document.getElementById("pane-" + o);
+    if (!ongletAutorise(o)) {
+      // Masqué (et non retiré) : les écouteurs ci-dessus restent valides.
+      if (ong) ong.style.display = "none";
+      if (pane) pane.style.display = "none";
+      if (pane) pane.classList.remove("active");
+    } else if (!premierOnglet) {
+      premierOnglet = o;
+    }
+  });
+  if (premierOnglet) {
+    onglets.forEach(function (o) {
+      var actif = o === premierOnglet && ongletAutorise(o);
+      var ong = document.querySelector('.tab[data-tab="' + o + '"]');
+      var pane = document.getElementById("pane-" + o);
+      if (ong) ong.classList.toggle("active", actif);
+      if (pane) pane.classList.toggle("active", actif);
+    });
+  }
+  var btnBulletin = document.getElementById("btnBulletin");
+  if (btnBulletin && !ongletAutorise("bulletins")) btnBulletin.style.display = "none";
+
+  /* ---------- Libellés des actions selon le profil ----------
+     Un parent n'ouvre pas « la fiche de l'élève », il ouvre celle de son
+     enfant ; le bouton de retour ne le ramène pas à un annuaire. */
+  var btnRetour = document.getElementById("btnRetour");
+  if (btnRetour) {
+    if (roleFiche === "Parent") btnRetour.textContent = "← Retour à mes enfants";
+    else if (roleFiche === "Élève") btnRetour.textContent = "← Retour";
+  }
+  if (btnBulletin) {
+    if (roleFiche === "Parent") btnBulletin.textContent = "📊 Voir ses bulletins";
+    else if (roleFiche === "Élève") btnBulletin.textContent = "📊 Mon bulletin";
+  }
 
   /* ---------- Onglet 📊 Notes ---------- */
   function mentionBadge(mention) {

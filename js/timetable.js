@@ -13,13 +13,26 @@
 
   /* ---------- Sélecteur de classe ---------- */
   var selClasse = el("selClasse");
-  SD.classes.forEach(function (c) {
+
+  /* Périmètre réduit (élève, parent) : une seule classe consultable →
+     la structure de l'établissement n'est pas proposée, seule la classe de
+     l'élève visible reste sélectionnable (et le sélecteur est masqué). */
+  var estFamille = SM.porteeEleves() !== "tous";
+  var classesListe = estFamille
+    ? SD.classes.filter(function (c) {
+      return SD.eleves.some(function (e) { return e.classe === c.id; });
+    })
+    : SD.classes;
+
+  classesListe.forEach(function (c) {
     var o = document.createElement("option");
     o.value = c.id;
     o.textContent = c.nom + " — " + c.cycle;
     selClasse.appendChild(o);
   });
   if (params.get("classe")) selClasse.value = params.get("classe");
+  if (!selClasse.value && selClasse.options.length) selClasse.value = selClasse.options[0].value;
+  if (estFamille && selClasse.parentNode) selClasse.parentNode.style.display = "none";
 
   /* ---------- Rendu ---------- */
   function couleurMatiere(matId) {

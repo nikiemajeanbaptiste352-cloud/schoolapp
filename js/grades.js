@@ -10,6 +10,17 @@
 
   function el(id) { return document.getElementById(id); }
 
+  /* ---------- Rôle courant ----------
+     Décisions issues du serveur (jamais de sessionStorage) :
+       - notes.ecrire  → Administrateur, Professeur : saisie complète
+       - portee        → élève/parent = un seul dossier : page de consultation */
+  var role = SM.roleCourant();
+  var estFamille = SM.porteeEleves() !== "tous";
+  // Saisie réservée aux profils disposant de l'opération « notes.ecrire »
+  // (Administrateur, Professeur) : décision du serveur, répercutée ici.
+  var peutSaisirNotes = SM.peut("notes.ecrire");
+  var lectureSeule = !peutSaisirNotes;
+
   var params = new URLSearchParams(window.location.search);
 
   /* ---------- Remplissage des sélecteurs ---------- */
@@ -17,13 +28,23 @@
   var selMatiere = el("selMatiere");
   var selEval = el("selEval");
 
-  SD.classes.forEach(function (c) {
+  // Structure de l'établissement : servie à tous, mais on ne propose au
+  // périmètre réduit que la classe où se trouve l'élève visible — sinon le
+  // sélecteur ouvrirait sur une classe vide (liste d'élèves filtrée).
+  var classesListe = estFamille
+    ? SD.classes.filter(function (c) {
+      return SD.eleves.some(function (e) { return e.classe === c.id; });
+    })
+    : SD.classes;
+
+  classesListe.forEach(function (c) {
     var o = document.createElement("option");
     o.value = c.id;
     o.textContent = c.nom + " (" + c.cycle + ")";
     selClasse.appendChild(o);
   });
   if (params.get("classe")) selClasse.value = params.get("classe");
+  if (!selClasse.value && selClasse.options.length) selClasse.value = selClasse.options[0].value;
 
   SD.EVALS.forEach(function (ev) {
     var o = document.createElement("option");
@@ -51,6 +72,21 @@
   }
   remplirMatieres();
 
+  /* ---------- Habillage selon le rôle ---------- */
+  // Périmètre réduit : une seule classe visible → le sélecteur « Classe »
+  // n'apporte rien, et la synthèse personnelle remplace les statistiques
+  // de classe (qui n'auraient aucun sens sur un effectif d'une personne).
+  var titrePerso = el("titrePerso");
+  if (estFamille) {
+    if (selClasse.parentNode) selClasse.parentNode.style.display = "none";
+    if (el("carteStatsEval")) el("carteStatsEval").style.display = "none";
+    if (el("carteClassement")) el("carteClassement").style.display = "none";
+    if (el("cartePerso")) el("cartePerso").style.display = "";
+    if (titrePerso) {
+      titrePerso.textContent = role === "Parent" ? "📊 Synthèse de votre enfant" : "📊 Ma synthèse";
+    }
+  }
+
   /* ---------- État courant ---------- */
   function classeId() { return selClasse.value; }
   function matiereId() { return selMatiere.value; }
@@ -76,31 +112,62 @@
     var matiere = SD.getMatiere(matiereId());
     var liste = SD.elevesDeClasse(classeId());
 
-    el("titreSaisie").textContent = "Saisie des notes — " + (matiere ? matiere.nom : "") + " · " + (classe ? classe.nom : "");
+    el("titreSaisie").textContent = (estFamille
+      ? (role === "Parent" ? "Notes de l'élève" : "Mes notes")
+      : "Saisie des notes") + " — " + (matiere ? matiere.nom : "") + (estFamille ? "" : " · " + (classe ? classe.nom : ""));
 
     var tbody = el("tableBody");
     if (!liste.length) {
-      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="e-ico">🪑</div><h4>Aucun élève dans cette classe</h4></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="' + (estFamille ? 4 : 5) + '"><div class="empty-state"><div class="e-ico">🪑</div><h4>Aucun élève dans cette classe</h4></div></td></tr>';
       el("countLabel").textContent = "0 élève";
       return;
     }
     tbody.innerHTML = liste.map(function (e) {
       var note = noteEnregistree(e.id);
       var app = note ? SD.appreciation(note.note).mention : "";
+      // Rang : pour un périmètre réduit, seul le serveur connaît le
+      // classement réel (il voit toute la classe) → on utilise e.rang.
+      var rang = estFamille
+        ? (e.rang ? '<span class="rank-pill ' + (e.rang.rang === 1 ? "r1" : e.rang.rang === 2 ? "r2" : e.rang.rang === 3 ? "r3" : "") + '">' + e.rang.rang + "</span>" : '<span class="text-muted">—</span>')
+        : '<span class="text-muted">…</span>';
+      var cellNote = lectureSeule
+        ? '  <td style="text-align:center">' + (note ? "<b>" + String(note.note).replace(".", ",") + "</b>" : '<span class="text-muted">—</span>') + "</td>"
+        : '  <td style="text-align:center"><input type="number" class="input note-input" id="note-' + e.id + '" min="0" max="20" step="0.5" value="' + (note ? note.note : "") + '" placeholder="—"></td>';
       return (
         "<tr>" +
-        '  <td class="text-center" id="rang-' + e.id + '"><span class="text-muted">…</span></td>' +
+        '  <td class="text-center" id="rang-' + e.id + '">' + rang + "</td>" +
         '  <td><div class="cell-user">' + SM.avatarHTML(e.nom + " " + e.prenom, "sm") +
         '    <div><div class="names">' + SM.escapeHtml(e.nom) + " " + SM.escapeHtml(e.prenom) +
         '      </div><div class="sub">' + SM.escapeHtml(e.id) + (e.statut === "Inactif" ? ' · <span class="badge badge-warning">Inactif</span>' : "") + "</div></div></div></td>" +
         '  <td><span class="chip-plain">' + SM.escapeHtml(SD.getClasse(e.classe) ? SD.getClasse(e.classe).nom : e.classe) + "</span></td>" +
-        '  <td style="text-align:center"><input type="number" class="input note-input" id="note-' + e.id + '" min="0" max="20" step="0.5" value="' + (note ? note.note : "") + '" placeholder="—"></td>' +
+        cellNote +
         '  <td id="app-' + e.id + '" class="text-sm">' + (note ? SM.escapeHtml(app) : '<span class="text-muted">—</span>') + "</td>" +
         "</tr>"
       );
     }).join("");
-    el("countLabel").textContent = liste.length + " élève" + (liste.length > 1 ? "s" : "") + " dans la classe";
+    el("countLabel").textContent = estFamille
+      ? (liste.length + " élève" + (liste.length > 1 ? "s" : ""))
+      : (liste.length + " élève" + (liste.length > 1 ? "s" : "") + " dans la classe");
+    // La colonne « Classe » est redondante quand une seule classe est visible :
+    // on masque l'en-tête et la cellule ensemble pour garder l'alignement.
+    if (estFamille) {
+      var ths = document.querySelectorAll("table.data thead th");
+      if (ths.length > 2) ths[2].style.display = "none";
+      var tds = tbody.querySelectorAll("tr > td:nth-child(3)");
+      for (var i = 0; i < tds.length; i++) tds[i].style.display = "none";
+      majSynthPerso(liste[0]);
+    }
     majStats();
+  }
+
+  /* Synthèse personnelle (moyenne générale + rang serveur) */
+  function majSynthPerso(eleve) {
+    if (!eleve) return;
+    var moy = SD.moyennesEleve(eleve.id);
+    var r = SD.rangEleve(eleve.id);
+    if (el("persoMoyenne")) el("persoMoyenne").textContent = moy.generale.toFixed(2).replace(".", ",") + "/20";
+    if (el("persoRang")) el("persoRang").textContent = r ? r.rang + "e / " + r.total : "—";
+    if (el("persoMention")) el("persoMention").textContent = SD.appreciation(moy.generale).mention;
   }
 
   /* ---------- Mise à jour à la saisie ---------- */
@@ -123,6 +190,9 @@
 
   /* ---------- Statistiques & classement ---------- */
   function majStats() {
+    // Périmètre réduit : pas de statistiques de classe (l'effectif visible
+    // vaut 1) et le rang affiché vient du serveur, pas de ce calcul local.
+    if (estFamille) return;
     var eleves = SD.elevesDeClasse(classeId());
     var rows = [];
     eleves.forEach(function (e) {
@@ -181,7 +251,16 @@
   }
 
   /* ---------- Enregistrement ---------- */
+  if (lectureSeule) {
+    var btnSaisie = el("btnSave");
+    if (btnSaisie) btnSaisie.style.display = "none";
+  }
+
   el("btnSave").addEventListener("click", function () {
+    if (!peutSaisirNotes) {
+      SM.toast("Consultation seule : vous n'avez pas le droit de saisir les notes.", "warning");
+      return;
+    }
     var eleves = SD.elevesDeClasse(classeId());
     var notes = [];
     var aSupprimer = [];

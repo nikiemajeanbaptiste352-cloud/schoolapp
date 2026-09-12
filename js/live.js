@@ -13,6 +13,17 @@
      ES5), reconstruction de window.SD via window.construireSD,
      puis lancement de ui.js + script de la page
      (window.SM_MODE = "api").
+
+   Expose aussi les CAPACITÉS renvoyées par /etat avant de charger
+   ui.js :
+     window.SM_CAPACITES = { role, pages[], operations[], portee }
+     window.SM_MOI       = { nom, email, role }
+
+   ui.js et les pages s'en servent pour n'afficher que ce que le
+   rôle effectif a le droit d'ouvrir ou de faire. C'est le serveur
+   qui décide (backend/app/services/perimetre.py) : le front ne
+   fait que refléter. Ordre de chargement à respecter — ces deux
+   variables doivent être posées AVANT chargerScripts().
    ============================================================ */
 
 (function () {
@@ -254,6 +265,11 @@
     return;
   }
   window.SM_MODE = "api";
+  // Capacités du rôle effectif (pages + opérations), décidées par le serveur.
+  // ui.js et les scripts de page les lisent : c'est la seule source d'autorité
+  // côté interface, `sessionStorage` n'étant qu'un repli d'affichage.
+  window.SM_CAPACITES = etat.capacites || null;
+  window.SM_MOI = etat.moi || null;
   masquerEcranDemarrage(); // mobile : données chargées, on affiche l'application
 
   /* ---------- Rafraîchissement après écriture API ---------- */
@@ -271,6 +287,10 @@
     }
     return window.API.etat().then(function (etat) {
       var d = mapperEtat(etat);
+      // Les capacités peuvent changer (rattachement modifié par un
+      // administrateur) : on les remet à jour à chaque rafraîchissement.
+      if (etat.capacites) window.SM_CAPACITES = etat.capacites;
+      if (etat.moi) window.SM_MOI = etat.moi;
       var sd = window.SD;
       if (!sd) {
         window.SD = window.construireSD(d);

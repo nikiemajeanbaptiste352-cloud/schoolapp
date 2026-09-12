@@ -9,6 +9,13 @@
   var SD = window.SD;
   var eleves = SD.eleves; // tableau vivant (démo)
 
+  // Droit d'écriture décidé par le serveur (capacités de GET /api/v1/etat) :
+  // un élève ou un parent consulte sa fiche mais ne la modifie pas.
+  var peutEcrire = SM.peut("eleves.ecrire");
+  // Périmètre réduit (élève, parent) : la page parle d'un dossier, pas d'un
+  // annuaire. Le téléphone du responsable relève de la gestion administrative.
+  var estFamille = SM.porteeEleves() !== "tous";
+
   /* ---------- Remplissage du sélecteur de classe ---------- */
   var selClasse = document.getElementById("fClasse");
   SD.classes.forEach(function (c) {
@@ -18,27 +25,49 @@
     selClasse.appendChild(o);
   });
 
-  /* ---------- Compteurs ---------- */
-  var actifs = eleves.filter(function (e) { return e.statut === "Actif"; }).length;
-  document.getElementById("miniCounts").innerHTML =
-    '<div class="mini-stat"><div class="v">' + eleves.length + '</div><div class="l">Total élèves</div></div>' +
-    '<div class="mini-stat"><div class="v">' + actifs + '</div><div class="l">Actifs</div></div>' +
-    '<div class="mini-stat"><div class="v">' + (eleves.length - actifs) + '</div><div class="l">Inactifs</div></div>' +
-    '<div class="mini-stat"><div class="v">' + SD.classes.length + '</div><div class="l">Classes</div></div>';
+  /* ---------- Compteurs ----------
+     Une direction compte ses effectifs ; un élève ou un parent suit les
+     résultats de sa scolarité. Les mêmes quatre cases ne peuvent pas servir
+     aux deux. */
+  if (estFamille && eleves.length) {
+    var premier = eleves[0];
+    var moyF = SD.moyennesEleve(premier.id);
+    var classeF = SD.getClasse(premier.classe);
+    document.getElementById("miniCounts").innerHTML =
+      '<div class="mini-stat"><div class="v">' + SM.escapeHtml(classeF ? classeF.nom : premier.classe) + '</div><div class="l">Classe</div></div>' +
+      '<div class="mini-stat"><div class="v">' + moyF.generale.toFixed(2) + '</div><div class="l">Moyenne /20</div></div>' +
+      '<div class="mini-stat"><div class="v">' + SD.tauxPresence(premier.id) + '%</div><div class="l">Présence</div></div>' +
+      '<div class="mini-stat"><div class="v">' + (premier.statut === "Actif" ? "✅" : "⏸️") + '</div><div class="l">' + SM.escapeHtml(premier.statut || "—") + "</div></div>";
+  } else {
+    var actifs = eleves.filter(function (e) { return e.statut === "Actif"; }).length;
+    document.getElementById("miniCounts").innerHTML =
+      '<div class="mini-stat"><div class="v">' + eleves.length + '</div><div class="l">Total élèves</div></div>' +
+      '<div class="mini-stat"><div class="v">' + actifs + '</div><div class="l">Actifs</div></div>' +
+      '<div class="mini-stat"><div class="v">' + (eleves.length - actifs) + '</div><div class="l">Inactifs</div></div>' +
+      '<div class="mini-stat"><div class="v">' + SD.classes.length + '</div><div class="l">Classes</div></div>';
+  }
 
   /* ---------- Rendu ---------- */
   function render(liste) {
     var tbody = document.getElementById("tableBody");
     if (!liste.length) {
       tbody.innerHTML =
-        '<tr><td colspan="8"><div class="empty-state"><div class="e-ico">🔍</div><h4>Aucun élève trouvé</h4>' +
-        "<p>Ajustez votre recherche ou ajoutez un nouvel élève.</p></div></td></tr>";
+        '<tr><td colspan="' + (estFamille ? 7 : 8) + '"><div class="empty-state"><div class="e-ico">🔍</div><h4>Aucun élève trouvé</h4>' +
+        "<p>" + (estFamille
+          ? "Aucun dossier d'élève n'est rattaché à votre compte."
+          : "Ajustez votre recherche ou ajoutez un nouvel élève.") + "</p></div></td></tr>";
       document.getElementById("countLabel").textContent = "0 élève";
       return;
     }
     tbody.innerHTML = liste.map(function (e) {
       var cls = SD.getClasse(e.classe);
       var nomC = e.nom + " " + e.prenom;
+      // Actions d'écriture : proposées uniquement si le serveur les accorde
+      // (un élève ou un parent consulte sa fiche, il ne la modifie pas).
+      var actions = peutEcrire
+        ? '    <button class="btn-icon primary-h" title="Modifier" data-edit="' + e.id + '">✏️</button>' +
+          '    <button class="btn-icon danger" title="Supprimer" data-del="' + e.id + '">🗑️</button>'
+        : "";
       return (
         "<tr>" +
         '  <td class="fw-600">' + SM.escapeHtml(e.id) + "</td>" +
@@ -48,16 +77,22 @@
         '  <td>' + (e.sexe === "M" ? '<span class="badge badge-info">♂</span>' : '<span class="badge badge-warning">♀</span>') + "</td>" +
         '  <td>' + SM.fmtDate(e.naissance) + "</td>" +
         '  <td><span class="chip">' + SM.escapeHtml(cls ? cls.nom : e.classe) + "</span></td>" +
-        "  <td>" + SM.escapeHtml(e.parent.tel) + "</td>" +
+        (estFamille ? "<td></td>" : "  <td>" + SM.escapeHtml(e.parent.tel) + "</td>") +
         "  <td>" + SM.badgeStatut(e.statut) + "</td>" +
         '  <td><div class="row-actions" style="justify-content:center">' +
         '    <button class="btn-icon primary-h" title="Voir la fiche" data-view="' + e.id + '">👁️</button>' +
-        '    <button class="btn-icon primary-h" title="Modifier" data-edit="' + e.id + '">✏️</button>' +
-        '    <button class="btn-icon danger" title="Supprimer" data-del="' + e.id + '">🗑️</button>' +
+        actions +
         "  </div></td>" +
         "</tr>"
       );
     }).join("");
+    // Le téléphone du responsable (6e colonne) n'est pas montré hors
+    // périmètre : on masque l'en-tête et la cellule ensemble, sinon les
+    // colonnes se décalent.
+    var ths = document.querySelectorAll("table.data thead th");
+    if (ths.length > 5) ths[5].style.display = estFamille ? "none" : "";
+    var tds = tbody.querySelectorAll("tr > td:nth-child(6)");
+    for (var i = 0; i < tds.length; i++) tds[i].style.display = estFamille ? "none" : "";
     document.getElementById("countLabel").textContent = liste.length + " élève" + (liste.length > 1 ? "s" : "") + " affiché" + (liste.length > 1 ? "s" : "");
   }
 

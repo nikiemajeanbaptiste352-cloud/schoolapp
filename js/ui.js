@@ -6,26 +6,112 @@
 (function () {
   "use strict";
 
-  /* ---------- Pages du menu ---------- */
+  /* ---------- Pages du menu ----------
+     La propriété « roles » n'est qu'un **repli** : elle sert uniquement si
+     le serveur n'a pas fourni ses capacités (page ouverte hors ligne, ou
+     ancienne version de l'API). En fonctionnement normal, c'est la liste
+     `capacites.pages` renvoyée par `GET /api/v1/etat` qui décide — voir
+     `backend/app/services/perimetre.py`. Y ajouter une page sans l'ajouter
+     là-bas ne l'affichera pas. */
+  var ROLES_TOUS = ["Administrateur", "Professeur", "Surveillant", "Élève", "Parent"];
   var PAGES = [
-    { key: "dashboard", lien: "dashboard.html", icone: "🏠", titre: "Tableau de bord", groupe: "Général" },
-    { key: "students", lien: "students.html", icone: "👨‍🎓", titre: "Élèves", groupe: "Gestion" },
-    { key: "teachers", lien: "teachers.html", icone: "👨‍🏫", titre: "Enseignants", groupe: "Gestion" },
-    { key: "classes", lien: "classes.html", icone: "🏫", titre: "Classes", groupe: "Gestion" },
-    { key: "subjects", lien: "subjects.html", icone: "📚", titre: "Matières", groupe: "Gestion" },
-    { key: "grades", lien: "grades.html", icone: "📝", titre: "Notes", groupe: "Pédagogie" },
-    { key: "report-cards", lien: "report-cards.html", icone: "📊", titre: "Bulletins", groupe: "Pédagogie" },
-    { key: "timetable", lien: "timetable.html", icone: "📅", titre: "Emploi du temps", groupe: "Pédagogie" },
+    { key: "dashboard", lien: "dashboard.html", icone: "🏠", titre: "Tableau de bord", groupe: "Général", roles: ROLES_TOUS },
+    { key: "students", lien: "students.html", icone: "👨‍🎓", titre: "Élèves", groupe: "Gestion", roles: ROLES_TOUS },
+    { key: "teachers", lien: "teachers.html", icone: "👨‍🏫", titre: "Enseignants", groupe: "Gestion", roles: ["Administrateur", "Professeur", "Surveillant"] },
+    { key: "classes", lien: "classes.html", icone: "🏫", titre: "Classes", groupe: "Gestion", roles: ROLES_TOUS },
+    { key: "subjects", lien: "subjects.html", icone: "📚", titre: "Matières", groupe: "Gestion", roles: ROLES_TOUS },
+    { key: "grades", lien: "grades.html", icone: "📝", titre: "Notes", groupe: "Pédagogie", roles: ["Administrateur", "Professeur", "Élève", "Parent"] },
+    { key: "report-cards", lien: "report-cards.html", icone: "📊", titre: "Bulletins", groupe: "Pédagogie", roles: ["Administrateur", "Professeur", "Élève", "Parent"] },
+    { key: "timetable", lien: "timetable.html", icone: "📅", titre: "Emploi du temps", groupe: "Pédagogie", roles: ROLES_TOUS },
     { key: "mes-seances", lien: "mes-seances.html", icone: "✍️", titre: "Ma présence", groupe: "Espace enseignant", roles: ["Professeur"] },
     { key: "ma-paie", lien: "ma-paie.html", icone: "💵", titre: "Ma rémunération", groupe: "Espace enseignant", roles: ["Professeur"] },
-    { key: "payments", lien: "payments.html", icone: "💰", titre: "Paiements", groupe: "Finance" },
+    { key: "payments", lien: "payments.html", icone: "💰", titre: "Paiements", groupe: "Finance", roles: ["Administrateur", "Élève", "Parent"] },
     { key: "paie", lien: "paie.html", icone: "💶", titre: "Rémunérations", groupe: "Finance", roles: ["Administrateur"] },
-    { key: "announcements", lien: "announcements.html", icone: "📢", titre: "Annonces", groupe: "Communication" },
+    { key: "announcements", lien: "announcements.html", icone: "📢", titre: "Annonces", groupe: "Communication", roles: ROLES_TOUS },
     { key: "utilisateurs", lien: "utilisateurs.html", icone: "👥", titre: "Utilisateurs", groupe: "Système", roles: ["Administrateur"] },
-    { key: "settings", lien: "settings.html", icone: "⚙️", titre: "Paramètres", groupe: "Système" }
+    { key: "settings", lien: "settings.html", icone: "⚙️", titre: "Paramètres", groupe: "Système", roles: ROLES_TOUS }
   ];
 
+  // Pages accessibles **hors menu** (liens internes). Elles n'ont pas de
+  // restriction propre : elles dépendent de la page qui y mène
+  // (`student-profile.html` est atteignable depuis une liste d'élèves déjà
+  // filtrée par le serveur).
+  var PAGES_HORS_MENU = ["student-profile"];
+
+  /* ---------- Titres de l'interface ----------
+     Un parent ne parle pas de « élèves » mais de ses enfants : le libellé
+     s'adapte au rôle, la page et son contenu restent identiques. Seules les
+     entrées qui changent réellement de sens figurent ici ; les autres gardent
+     le titre de PAGES. */
+  var LIBELLES_ROLE = {
+    "Parent:students": "Mes enfants",
+    "Élève:students": "Ma fiche",
+    "Parent:classes": "Sa classe",
+    "Élève:classes": "Ma classe",
+    "Parent:subjects": "Ses matières",
+    "Élève:subjects": "Mes matières",
+    "Parent:timetable": "Son emploi du temps",
+    "Élève:timetable": "Mon emploi du temps",
+    "Parent:grades": "Ses notes",
+    "Élève:grades": "Mes notes",
+    "Parent:report-cards": "Ses bulletins",
+    "Élève:report-cards": "Mes bulletins",
+    "Parent:payments": "Mes paiements",
+    "Élève:payments": "Mes paiements",
+    "Professeur:grades": "Saisie des notes"
+  };
+
   var ROLE_EMOJI = { Administrateur: "👨‍💼", Professeur: "👨‍🏫", Surveillant: "📋", Élève: "👨‍🎓", Parent: "👨‍👩‍👧" };
+
+  /* ---------- Capacités renvoyées par le serveur ----------
+     `js/live.js` place ici la réponse de `GET /api/v1/etat` AVANT de charger
+     ce fichier : le menu et la garde des pages n'ont donc rien à deviner. */
+  function capacites() {
+    return window.SM_CAPACITES || null;
+  }
+
+  function roleCourant() {
+    var c = capacites();
+    if (c && c.role) return c.role;
+    var s = getSession();
+    return s ? s.role : null;
+  }
+
+  function porteeEleves() {
+    var c = capacites();
+    return (c && c.portee) || "tous";
+  }
+
+  // Le compte a-t-il le droit d'effectuer cette opération d'écriture ?
+  // (liste fermée : sans capacités, la réponse est NON)
+  function peut(operation) {
+    var c = capacites();
+    if (!c || !c.operations) return false;
+    return c.operations.indexOf(operation) !== -1;
+  }
+
+  // Libellé d'une page pour le rôle courant.
+  function titrePage(key, defaut) {
+    var r = roleCourant();
+    return (r && LIBELLES_ROLE[r + ":" + key]) || defaut;
+  }
+
+  /* ---------- Fiche enseignant du compte connecté ----------
+     Un professeur est identifié par l'adresse de son compte, déjà présente
+     dans `enseignants` de `/etat` (l'annuaire est servi au personnel). Sert à
+     signaler « mes classes » / « ma matière » sans rien retirer de la vue
+     complète que le serveur accorde par ailleurs. `null` si le compte n'est
+     rattaché à aucune fiche : l'appelant garde alors la vue générale. */
+  function monEnseignant(sd) {
+    var moi = window.SM_MOI || {};
+    var liste = (sd || window.SD || {}).enseignants;
+    if (!moi.email || !liste || !liste.length) return null;
+    var email = String(moi.email).toLowerCase();
+    for (var i = 0; i < liste.length; i++) {
+      if (String(liste[i].email || "").toLowerCase() === email) return liste[i];
+    }
+    return null;
+  }
 
   /* ---------- Session ---------- */
   function getSession() {
@@ -36,6 +122,7 @@
 
   var TITRES = {};
   PAGES.forEach(function (p) { TITRES[p.key] = p.titre; });
+  TITRES["student-profile"] = "Fiche élève";
 
   /* ---------- Libellé du mode de données (toujours le serveur) ---------- */
   function modeApi() { return window.SM_MODE === "api"; }
@@ -52,13 +139,22 @@
       return;
     }
 
-    // Rôle courant : sert à masquer les entrées de menu réservées
-    // (propriété « roles » d'une page) — les pages existantes, sans
-    // restriction, restent visibles pour tous comme avant.
-    var sessionRole = (function () {
-      var s = getSession();
-      return s ? s.role : null;
-    })();
+    // Garde de périmètre : une page que le rôle effectif n'a pas le droit
+    // d'ouvrir renvoie au tableau de bord. Avant la Phase 2, ce contrôle
+    // n'existait qu'au moment d'une bascule d'établissement : il suffisait
+    // de saisir l'adresse d'une page pour l'afficher (les données restaient
+    // protégées par l'API, mais l'écran s'ouvrait).
+    if (page && !pageAutorisee(page, roleCourant())) {
+      try { sessionStorage.setItem("sm_flash", "Cette page n'est pas accessible avec votre profil."); } catch (e) { /* stockage indisponible */ }
+      window.location.replace("dashboard.html");
+      return;
+    }
+
+    // Rôle effectif + liste des pages autorisées, tels que décidés par le
+    // serveur (`GET /api/v1/etat` → `capacites`). Si le serveur n'a rien
+    // fourni, on retombe sur la propriété « roles » — repli uniquement.
+    var sessionRole = roleCourant();
+    var pagesServeur = pagesAutoriseesServeur();
 
     var sidebar = document.getElementById("sidebar");
     var topbar = document.getElementById("topbar");
@@ -69,14 +165,18 @@
       var nav = "";
       var lastGroupe = "";
       PAGES.forEach(function (p) {
-        // Page réservée à certains rôles : masquée pour les autres.
-        if (p.roles && p.roles.indexOf(sessionRole) === -1) return;
+        // Liste fermée : uniquement ce que le serveur a autorisé.
+        if (pagesServeur) {
+          if (pagesServeur.indexOf(p.key) === -1) return;
+        } else if (p.roles && p.roles.indexOf(sessionRole) === -1) {
+          return;
+        }
         if (p.groupe !== lastGroupe) {
           nav += '<div class="nav-section">' + p.groupe + "</div>";
           lastGroupe = p.groupe;
         }
         var act = page === p.key ? " active" : "";
-        nav += '<a class="nav-link' + act + '" href="' + p.lien + '"><span class="nav-ico">' + p.icone + "</span>" + p.titre + "</a>";
+        nav += '<a class="nav-link' + act + '" href="' + p.lien + '"><span class="nav-ico">' + p.icone + "</span>" + escapeHtml(titrePage(p.key, p.titre)) + "</a>";
       });
       var versionTexte = SD.ecole.version ? "<span>v" + SD.ecole.version + "</span>" : "<span></span>";
       sidebar.innerHTML =
@@ -90,15 +190,21 @@
 
     // Topbar
     if (topbar) {
+      // Identité : le serveur fait foi (`capacites.role`, `moi`) ;
+      // sessionStorage n'est qu'un repli d'affichage.
       var sess = getSession();
-      var role = sess ? sess.role : "Administrateur";
-      var name = sess ? sess.nom : "Administrateur";
+      var moi = window.SM_MOI || {};
+      var role = roleCourant() || (sess ? sess.role : "Administrateur");
+      var name = moi.nom || (sess ? sess.nom : "Administrateur");
+      var email = moi.email || (sess ? sess.email : "");
       var emoji = ROLE_EMOJI[role] || "👤";
-      var titre = TITRES[page] || "SchoolManager";
+      var titre = titrePage(page, TITRES[page] || "SchoolManager");
 
-      var notifs = SD.annonces.slice(0, 3).map(function (a) {
+      // Les annonces ne sont proposées qu'aux profils qui possèdent la page.
+      var voitAnnonces = !pagesServeur || pagesServeur.indexOf("announcements") !== -1;
+      var notifs = voitAnnonces ? SD.annonces.slice(0, 3).map(function (a) {
         return '<button class="dropdown-item" data-go="announcements"><span>📢</span>' + escapeHtml(a.titre) + "</button>";
-      }).join("");
+      }).join("") : "";
 
       topbar.innerHTML =
         '<div class="topbar-left">' +
@@ -118,8 +224,8 @@
         '    <div class="dropdown-menu" id="menuNotif">' +
         '      <div class="dropdown-head">Notifications</div>' +
         notifs +
-        '      <div class="dropdown-sep"></div>' +
-        '      <button class="dropdown-item" data-go="announcements"><span>🔔</span>Toutes les annonces</button>' +
+        (voitAnnonces ? '      <div class="dropdown-sep"></div>' +
+        '      <button class="dropdown-item" data-go="announcements"><span>🔔</span>Toutes les annonces</button>' : "") +
         "    </div>" +
         "  </div>" +
         '  <div class="dropdown">' +
@@ -128,7 +234,7 @@
         '      <span class="u-info"><span class="u-name" style="display:block">' + escapeHtml(name) + '</span><span class="u-role">' + escapeHtml(role) + "</span></span>" +
         "    </button>" +
         '    <div class="dropdown-menu" id="menuUser" style="right:0">' +
-        '      <div class="dropdown-head">' + emoji + " Compte</div>" +
+        '      <div class="dropdown-head">' + emoji + " Compte" + (email ? " · " + escapeHtml(email) : "") + "</div>" +
         '      <button class="dropdown-item" data-go="settings"><span>⚙️</span>Paramètres</button>' +
         '      <div class="dropdown-sep"></div>' +
         '      <button class="dropdown-item danger" id="btnLogout"><span>🚪</span>Se déconnecter</button>' +
@@ -168,6 +274,26 @@
       });
     }
 
+    // Actions interdites : masquées. On masque au lieu de retirer, car les
+    // scripts de page attachent leurs écouteurs à ces boutons au chargement.
+    appliquerCapacites();
+
+    // Titre de l'écran et de l'onglet adaptés au rôle (« Mes enfants » pour un
+    // parent). Les libellés génériques ne sont pas touchés : seuls ceux qui
+    // varient selon le rôle sont réécrits.
+    var libelleRole = titrePage(page, null);
+    if (libelleRole) {
+      var h2 = document.querySelector(".page-header h2");
+      if (h2) {
+        var ico = iconePage(page);
+        h2.textContent = (ico ? ico + " " : "") + libelleRole;
+      }
+      document.title = libelleRole + " — SchoolManager";
+    }
+
+    // Contenu de l'écran adapté au rôle (sous-titre, filtres sans objet).
+    adapterPageAuRole(page);
+
     // Message différé (ex. bascule d'établissement) : la bascule recharge la
     // page, le message est donc affiché au chargement suivant.
     var flash = null;
@@ -179,6 +305,148 @@
 
     // Micro-animations (apparitions, compteurs, onde au clic)
     animerInterface();
+  }
+
+  /* ---------- Actions autorisées ----------
+     Tout élément portant `data-cap="<opération>"` est masqué si le rôle
+     effectif n'a pas cette opération (voir OPERATIONS_PAR_ROLE dans
+     backend/app/services/perimetre.py). L'API reste la seule juge : ceci
+     n'évite pas un appel direct, cela évite de proposer l'action. */
+  function appliquerCapacites() {
+    var liste = document.querySelectorAll("[data-cap]");
+    for (var i = 0; i < liste.length; i++) {
+      var op = liste[i].getAttribute("data-cap");
+      if (op && !peut(op)) liste[i].style.display = "none";
+    }
+  }
+
+  function iconePage(key) {
+    for (var i = 0; i < PAGES.length; i++) {
+      if (PAGES[i].key === key) return PAGES[i].icone;
+    }
+    return "";
+  }
+
+  /* ---------- Contenu des pages selon le rôle ----------
+     Une même page ne rend pas le même service à tout le monde. Un parent qui
+     ouvre « Élèves » ne gère pas l'établissement : il consulte son enfant.
+     Le serveur décide ce qui est VISIBLE (capacités) ; on adapte ici ce qui
+     est DIT — sous-titre, filtres inutiles — pour que chaque page parle de la
+     fonction réelle du profil qui la lit.
+
+     Une page absente de cette table garde son texte d'origine (valable pour
+     tous les rôles qui y accèdent). */
+  var TEXTES_PAGES = {
+    dashboard: {
+      Administrateur: "Vue d'ensemble de l'établissement : effectifs, classes et présence.",
+      Professeur: "Vos classes, vos matières et votre activité pédagogique.",
+      Surveillant: "Vie scolaire : effectifs, classes et suivi des présences.",
+      "Élève": "Votre scolarité : moyenne, présences, paiements et annonces.",
+      Parent: "La scolarité de votre enfant : notes, présences et paiements."
+    },
+    students: {
+      Administrateur: "Gérez les fiches de tous les élèves de l'établissement.",
+      Professeur: "Les élèves de l'établissement — vous notez ceux de vos classes.",
+      Surveillant: "Les élèves de l'établissement — suivi de la vie scolaire.",
+      "Élève": "Votre fiche d'élève et votre parcours scolaire.",
+      Parent: "Les fiches de vos enfants inscrits dans l'établissement."
+    },
+    teachers: {
+      Administrateur: "Gérez l'équipe pédagogique, les matières et les barèmes horaires.",
+      Professeur: "L'équipe pédagogique — votre fiche est signalée.",
+      Surveillant: "Annuaire de l'équipe pédagogique."
+    },
+    classes: {
+      Administrateur: "Gérez les classes, les niveaux et les professeurs principaux.",
+      Professeur: "Les classes de l'établissement — vos classes sont signalées.",
+      Surveillant: "Les classes de l'établissement."
+    },
+    subjects: {
+      Administrateur: "Gérez les matières, leurs coefficients et leurs enseignants.",
+      Professeur: "Les matières de l'établissement — la vôtre est signalée.",
+      Surveillant: "Les matières enseignées dans l'établissement."
+    },
+    grades: {
+      Administrateur: "Saisissez et consultez les notes de toutes les classes.",
+      Professeur: "Saisissez les notes de vos classes, par évaluation.",
+      "Élève": "Vos notes, matière par matière et évaluation par évaluation.",
+      Parent: "Les notes de votre enfant, par matière et par évaluation."
+    },
+    "report-cards": {
+      Administrateur: "Consultez et imprimez les bulletins de l'établissement.",
+      Professeur: "Les bulletins des classes où vous enseignez.",
+      "Élève": "Votre bulletin scolaire, prêt à imprimer.",
+      Parent: "Les bulletins de votre enfant, prêts à imprimer."
+    },
+    timetable: {
+      Administrateur: "Emploi du temps des classes et des enseignants.",
+      Professeur: "Votre emploi du temps et celui de vos classes.",
+      Surveillant: "Emploi du temps des classes.",
+      "Élève": "Votre emploi du temps de la semaine.",
+      Parent: "L'emploi du temps de votre enfant."
+    },
+    payments: {
+      Administrateur: "Suivez les frais de scolarité, les encaissements et les impayés.",
+      "Élève": "Vos frais de scolarité, vos versements et votre solde.",
+      Parent: "Les frais de scolarité de votre enfant, vos versements et le solde."
+    },
+    paie: {
+      Administrateur: "Rémunérations des enseignants, barèmes horaires et fiches de paie."
+    },
+    announcements: {
+      Administrateur: "Publiez et gérez les annonces de l'établissement.",
+      Professeur: "Les annonces de l'établissement.",
+      Surveillant: "Les annonces de l'établissement.",
+      "Élève": "Les annonces de l'établissement.",
+      Parent: "Les annonces de l'établissement."
+    },
+    utilisateurs: {
+      Administrateur: "Comptes, rôles et rattachements à cet établissement."
+    },
+    // Page hors menu : le texte d'origine convient au personnel, on ne le
+    // réécrit que pour les profils qui voient un dossier plus étroit que la
+    // fiche complète (onglets filtrés par ACCES_ONGLETS).
+    "student-profile": {
+      Professeur: "Le dossier pédagogique de l'élève : notes, présences et bulletin.",
+      Surveillant: "Le suivi de vie scolaire de l'élève : présences et contact du parent.",
+      "Élève": "Votre dossier scolaire : notes, présences, paiements et bulletin.",
+      Parent: "Le dossier scolaire de votre enfant : notes, présences, paiements et bulletin."
+    },
+    settings: {
+      Administrateur: "Informations de l'établissement, comptes et préférences.",
+      Professeur: "Votre profil et vos préférences.",
+      Surveillant: "Votre profil et vos préférences.",
+      "Élève": "Votre profil et vos préférences.",
+      Parent: "Votre profil et vos préférences."
+    }
+  };
+
+  /* Adaptation de l'écran au rôle : texte d'en-tête, filtres sans objet. */
+  function adapterPageAuRole(page) {
+    page = page || document.body.getAttribute("data-page");
+    if (!page) return;
+    var role = roleCourant();
+
+    // 1. Sous-titre : ce que la page permet de faire POUR ce profil.
+    var textes = TEXTES_PAGES[page];
+    if (textes) {
+      var texte = textes[role] || textes.defaut;
+      if (texte) {
+        var sub = document.querySelector(".page-header .subtitle");
+        if (sub) sub.textContent = texte;
+      }
+    }
+
+    // 2. Périmètre réduit (élève, parent) : la liste ne contient que son
+    //    dossier. Un moteur de recherche n'y sert à rien, on le retire.
+    if (porteeEleves() !== "tous") {
+      var boites = document.querySelectorAll(".page-header .search-box");
+      for (var i = 0; i < boites.length; i++) boites[i].style.display = "none";
+    }
+
+    // 3. Étiquette du profil sur le corps de page : sert au CSS et au
+    //    diagnostic (inspecter data-role suffit à savoir qui a rendu la page).
+    document.body.setAttribute("data-role", role || "");
   }
 
   /* ---------- V2 : micro-animations ----------
@@ -408,15 +676,45 @@
     return "";
   }
 
-  // La page courante est-elle visible pour ce rôle ? (propriété « roles » de
-  // PAGES : les pages sans restriction restent accessibles à tous.)
-  function pageAutorisee(cle, role) {
-    for (var i = 0; i < PAGES.length; i++) {
-      if (PAGES[i].key === cle) {
-        return !PAGES[i].roles || PAGES[i].roles.indexOf(role) !== -1;
-      }
+  /* ---------- Contrôle d'accès aux pages ----------
+     Deux sources, dans cet ordre :
+       1. `capacites().pages` — la liste décidée par le serveur (elle découle
+          des `require_roles(...)` des routeurs, voir perimetre.py) ;
+       2. la propriété « roles » de PAGES — repli local, utilisé quand le
+          serveur n'a rien fourni ou quand on évalue un autre rôle que le
+          rôle courant (bascule d'établissement).
+     La liste est FERMÉE : une clé inconnue est refusée. Auparavant elle était
+     acceptée, si bien qu'un simple `sessionStorage` modifié à la main
+     contournait le menu. */
+  var PAGES_MINIMALES = ["dashboard", "settings"];
+
+  function pagesAutoriseesServeur() {
+    var c = capacites();
+    return c && c.pages ? c.pages : null;
+  }
+
+  function pagesPourRole(role) {
+    var c = capacites();
+    if (c && c.pages && role && role === c.role) return c.pages;
+    var liste = [];
+    if (role) {
+      PAGES.forEach(function (p) {
+        if (p.roles && p.roles.indexOf(role) !== -1) liste.push(p.key);
+      });
     }
-    return true; // page hors menu (ex. fiche élève) : aucune restriction
+    return liste;
+  }
+
+  // La page courante est-elle visible pour ce rôle ?
+  function pageAutorisee(cle, role) {
+    if (!cle) return true;
+    // Toujours autorisées : sans cela, la redirection reboucle sur dashboard.
+    if (PAGES_MINIMALES.indexOf(cle) !== -1) return true;
+    var liste = pagesPourRole(role);
+    if (liste.indexOf(cle) !== -1) return true;
+    // Écran hors menu (fiche élève) : suit la page qui y mène.
+    if (PAGES_HORS_MENU.indexOf(cle) !== -1) return liste.indexOf("students") !== -1;
+    return false;
   }
 
   // Récupère les rattachements du compte. Le sélecteur n'apparaît que si le
@@ -631,8 +929,19 @@
   /* ---------- Export global ---------- */
   window.SM = {
     PAGES: PAGES,
+    PAGES_HORS_MENU: PAGES_HORS_MENU,
     buildLayout: buildLayout,
     getSession: getSession,
+    // Capacités décidées par le serveur : à utiliser par les pages pour
+    // masquer les boutons d'action (« Ajouter », « Enregistrer », …).
+    capacites: capacites,
+    roleCourant: roleCourant,
+    porteeEleves: porteeEleves,
+    peut: peut,
+    monEnseignant: monEnseignant,
+    titrePage: titrePage,
+    pageAutorisee: pageAutorisee,
+    adapterPageAuRole: adapterPageAuRole,
     escapeHtml: escapeHtml,
     initiales: initiales,
     couleurAvatar: couleurAvatar,

@@ -30,6 +30,12 @@ Parent                  ses enfants       de ses enfants     idem        idem
 
 Convention de retour : `None` signifie « tout l'établissement », un `set()`
 vide signifie « rien ». Les appelants ne doivent jamais confondre les deux.
+
+Phase 2 — capacités de l'interface
+----------------------------------
+Les mêmes listes servent au navigateur : `capacites()` renvoie les pages et
+les opérations autorisées, que `js/ui.js` se contente d'afficher. Aucune
+décision d'habilitation n'est donc prise côté client.
 """
 
 from __future__ import annotations
@@ -231,3 +237,162 @@ def exiger_acces_notes(db: Session, user: User) -> None:
         raise HTTPException(status_code=403, detail="Accès réservé au corps enseignant.")
     if role == ROLE_PROF and user.enseignant_id is None:
         raise HTTPException(status_code=403, detail="Aucune fiche enseignant liée.")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Capacités de l'interface
+# ---------------------------------------------------------------------------
+# Même problème que la Phase 1, mais côté navigateur : `js/ui.js` décidait
+# seul quelles pages montrer, à partir de `sessionStorage` (que l'utilisateur
+# peut modifier) et *sans restriction par défaut* — toute page sans clé
+# `roles` était donc visible par tout le monde. Un Parent voyait ainsi les
+# entrées « Élèves », « Notes », « Rémunérations », etc.
+#
+# Ici, les listes ci-dessous sont la **seule** source de vérité : elles
+# reproduisent exactement les `require_roles(...)` des routeurs. Le front ne
+# fait plus que les afficher (principe : *le serveur autorise, le navigateur
+# présente*).
+#
+# ⚠️ Toute nouvelle page du menu ou tout nouvel écran d'action doit être
+# ajouté ICI en même temps que sa route, sinon il n'apparaîtra jamais.
+
+#: Clés de pages telles que déclarées dans `js/ui.js` (tableau PAGES).
+PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
+    ROLE_ADMIN: (
+        "dashboard",
+        "students",
+        "teachers",
+        "classes",
+        "subjects",
+        "grades",
+        "report-cards",
+        "timetable",
+        "payments",
+        "paie",
+        "announcements",
+        "utilisateurs",
+        "settings",
+    ),
+    ROLE_PROF: (
+        "dashboard",
+        "students",
+        "teachers",
+        "classes",
+        "subjects",
+        "grades",
+        "report-cards",
+        "timetable",
+        "mes-seances",
+        "ma-paie",
+        "announcements",
+        "settings",
+    ),
+    # Vie scolaire : élèves, classes et emplois du temps ; ni notes ni argent.
+    # `GET /notes` et `/classes/{id}/bulletins` refusent ce rôle → pas de page.
+    ROLE_SURVEILLANT: (
+        "dashboard",
+        "students",
+        "teachers",
+        "classes",
+        "subjects",
+        "timetable",
+        "announcements",
+        "settings",
+    ),
+    # Élève et parent : uniquement leur propre dossier (le serveur réduit déjà
+    # toutes les listes à leur périmètre).
+    ROLE_ELEVE: (
+        "dashboard",
+        "students",
+        "grades",
+        "report-cards",
+        "timetable",
+        "payments",
+        "announcements",
+        "settings",
+    ),
+    ROLE_PARENT: (
+        "dashboard",
+        "students",
+        "grades",
+        "report-cards",
+        "timetable",
+        "payments",
+        "announcements",
+        "settings",
+    ),
+}
+
+#: Écrans accessibles mais hors menu (liens internes). `students` couvre
+#: `pages/student-profile.html`, qui n'a pas d'entrée de menu propre.
+PAGES_HORS_MENU: tuple[str, ...] = ("student-profile",)
+
+#: Rôle inconnu, rattachement suspendu ou compte sans membre : rien.
+#: On garde le tableau de bord (chiffres à zéro) et les paramètres pour que
+#: le compte puisse au moins se déconnecter ou régulariser sa situation.
+PAGES_MINIMALES: tuple[str, ...] = ("dashboard", "settings")
+
+#: Capacités d'écriture. Elles correspondent une à une aux `require_roles`
+#: des routeurs de modification.
+OPERATIONS_PAR_ROLE: dict[str, tuple[str, ...]] = {
+    ROLE_ADMIN: (
+        "ecole.ecrire",
+        "eleves.ecrire",
+        "enseignants.ecrire",
+        "classes.ecrire",
+        "matieres.ecrire",
+        "annonces.ecrire",
+        "membres.ecrire",
+        "notes.ecrire",
+        "presences.ecrire",
+        "finance.ecrire",
+        "paie.ecrire",
+    ),
+    ROLE_PROF: (
+        "notes.ecrire",
+        "presences.ecrire",
+        "seances.ecrire",
+    ),
+    ROLE_SURVEILLANT: ("presences.ecrire",),
+    ROLE_ELEVE: (),
+    ROLE_PARENT: (),
+}
+
+#: Nature de la vue « élèves » telle que la reçoit le compte. Sert au front
+#: pour adapter ses libellés (« Élèves » → « Mes enfants ») et masquer les
+#: filtres qui n'auraient aucun sens. Le serveur la calcule à partir du même
+#: périmètre que les données, elle ne peut donc pas mentir.
+PORTEE_TOUS = "tous"
+PORTEE_PERIMETRE = "perimetre"
+PORTEE_AUCUN = "aucun"
+
+
+def pages_autorisees(db: Session, user: User) -> tuple[str, ...]:
+    """Clés de pages autorisées pour le rôle effectif de l'établissement."""
+    return PAGES_PAR_ROLE.get(role_courant(db, user), PAGES_MINIMALES)
+
+
+def operations_autorisees(db: Session, user: User) -> tuple[str, ...]:
+    """Opérations d'écriture autorisées (liste vide si aucune)."""
+    return OPERATIONS_PAR_ROLE.get(role_courant(db, user), ())
+
+
+def portee_eleves(db: Session, user: User) -> str:
+    """« tous », « perimetre » ou « aucun » — calculé sur le périmètre réel."""
+    ids = ids_eleves_autorises(db, user)
+    if ids is None:
+        return PORTEE_TOUS
+    return PORTEE_PERIMETRE if ids else PORTEE_AUCUN
+
+
+def capacites(db: Session, user: User) -> dict:
+    """Capacités complètes du compte, consommées par `js/ui.js`.
+
+    Le navigateur n'a plus à interpréter un rôle : il applique ce dictionnaire.
+    """
+    return {
+        "role": role_courant(db, user),
+        "pages": list(pages_autorisees(db, user)),
+        "operations": list(operations_autorisees(db, user)),
+        "portee": portee_eleves(db, user),
+    }

@@ -11,10 +11,10 @@
   var SM = window.SM;
   var API = window.API;
 
-  // Accès réservé au Professeur lié à sa fiche enseignant.
-  var sess = SM.getSession();
-  if (!sess || sess.role !== "Professeur") {
-    window.location.replace("../index.html");
+  // Accès réservé au Professeur lié à sa fiche enseignant. La décision
+  // vient du serveur (capacités de GET /api/v1/etat), pas du navigateur.
+  if (!SM.pageAutorisee("mes-seances", SM.roleCourant())) {
+    window.location.replace("dashboard.html");
     return;
   }
 

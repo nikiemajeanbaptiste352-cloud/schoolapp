@@ -36,41 +36,41 @@
                 <!-- Contenu : répartition, paiements, annonces -->
                 <div class="dashboard-grid mt-16">
                     <div class="col-left">
-                        <div class="card mb-16">
+                        <div class="card mb-16" id="carteRepartition">
                             <div class="card-head">
-                                <h3>🏫 Répartition des élèves par classe</h3>
-                                <a href="classes.html" class="text-sm fw-600">Tout voir →</a>
+                                <h3 id="titreRepartition">🏫 Répartition des élèves par classe</h3>
+                                <a href="classes.html" class="text-sm fw-600" id="lienRepartition">Tout voir →</a>
                             </div>
                             <div class="card-pad" id="classBars"></div>
                         </div>
 
-                        <div class="card">
+                        <div class="card" id="cartePaiements">
                             <div class="card-head">
-                                <h3>💳 Derniers paiements</h3>
-                                <a href="payments.html" class="text-sm fw-600">Gérer →</a>
+                                <h3 id="titrePaiements">💳 Derniers paiements</h3>
+                                <a href="payments.html" class="text-sm fw-600" id="lienPaiements">Gérer →</a>
                             </div>
                             <div class="list-group" id="recentPayments"></div>
                         </div>
                     </div>
 
                     <div class="col-right">
-                        <div class="card mb-16">
+                        <div class="card mb-16" id="carteAnnonces">
                             <div class="card-head">
-                                <h3>📢 Dernières annonces</h3>
-                                <a href="announcements.html" class="text-sm fw-600">Voir →</a>
+                                <h3 id="titreAnnonces">📢 Dernières annonces</h3>
+                                <a href="announcements.html" class="text-sm fw-600" id="lienAnnonces">Voir →</a>
                             </div>
                             <div class="list-group" id="recentAnnounces"></div>
                         </div>
 
                         <div class="card">
                             <div class="card-head"><h3>⚡ Accès rapides</h3></div>
-                            <div class="card-pad quick-grid">
-                                <a class="quick-btn" href="students.html"><span>👨‍🎓</span>Élèves</a>
-                                <a class="quick-btn" href="grades.html"><span>📝</span>Notes</a>
-                                <a class="quick-btn" href="report-cards.html"><span>📊</span>Bulletins</a>
-                                <a class="quick-btn" href="payments.html"><span>💰</span>Paiements</a>
-                                <a class="quick-btn" href="timetable.html"><span>📅</span>Emploi du temps</a>
-                                <a class="quick-btn" href="announcements.html"><span>📢</span>Annonces</a>
+                            <div class="card-pad quick-grid" id="quickGrid">
+                                <a class="quick-btn" href="students.html" data-page-cap="students"><span>👨‍🎓</span>Élèves</a>
+                                <a class="quick-btn" href="grades.html" data-page-cap="grades"><span>📝</span>Notes</a>
+                                <a class="quick-btn" href="report-cards.html" data-page-cap="report-cards"><span>📊</span>Bulletins</a>
+                                <a class="quick-btn" href="payments.html" data-page-cap="payments"><span>💰</span>Paiements</a>
+                                <a class="quick-btn" href="timetable.html" data-page-cap="timetable"><span>📅</span>Emploi du temps</a>
+                                <a class="quick-btn" href="announcements.html" data-page-cap="announcements"><span>📢</span>Annonces</a>
                             </div>
                         </div>
                     </div>

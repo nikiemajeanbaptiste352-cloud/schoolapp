@@ -18,6 +18,12 @@ périmètre du rôle effectif dans l'établissement courant
 Avant cette phase, l'instantané contenait l'ensemble de l'établissement pour
 tout rôle connecté : un parent fraîchement inscrit recevait les données de
 tous les autres élèves.
+
+Phase 2 — habilitations de l'interface : deux clés **supplémentaires** sont
+ajoutées (`moi`, `capacites`). Les clés existantes ne changent ni de nom ni de
+forme, donc le front actuel continue de fonctionner tel quel. `js/ui.js` s'en
+sert pour n'afficher que les pages et les boutons autorisés par le rôle
+effectif, au lieu de se fier à `sessionStorage`.
 """
 
 from __future__ import annotations
@@ -190,4 +196,15 @@ def etat_complet(
         "presences": presences_out,
         "paiements": paiements_out,
         "annonces": annonces_out,
+        # --- Phase 2 : habilitations de l'interface -------------------------
+        # Identité et rôle **effectifs** (jamais ceux recopiés dans le
+        # navigateur, que l'utilisateur peut modifier) + liste des pages et
+        # des écrans d'action autorisés. `js/ui.js` applique ces deux clés :
+        # le menu, la garde des pages et les boutons d'action en découlent.
+        "moi": {
+            "nom": user.nom,
+            "email": user.email,
+            "role": perimetre.role_courant(db, user),
+        },
+        "capacites": perimetre.capacites(db, user),
     }

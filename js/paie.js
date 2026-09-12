@@ -11,9 +11,10 @@
   var SM = window.SM;
   var API = window.API;
 
-  var sess = SM.getSession();
-  if (!sess || sess.role !== "Administrateur") {
-    window.location.replace("../index.html");
+  // Accès décidé par le serveur (capacités de GET /api/v1/etat) : la page
+  // n'est ouverte qu'aux profils qui possèdent l'opération d'écriture.
+  if (!SM.peut("paie.ecrire")) {
+    window.location.replace("dashboard.html");
     return;
   }
 

@@ -10,8 +10,16 @@
 
   function el(id) { return document.getElementById(id); }
 
-  var sess = SM.getSession() || {};
-  var estAdmin = sess.role === "Administrateur";
+  // Droit d'écriture décidé par le serveur (capacités de GET /api/v1/etat),
+  // et non plus par le rôle mémorisé dans le navigateur.
+  var estAdmin = SM.peut("matieres.ecrire");
+  var role = SM.roleCourant();
+  var estProf = role === "Professeur";
+  // Fiche enseignant du compte connecté : sert à signaler sa matière. La vue
+  // complète reste affichée (le serveur accorde toutes les matières au
+  // personnel), rien n'est retiré.
+  var maFiche = estProf ? SM.monEnseignant(SD) : null;
+  var maMatiereId = maFiche ? maFiche.matiere : null;
   var editId = null;
   var deleteId = null;
 
@@ -26,6 +34,13 @@
   function compteurs() {
     var coefTotal = SD.matieres.reduce(function (s, m) { return s + m.coef; }, 0);
     if (el("coefTotal")) el("coefTotal").textContent = coefTotal;
+    if (estProf && maFiche) {
+      el("miniCounts").innerHTML =
+        '<div class="mini-stat"><div class="v">' + SD.matieres.length + '</div><div class="l">Matières</div></div>' +
+        '<div class="mini-stat"><div class="v">' + maFiche.classes.length + '</div><div class="l">Mes classes</div></div>' +
+        '<div class="mini-stat"><div class="v">' + coefTotal + '</div><div class="l">Coef. total</div></div>';
+      return;
+    }
     el("miniCounts").innerHTML =
       '<div class="mini-stat"><div class="v">' + SD.matieres.length + '</div><div class="l">Matières</div></div>' +
       '<div class="mini-stat"><div class="v">' + coefTotal + '</div><div class="l">Coef. total</div></div>' +
@@ -48,7 +63,9 @@
       return (
         "<tr>" +
         '  <td><div class="flex-center" style="justify-content:flex-start;gap:10px"><span style="font-size:22px">' + m.icone + '</span>' +
-        '    <div><div class="fw-600">' + SM.escapeHtml(m.nom) + '</div><div class="sub text-muted" style="font-size:12px">' + SM.escapeHtml(m.id) + "</div></div></div></td>" +
+        '    <div><div class="fw-600">' + SM.escapeHtml(m.nom) +
+        (m.id === maMatiereId ? ' <span class="badge badge-success">Ma matière</span>' : "") +
+        '</div><div class="sub text-muted" style="font-size:12px">' + SM.escapeHtml(m.id) + "</div></div></div></td>" +
         '  <td class="text-center"><span class="chip">' + m.coef + "</span></td>" +
         "  <td>" +
         (profs.length
