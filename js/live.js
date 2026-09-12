@@ -59,6 +59,11 @@
     try {
       sessionStorage.removeItem("sm_token");
       sessionStorage.removeItem("sm_user");
+      // La session d'interface (sm_session) doit partir avec le jeton :
+      // sinon la page de connexion voit « une session ouverte » et renvoie
+      // vers le tableau de bord, qui renvoie ici à son tour — boucle sans
+      // fin lorsque le jeton a expiré.
+      sessionStorage.removeItem("sm_session");
     } catch (e) { /* stockage indisponible */ }
   }
 

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>SchoolManager</title>
+  <!-- ============================================================
+       SchoolManager — Écran d'accueil de l'APPLICATION mobile
+       ------------------------------------------------------------
+       Ce fichier n'existe QUE dans mobile/ : outils/assembler-www.js
+       le copie par-dessus www/index.html (voir appliquerSurcharges).
+
+       Pourquoi : dans l'application, l'écran d'accueil ne doit pas
+       être la page publique du site (bandeau, photo, FAQ, pied de
+       page…), mais un véritable écran d'application : fixe, sans
+       défilement de page, aux couleurs de l'application.
+
+       La page publique du site reste disponible dans l'application
+       sous le nom « site.html » (inscription établissement, code
+       reçu par email, connexion Google).
+
+       Le site web publié (Vercel) garde son index.html : rien n'est
+       modifié côté web.
+       ============================================================ -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#071226" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="icon" href="assets/logo.svg" />
+  <style>
+    :root {
+      --nuit: #071226;
+      --or: #f2b33d;
+      --texte: #eaf0fb;
+      --texte-2: #93a6c4;
+      --bord: rgba(255, 255, 255, .10);
+      --ok: #3ddc97;
+      --ko: #ff8f8f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--nuit);
+      color: var(--texte);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      /* Écran d'application : la page ne défile pas (contrairement à un site) */
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    [hidden] { display: none !important; }
+
+    .sm-app {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      padding: calc(env(safe-area-inset-top, 0px) + 26px) 20px calc(env(safe-area-inset-bottom, 0px) + 14px);
+      background:
+        radial-gradient(520px 300px at 50% -6%, rgba(37, 99, 235, .40), transparent 68%),
+        radial-gradient(420px 260px at 104% 106%, rgba(242, 179, 61, .16), transparent 72%),
+        linear-gradient(180deg, #071226 0%, #0a1a33 55%, #071226 100%);
+    }
+
+    /* ---------- En-tête : logo + nom de l'application ---------- */
+    .sm-tete { flex: none; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 4px; }
+    .sm-logo { width: 74px; height: 74px; display: block; border-radius: 20px; box-shadow: 0 14px 32px rgba(0, 0, 0, .45); }
+    .sm-nom { margin: 16px 0 4px; font-size: 23px; font-weight: 800; letter-spacing: -.4px; }
+    .sm-sous { margin: 0; color: var(--texte-2); font-size: 13px; }
+
+    /* ---------- Zone centrale (seule zone défilante si le clavier s'ouvre) ---------- */
+    .sm-corps {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 20px 0;
+    }
+    .sm-carte {
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+      background: rgba(255, 255, 255, .055);
+      border: 1px solid var(--bord);
+      border-radius: 20px;
+      padding: 20px 18px 18px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, .35);
+    }
+    .sm-champ { display: block; margin-bottom: 14px; }
+    .sm-champ span { display: block; margin-bottom: 7px; font-size: 12.5px; font-weight: 700; letter-spacing: .2px; color: var(--texte-2); }
+    .sm-champ input {
+      width: 100%;
+      height: 52px;
+      padding: 0 14px;
+      font-family: inherit;
+      font-size: 16px; /* 16px : le clavier ne zoome pas */
+      color: var(--texte);
+      background: #0a1830;
+      border: 1px solid #1c3255;
+      border-radius: 13px;
+      outline: none;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .sm-champ input::placeholder { color: #5d7396; }
+    .sm-champ input:focus { border-color: var(--or); box-shadow: 0 0 0 3px rgba(242, 179, 61, .16); }
+
+    .sm-erreur {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #ffb9b9;
+      background: rgba(255, 90, 90, .12);
+      border: 1px solid rgba(255, 120, 120, .34);
+      border-radius: 11px;
+    }
+
+    .sm-btn {
+      width: 100%;
+      height: 54px;
+      border: 0;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 800;
+      color: #231603;
+      background: linear-gradient(180deg, #f7c458, #e0a52c);
+      box-shadow: 0 10px 22px rgba(224, 165, 44, .28);
+      cursor: pointer;
+    }
+    .sm-btn:active { transform: translateY(1px); }
+    .sm-btn:disabled { opacity: .72; cursor: default; }
+
+    .sm-etat { margin: 14px 0 0; text-align: center; font-size: 12.5px; color: var(--texte-2); }
+    .sm-etat.ok { color: var(--ok); }
+    .sm-etat.ko { color: var(--ko); }
+
+    /* ---------- Pied d'écran ---------- */
+    .sm-pied { flex: none; display: flex; flex-direction: column; align-items: center; padding-top: 6px; }
+    .sm-lien {
+      padding: 9px 6px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--or);
+      text-decoration: none;
+      background: none;
+      border: 0;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .sm-note { margin: 2px 0 0; font-size: 11.5px; color: #5d7396; }
+
+    /* Petits écrans (téléphone en paysage) : on compacte l'en-tête */
+    @media (max-height: 620px) {
+      .sm-app { padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
+      .sm-logo { width: 54px; height: 54px; border-radius: 15px; }
+      .sm-nom { margin: 10px 0 2px; font-size: 19px; }
+      .sm-sous { display: none; }
+      .sm-corps { padding: 10px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sm-app">
+    <header class="sm-tete">
+      <img class="sm-logo" src="assets/logo.svg" alt="" />
+      <h1 class="sm-nom">SchoolManager</h1>
+      <p class="sm-sous">Gestion scolaire de votre établissement</p>
+    </header>
+
+    <main class="sm-corps">
+      <form class="sm-carte" id="formConnexion" novalidate>
+        <label class="sm-champ">
+          <span>Adresse email</span>
+          <input id="email" name="email" type="email" inputmode="email" autocomplete="username"
+                 autocapitalize="none" autocorrect="off" spellcheck="false"
+                 enterkeyhint="next" placeholder="nom@etablissement.com" />
+        </label>
+        <label class="sm-champ">
+          <span>Mot de passe</span>
+          <input id="mdp" name="motdepasse" type="password" autocomplete="current-password"
+                 enterkeyhint="go" placeholder="••••••••" />
+        </label>
+
+        <p class="sm-erreur" id="erreur" hidden></p>
+
+        <button class="sm-btn" id="btnLogin" type="submit">Se connecter</button>
+        <p class="sm-etat" id="etat">Vérification du serveur…</p>
+      </form>
+    </main>
+
+    <footer class="sm-pied">
+      <a class="sm-lien" href="site.html">Autres accès : Google, inscription, code</a>
+      <button class="sm-lien" id="btnAide" type="button">Mot de passe oublié</button>
+      <p class="sm-note">Version 1.1 · Application Android</p>
+    </footer>
+  </div>
+
+  <!-- js/api.js est chargé ici : l'assemblage insère juste avant lui
+       js/mobile-config.js, qui fixe l'adresse du serveur et rend la
+       session persistante. Ne pas changer cet ordre. -->
+  <script src="js/api.js"></script>
+  <script>
+    /* ============================================================
+       Écran d'accueil de l'application — logique
+       ------------------------------------------------------------
+       1. session déjà ouverte  → tableau de bord (sans repasser par
+          l'écran de connexion) ;
+       2. session morte (session sans jeton : jeton expiré, appareil
+          nettoyé) → on efface la session : sans cela l'application
+          ferait des allers-retours sans fin entre les deux écrans ;
+       3. sinon → connexion par email / mot de passe (POST /auth/login).
+       Seuls la connexion email/mot de passe et les autres accès
+       (site.html) sont proposés ici : les autres parcours d'entrée
+       restent ceux du site.
+       ============================================================ */
+    (function () {
+      "use strict";
+
+      var CLE_JETON = "sm_token";
+      var CLE_SESSION = "sm_session";
+      var TABLEAU_DE_BORD = "pages/dashboard.html";
+
+      function lire(cle) {
+        try { return sessionStorage.getItem(cle); } catch (e) { return null; }
+      }
+      function effacer(cle) {
+        try { sessionStorage.removeItem(cle); } catch (e) { /* stockage indisponible */ }
+      }
+
+      var jeton = lire(CLE_JETON);
+      var session = lire(CLE_SESSION);
+
+      if (jeton && session) {
+        window.location.replace(TABLEAU_DE_BORD);
+        return;
+      }
+      if (!jeton && session) {
+        // Session sans jeton valide : « sm_session » seul ne sert à rien et
+        // provoquerait une boucle écran de connexion ↔ tableau de bord.
+        effacer(CLE_SESSION);
+      }
+
+      var form = document.getElementById("formConnexion");
+      var email = document.getElementById("email");
+      var mdp = document.getElementById("mdp");
+      var btn = document.getElementById("btnLogin");
+      var erreur = document.getElementById("erreur");
+      var etat = document.getElementById("etat");
+      var btnAide = document.getElementById("btnAide");
+      var occupe = false;
+
+      function message(texte) {
+        if (!texte) { erreur.textContent = ""; erreur.hidden = true; return; }
+        erreur.textContent = texte;
+        erreur.hidden = false;
+      }
+      function statut(texte, classe) {
+        etat.textContent = texte;
+        etat.className = "sm-etat" + (classe ? " " + classe : "");
+      }
+
+      /* Le serveur répond-il ? (le premier appel réveille parfois un backend
+         « serverless » : on réessaie avant de conclure à une panne.) */
+      var essais = 0;
+      function verifierServeur() {
+        if (!window.API || !window.API.enLigne()) {
+          statut("Serveur injoignable.", "ko");
+          return;
+        }
+        window.API.disponible().then(function (ok) {
+          if (ok) { statut("Serveur connecté.", "ok"); return; }
+          statut("Serveur injoignable — nouvelle tentative…", "ko");
+          essais += 1;
+          if (essais < 5) { window.setTimeout(verifierServeur, 2500); }
+        });
+      }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (occupe) return;
+
+        var courriel = (email.value || "").trim();
+        var secret = mdp.value || "";
+        if (!courriel || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(courriel)) {
+          message("Saisissez une adresse email valide (ex. nom@etablissement.com).");
+          email.focus();
+          return;
+        }
+        if (!secret) {
+          message("Saisissez votre mot de passe.");
+          mdp.focus();
+          return;
+        }
+
+        message("");
+        occupe = true;
+        btn.disabled = true;
+        btn.textContent = "Connexion…";
+
+        window.API.connexion(courriel, secret).then(function (data) {
+          var user = (data && data.user) || {};
+          try {
+            sessionStorage.setItem(CLE_SESSION, JSON.stringify({
+              role: user.role || "Administrateur",
+              email: user.email || courriel,
+              nom: user.nom || ""
+            }));
+          } catch (e2) { /* stockage indisponible : la session reste en mémoire */ }
+          window.location.replace(TABLEAU_DE_BORD);
+        }).catch(function (err) {
+          occupe = false;
+          btn.disabled = false;
+          btn.textContent = "Se connecter";
+          if (err && err.reseau) {
+            statut("Serveur injoignable.", "ko");
+            message("Connexion impossible : le serveur ne répond pas. Vérifiez votre connexion internet, puis réessayez.");
+            verifierServeur();
+          } else {
+            message((err && err.detail) || "Connexion impossible. Vérifiez vos identifiants.");
+          }
+        });
+      });
+
+      email.addEventListener("input", function () { message(""); });
+      mdp.addEventListener("input", function () { message(""); });
+
+      btnAide.addEventListener("click", function () {
+        message("Contactez l'administrateur de votre établissement pour réinitialiser votre mot de passe.");
+      });
+
+      verifierServeur();
+    })();
+  </script>
+</body>
+</html>

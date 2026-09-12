@@ -16,6 +16,16 @@
    passe et aucune clé : elle n'affiche que l'interface et interroge
    l'API distante.
 
+   Deux écrans ne viennent PAS du site (dossier surcharges/) :
+
+     - index.html : l'écran d'accueil de l'application (logo, connexion
+       email / mot de passe). La page publique du site ne peut pas servir
+       d'écran d'accueil : bandeau, photo, FAQ et pied de page font
+       « site web », pas « application » ;
+     - la page publique du site (index.html) est conservée sous le nom
+       site.html : inscription établissement, code reçu par email et
+       connexion Google restent accessibles depuis l'application.
+
    Usage :  node outils/assembler-www.js
    ============================================================ */
 
@@ -31,6 +41,11 @@ const SURCHARGES = path.join(MOBILE, "surcharges");
 
 /* Liste blanche */
 const INCLUS = ["index.html", "css", "js", "pages", "assets"];
+
+/* Écrans fournis par la version mobile, absents du site : ils s'ajoutent
+   aux pages du site et doivent donc recevoir la configuration mobile eux
+   aussi (js/mobile-config.js). */
+const PAGES_MOBILE = ["index.html"];
 
 /* Fichiers qui ne doivent JAMAIS se retrouver dans l'application */
 const INTERDITS = [
@@ -79,6 +94,36 @@ function copier() {
   return rapport;
 }
 
+/**
+ * La page publique du site devient « site.html » dans l'application :
+ * l'écran d'accueil de l'application (surcharges/index.html) prend sa place.
+ * Les liens de cette page sont relatifs à la racine : ils restent valides.
+ */
+function preparerSite() {
+  const source = path.join(WWW, "index.html");
+  if (!fs.existsSync(source)) return false;
+  fs.renameSync(source, path.join(WWW, "site.html"));
+  return true;
+}
+
+/**
+ * Nombre de pages HTML du site (index.html + pages/*.html). Sert de
+ * garde-fou : TOUTES les pages du site doivent avoir reçu la configuration
+ * mobile. Le nombre est calculé — une page ajoutée au site ne doit pas
+ * casser l'assemblage (c'est arrivé avec pages/vie-scolaire.html).
+ */
+function compterPagesSite() {
+  let n = 0;
+  if (fs.existsSync(path.join(RACINE, "index.html"))) n += 1;
+  const dossier = path.join(RACINE, "pages");
+  if (fs.existsSync(dossier)) {
+    for (const entree of fs.readdirSync(dossier)) {
+      if (entree.endsWith(".html")) n += 1;
+    }
+  }
+  return n;
+}
+
 function appliquerSurcharges() {
   if (!fs.existsSync(SURCHARGES)) return 0;
   let n = 0;
@@ -117,7 +162,10 @@ function injecterConfiguration() {
       if (!entree.endsWith(".html")) continue;
 
       let html = fs.readFileSync(complet, "utf8");
-      if (html.indexOf("js/mobile-config.js") !== -1) continue; // déjà fait
+      // Déjà configurée ? On cherche la BALISE, pas le simple nom : un
+      // commentaire expliquant mobile-config.js ne doit pas faire croire que
+      // la page est déjà équipée.
+      if (/<script[^>]*src="[^"]*js\/mobile-config\.js"/.test(html)) continue;
 
       // Cas normal : la page charge js/api.js → la configuration doit
       // passer juste AVANT, puisque api.js lit window.SM_API_BASE.
@@ -176,9 +224,14 @@ console.log("Assemblage de l'application depuis : " + RACINE);
 vider();
 
 const rapport = copier();
+const pageSiteRangee = preparerSite();
 const nbSurcharges = appliquerSurcharges();
 const pages = injecterConfiguration();
 const problemes = controler();
+
+/* Pages attendues : toutes celles du site + les écrans de l'application. */
+const pagesSite = compterPagesSite();
+const pagesAttendues = pagesSite + PAGES_MOBILE.length;
 
 console.log("");
 console.log("Contenu embarqué dans l'application :");
@@ -189,7 +242,17 @@ for (const ligne of rapport) {
 }
 console.log("");
 console.log("  Surcharges mobiles appliquées : " + nbSurcharges + " fichier(s)");
-console.log("  Pages configurées             : " + pages.length);
+console.log(
+  "  Page publique du site         : " +
+    (pageSiteRangee ? "conservée sous site.html" : "INTROUVABLE")
+);
+console.log(
+  "  Pages configurées             : " +
+    pages.length +
+    " (" +
+    pagesSite +
+    " du site + écran d'accueil)"
+);
 console.log("  Taille totale de l'application: " + mo(taille(WWW)));
 
 if (problemes.length) {
@@ -199,10 +262,18 @@ if (problemes.length) {
   process.exit(1);
 }
 
-if (pages.length !== 18) {
+if (pages.length !== pagesAttendues) {
   console.error("");
   console.error(
-    "ERREUR — 18 pages attendues, " + pages.length + " configurée(s)."
+    "ERREUR — " +
+      pagesAttendues +
+      " pages attendues (" +
+      pagesSite +
+      " du site + " +
+      PAGES_MOBILE.length +
+      " écran d'accueil mobile), " +
+      pages.length +
+      " configurée(s)."
   );
   process.exit(1);
 }

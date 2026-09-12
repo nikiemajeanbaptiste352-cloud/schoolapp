@@ -8,9 +8,11 @@ web de SchoolManager. Elle s'adresse à la personne qui devra **reconstruire**,
 
 ## 1. Principe
 
-L'application mobile ne réécrit pas l'interface. Elle **embarque exactement les mêmes
-fichiers HTML, CSS et JavaScript** que le site, et les affiche dans une vue interne
-(WebView) fournie par [Capacitor](https://capacitorjs.com/).
+L'application mobile ne réécrit pas l'interface. Elle **embarque les mêmes fichiers
+HTML, CSS et JavaScript** que le site, et les affiche dans une vue interne (WebView)
+fournie par [Capacitor](https://capacitorjs.com/). Seuls deux écrans changent, et
+uniquement à l'intérieur de l'application : son écran d'accueil et son accès à la page
+publique du site (voir § 7).
 
 Conséquence directe : **toute correction faite sur le site ne s'applique pas
 automatiquement à l'application déjà installée**. Pour qu'un correctif visuel apparaisse,
@@ -43,6 +45,7 @@ mise à jour de l'application.
 | Projet mobile | `mobile/` | oui |
 | Configuration Capacitor | `mobile/capacitor.config.json` | oui |
 | Adaptations mobiles | `mobile/surcharges/js/mobile-config.js` | oui |
+| Écran d'accueil de l'application | `mobile/surcharges/index.html` | oui |
 | Script d'assemblage | `mobile/outils/assembler-www.js` | oui |
 | Script d'identité (icônes) | `mobile/outils/generer-identite.js` | oui |
 | Script de signature | `mobile/outils/creer-cle-signature.js` | oui |
@@ -51,8 +54,8 @@ mise à jour de l'application.
 | **Clé de signature** | `mobile/android/keystore/schoolmanager.jks` | **non — confidentiel** |
 | **Mot de passe de la clé** | `mobile/android/key.properties` | **non — confidentiel** |
 | Copie de sauvegarde de la clé | `Documents\SchoolManager-SIGNATURE\` | **hors dépôt** |
-| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.0.aab` | non |
-| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.0.apk` | non |
+| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.1.aab` | non |
+| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.1.apk` | non |
 
 > ⚠️ `supabase/`, `backend/`, `docs/` et tout fichier `.env` sont **volontairement exclus**
 > de l'application. Le script `assembler-www.js` vérifie cette exclusion et s'arrête
@@ -66,8 +69,8 @@ mise à jour de l'application.
 |---|---|
 | Nom affiché | SchoolManager |
 | Identifiant (paquet) | `com.schoolapp.mobile` |
-| Code de version | `1` |
-| Nom de version | `1.0` |
+| Code de version | `2` |
+| Nom de version | `1.1` |
 | Android minimal | 7.0 (niveau d'API 24) |
 | Android ciblé | API 36 (Android 16) |
 | Alias de signature | `schoolmanager` |
@@ -114,8 +117,10 @@ Copie `index.html`, `css/`, `js/`, `pages/` et `assets/` dans `mobile/www/`, pui
 applique les adaptations mobiles. La commande doit finir par :
 
 ```
-  Pages configurées             : 18
-  Taille totale de l'application: 0.73 Mo
+  Surcharges mobiles appliquées : 2 fichier(s)
+  Page publique du site         : conservée sous site.html
+  Pages configurées             : 20 (19 du site + écran d'accueil)
+  Taille totale de l'application: 0.81 Mo
 OK — l'application ne contient aucune donnée ni aucun secret.
 ```
 
@@ -203,7 +208,16 @@ pour qu'un autre développeur puisse compiler sans posséder la clé.
 
 ## 7. Différences entre le site et l'application
 
-Trois adaptations, toutes regroupées dans `mobile/surcharges/js/mobile-config.js`,
+Deux écrans sont propres à l'application. Ils vivent dans `mobile/surcharges/` et ne
+remplacent les fichiers du site **qu'à l'intérieur de `mobile/www/`** : le site publié
+sur Vercel n'est jamais touché.
+
+| Écran | Fichier | Rôle |
+|---|---|---|
+| Écran d'accueil | `mobile/surcharges/index.html` | Remplace `www/index.html`. C'est le premier écran de l'application : logo, nom, formulaire de connexion, état du serveur. Aucun menu de site, aucun défilement de page, aucune photo de présentation. |
+| Page publique | `www/site.html` | L'ancienne page d'accueil du site, conservée sous ce nom et atteignable par le lien **« Autres accès »** de l'écran d'accueil. Elle sert aux inscriptions et aux connexions Google ou par code. |
+
+Les autres adaptations sont regroupées dans `mobile/surcharges/js/mobile-config.js`,
 injecté automatiquement dans chaque page par l'assembleur. **Aucun fichier du site
 lui-même n'a été modifié pour l'application, à une exception près** (`js/live.js`,
 voir plus bas).
@@ -214,9 +228,11 @@ voir plus bas).
 | `sessionStorage` est redirigé vers `localStorage` | Sur mobile, « session » signifie « tant que l'application n'est pas tuée ». La session aurait été perdue à chaque fermeture. Ce détour la conserve, sans toucher aux fichiers du site. |
 | L'écran de démarrage est masqué dès que la page est prête | Sinon l'image de démarrage resterait affichée pendant que la page charge. |
 
-`js/live.js` a reçu trois lignes supplémentaires : un appel à `window.SM_MASQUER_DEMARRAGE`
-lorsque l'application affiche son écran de connexion ou passe en mode API. Sur le site,
-cette fonction n'existe pas : l'appel est donc sans effet.
+`js/live.js` a reçu deux corrections utiles à l'application : un appel à
+`window.SM_MASQUER_DEMARRAGE` lorsque la page est affichée (sans effet sur le site, où
+cette fonction n'existe pas), et l'effacement de `sm_session` en même temps qu'un jeton
+invalide — sans quoi l'application renvoyait sans fin de l'écran de connexion au
+tableau de bord, puis du tableau de bord à l'écran de connexion.
 
 ### Conséquence à connaître
 
@@ -279,7 +295,7 @@ déléguées.
 ### Téléversement
 
 Play Console → votre application → **Production** (ou **Test fermé**) → **Créer une
-version** → déposer `SchoolManager-1.0.aab` → écrire les notes de version → envoyer
+version** → déposer `SchoolManager-1.1.aab` → écrire les notes de version → envoyer
 pour examen. Le premier examen prend généralement quelques jours.
 
 ---
@@ -298,7 +314,7 @@ Le `versionCode` suit une progression stricte : 1, 2, 3… sans retour en arriè
 
 ## 11. Installer sur un téléphone sans passer par Google Play
 
-1. Copier `SchoolManager-1.0.apk` sur le téléphone (câble, courriel, ou `adb install`).
+1. Copier `SchoolManager-1.1.apk` sur le téléphone (câble, courriel, ou `adb install`).
 2. Sur le téléphone : Paramètres → Sécurité → autoriser l'installation
    d'applications de sources inconnues pour l'application utilisée.
 3. Ouvrir le fichier `.apk` et confirmer.
@@ -307,7 +323,7 @@ Avec le câble, depuis un terminal :
 
 ```powershell
 & "$env:USERPROFILE\AndroidToolchain\sdk\platform-tools\adb.exe" install -r `
-  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.0.apk"
+  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.1.apk"
 ```
 
 Cette voie convient aux tests et aux utilisateurs avertis. Pour une diffusion large,
@@ -323,6 +339,7 @@ Google Play reste la seule solution raisonnable.
 | « Service momentanément indisponible » | Serveur injoignable ou adresse erronée | Vérifier `SM_API_BASE` dans `mobile/surcharges/js/mobile-config.js` et l'état du serveur |
 | La session est perdue à chaque ouverture | L'adaptation `sessionStorage` n'a pas été appliquée | Vérifier que `js/mobile-config.js` est présent dans `www/` |
 | L'écran de démarrage ne disparaît pas | `js/live.js` n'appelle pas `SM_MASQUER_DEMARRAGE` | Comparer avec la version du dépôt |
+| L'application s'ouvre sur la page d'accueil du site web | La surcharge de l'écran d'accueil n'a pas été appliquée | Vérifier la présence de `mobile/surcharges/index.html`, puis relancer `npm run www` et `npm run sync` |
 | `key.properties not found` à la compilation | Normal : aucun paquet signé ne sera produit | Recopier la clé depuis la sauvegarde, ou travailler en `.apk` de test |
 | La compilation échoue après une modification de `build.gradle` | Syntaxe Gradle invalide | Revenir à la version du dépôt : `git checkout mobile/android/app/build.gradle` |
 
@@ -334,7 +351,7 @@ Get-Content "$env:USERPROFILE\AndroidToolchain\journaux\release.log" -Tail 50
 
 ---
 
-## 13. Limites connues de la version 1.0
+## 13. Limites connues de la version 1.1
 
 * **Android uniquement.** Une version iOS exigerait un Mac et un compte Apple
   Developer (99 USD par an) : la même base web est réutilisable, mais le travail
@@ -342,8 +359,9 @@ Get-Content "$env:USERPROFILE\AndroidToolchain\journaux\release.log" -Tail 50
 * **La connexion par Google et par courriel n'est pas disponible** dans
   l'application : ces procédés reposent sur une redirection du navigateur qui se
   comporte mal dans une vue interne. La connexion par identifiant et mot de passe
-  fonctionne normalement. Le serveur signale d'ailleurs lui-même que ces deux
-  options sont désactivées (réponse `{"google":false,"code_email":false}`).
+  fonctionne normalement. Le lien **« Autres accès »** ouvre la page publique, mais
+  ces deux options ne fonctionneront que le jour où le serveur les activera
+  (aujourd'hui : `{"google":false,"code_email":false}`).
 * **Aucun fonctionnement hors ligne.** L'application exige une connexion réseau.
 * **Pas de notifications.** L'envoi de notifications exigerait la mise en place
   d'un service de messagerie (Firebase) et un travail supplémentaire.
