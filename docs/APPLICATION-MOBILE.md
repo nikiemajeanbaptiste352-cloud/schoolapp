@@ -55,8 +55,8 @@ mise à jour de l'application.
 | **Clé de signature** | `mobile/android/keystore/schoolmanager.jks` | **non — confidentiel** |
 | **Mot de passe de la clé** | `mobile/android/key.properties` | **non — confidentiel** |
 | Copie de sauvegarde de la clé | `Documents\SchoolManager-SIGNATURE\` | **hors dépôt** |
-| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.3.aab` | non |
-| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.3.apk` | non |
+| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.4.aab` | non |
+| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.4.apk` | non |
 
 > ⚠️ `supabase/`, `backend/`, `docs/` et tout fichier `.env` sont **volontairement exclus**
 > de l'application. Le script `assembler-www.js` vérifie cette exclusion et s'arrête
@@ -70,8 +70,8 @@ mise à jour de l'application.
 |---|---|
 | Nom affiché | SchoolManager |
 | Identifiant (paquet) | `com.schoolapp.mobile` |
-| Code de version | `4` |
-| Nom de version | `1.3` |
+| Code de version | `5` |
+| Nom de version | `1.4` |
 | Android minimal | 7.0 (niveau d'API 24) |
 | Android ciblé | API 36 (Android 16) |
 | Alias de signature | `schoolmanager` |
@@ -304,7 +304,7 @@ déléguées.
 ### Téléversement
 
 Play Console → votre application → **Production** (ou **Test fermé**) → **Créer une
-version** → déposer `SchoolManager-1.3.aab` → écrire les notes de version → envoyer
+version** → déposer `SchoolManager-1.4.aab` → écrire les notes de version → envoyer
 pour examen. Le premier examen prend généralement quelques jours.
 
 ---
@@ -323,7 +323,7 @@ Le `versionCode` suit une progression stricte : 1, 2, 3… sans retour en arriè
 
 ## 11. Installer sur un téléphone sans passer par Google Play
 
-1. Copier `SchoolManager-1.3.apk` sur le téléphone (câble, courriel, ou `adb install`).
+1. Copier `SchoolManager-1.4.apk` sur le téléphone (câble, courriel, ou `adb install`).
 2. Sur le téléphone : Paramètres → Sécurité → autoriser l'installation
    d'applications de sources inconnues pour l'application utilisée.
 3. Ouvrir le fichier `.apk` et confirmer.
@@ -332,7 +332,7 @@ Avec le câble, depuis un terminal :
 
 ```powershell
 & "$env:USERPROFILE\AndroidToolchain\sdk\platform-tools\adb.exe" install -r `
-  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.3.apk"
+  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.4.apk"
 ```
 
 Cette voie convient aux tests et aux utilisateurs avertis. Pour une diffusion large,
@@ -350,6 +350,8 @@ Google Play reste la seule solution raisonnable.
 | L'écran de démarrage ne disparaît pas | `js/live.js` n'appelle pas `SM_MASQUER_DEMARRAGE` | Comparer avec la version du dépôt |
 | L'application s'ouvre sur la page d'accueil du site web | La surcharge de l'écran d'accueil n'a pas été appliquée | Vérifier la présence de `mobile/surcharges/index.html`, puis relancer `npm run www` et `npm run sync` |
 | La barre de navigation du bas n'apparaît pas | L'écran mesure plus de 900 px de large (tablette, paysage) | Normal : au-delà de 900 px la barre latérale suffit — réduire la fenêtre pour la voir |
+| Le tableau d'une page est coupé sur la droite | Écran trop étroit pour les colonnes | Depuis la 1.4, les grands tableaux s'affichent en fiches empilées : mettre à jour l'application |
+| Le titre de l'écran passe sous l'heure du téléphone | Réservation de la barre d'état non appliquée | Depuis la 1.4 : `overlaysWebView: false` dans `mobile/capacitor.config.json` et zones sûres dans `mobile/surcharges/js/mobile-config.js` |
 | `key.properties not found` à la compilation | Normal : aucun paquet signé ne sera produit | Recopier la clé depuis la sauvegarde, ou travailler en `.apk` de test |
 | La compilation échoue après une modification de `build.gradle` | Syntaxe Gradle invalide | Revenir à la version du dépôt : `git checkout mobile/android/app/build.gradle` |
 
@@ -361,7 +363,33 @@ Get-Content "$env:USERPROFILE\AndroidToolchain\journaux\release.log" -Tail 50
 
 ---
 
-## 13. Limites connues de la version 1.3
+## 12 bis. Version 1.4 — notes de version
+
+Trois corrections d'usage sur téléphone :
+
+1. **Les grands tableaux ne sont plus coupés.** Paiements, Élèves, Notes,
+   Enseignants, Utilisateurs… comptent jusqu'à neuf colonnes : sur un écran de
+   360 px, le tableau mesurait 739 px et se terminait hors de l'écran, sans que
+   rien n'indique qu'il fallait le faire glisser. Chaque ligne devient une
+   **fiche** : le nom de la colonne est repris devant chaque valeur
+   (`js/ui.js` → `etiqueterTableaux`, `css/responsive.css` → `table.data.sm-cartes`).
+   Aucune page n'a été modifiée : les libellés sont lus dans les en-têtes
+   existants, et un observateur rejoue l'étiquetage après chaque recherche ou
+   filtre. Sur ordinateur **et à l'impression**, le tableau reste un tableau
+   (l'en-tête est masqué uniquement à l'écran et sous 700 px).
+
+2. **Le haut de l'écran ne passe plus sous la barre d'état** (heure, batterie).
+   L'affichage « bord à bord » est demandé par Android : la page réserve
+   désormais la hauteur annoncée par le système (`env(safe-area-inset-top)`),
+   au-dessus du bandeau et de la barre latérale. Repli natif :
+   `"overlaysWebView": false` dans la configuration Capacitor.
+
+3. **En-têtes de page empilés** sous 700 px : le bouton d'action reste
+   accessible sous un titre long, au lieu d'être repoussé hors de l'écran.
+
+---
+
+## 13. Limites connues de la version 1.4
 
 * **Android uniquement.** Une version iOS exigerait un Mac et un compte Apple
   Developer (99 USD par an) : la même base web est réutilisable, mais le travail

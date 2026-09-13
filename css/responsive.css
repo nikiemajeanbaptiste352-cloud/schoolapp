@@ -142,3 +142,110 @@
   .navbas-ico { font-size: 17px; }
   .content { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Tableau à défilement latéral : le geste doit rester fluide. */
+@media screen and (max-width: 900px) {
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+}
+
+/* ============================================================
+   Tableaux sur téléphone (<= 700px) — chaque ligne devient une fiche
+   ============================================================
+   Un tableau de neuf colonnes ne tient pas sur un écran de téléphone :
+   il faudrait le faire glisser de côté à chaque lecture, et la ligne ne
+   serait jamais visible en entier (le lecteur perd de vue à qui
+   appartiennent les montants affichés).
+
+   js/ui.js recopie donc le nom de chaque colonne dans l'attribut
+   `data-label` de sa cellule et pose la classe `sm-cartes`. Ici,
+   l'en-tête disparaît et chaque ligne se présente comme une fiche
+   « libellé / valeur », empilée verticalement — le geste de lecture
+   devient vertical, comme dans toutes les applications.
+
+   Le tableau reprend son aspect normal dès que l'écran est plus large.
+   La requête vise `screen` : les bulletins et la feuille d'appel
+   s'impriment depuis ces mêmes pages et doivent garder leur mise en
+   page de tableau. */
+@media screen and (max-width: 700px) {
+  /* Le cadre n'a plus rien à faire défiler : les fiches tiennent en largeur. */
+  .table-wrap.sm-cartes {
+    overflow-x: visible;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  table.data.sm-cartes { display: block; min-width: 0; width: 100%; }
+  table.data.sm-cartes thead { display: none; }
+  table.data.sm-cartes tbody { display: block; }
+
+  table.data.sm-cartes > tbody > tr {
+    display: block;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+  }
+  table.data.sm-cartes > tbody > tr:last-child { margin-bottom: 0; }
+  table.data.sm-cartes > tbody > tr:hover { background: var(--surface); }
+
+  table.data.sm-cartes > tbody > tr > td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: none;
+    font-size: 14px;
+    text-align: right;
+  }
+  table.data.sm-cartes > tbody > tr > td + td { border-top: 1px dashed #eef2f7; }
+
+  /* Étiquette : le nom de la colonne, lu dans l'en-tête par js/ui.js. */
+  table.data.sm-cartes > tbody > tr > td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  /* Première colonne : elle nomme la ligne, elle devient le titre de la fiche. */
+  table.data.sm-cartes > tbody > tr > td:first-child {
+    display: block;
+    padding-top: 4px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+    text-align: left;
+  }
+  table.data.sm-cartes > tbody > tr > td:first-child::before { display: none; }
+
+  /* Cellule de synthèse (« Aucun résultat ») : elle couvre toutes les
+     colonnes, elle n'a pas de libellé à afficher. */
+  table.data.sm-cartes > tbody > tr > td[colspan] {
+    display: block;
+    padding: 6px 0;
+    text-align: center;
+  }
+  table.data.sm-cartes > tbody > tr > td[colspan]::before { display: none; }
+
+  /* Boutons d'action : alignés à droite, comme les autres valeurs. */
+  table.data.sm-cartes .row-actions { justify-content: flex-end; }
+
+  .table-footer { padding: 10px 2px; }
+}
+
+/* Sur téléphone, un sous-titre de page long mange l'écran : il passe
+   sous le titre plutôt que de repousser les boutons d'action. */
+@media screen and (max-width: 700px) {
+  .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-header .header-actions { width: 100%; }
+  .page-header .header-actions .btn { justify-content: center; }
+}

@@ -198,6 +198,73 @@
     });
   }
 
+  /* ---------- Tableaux lisibles sur téléphone ----------
+     Un tableau de neuf colonnes ne tient pas sur un écran de téléphone :
+     il faudrait le faire glisser de côté, et la ligne ne serait jamais
+     visible en entier — on perd de vue à qui appartiennent les montants
+     affichés. Chaque ligne devient donc une fiche : le nom de la colonne,
+     lu dans l'en-tête, est recopié devant chaque valeur dans `data-label`,
+     et la classe `sm-cartes` demande à css/responsive.css de masquer
+     l'en-tête puis d'empiler les fiches.
+
+     Aucune page n'a besoin d'être modifiée : les libellés viennent des
+     `th` existants. Les pages réécrivant leur `tbody` à chaque recherche
+     ou filtre, un observateur rejoue l'étiquetage après chaque rendu.
+
+     Si les colonnes ne correspondent pas au corps du tableau (en-têtes
+     groupés, lignes de séparation…), on ne touche à rien : le tableau
+     conserve son défilement latéral plutôt que de perdre ses libellés. */
+  var MINUTERIE_TABLEAUX = null;
+  var SURVEILLANCE_TABLEAUX = false;
+
+  function etiqueterTableaux() {
+    var tableaux = document.querySelectorAll("table.data");
+    for (var i = 0; i < tableaux.length; i++) {
+      var t = tableaux[i];
+      var ths = t.querySelectorAll("thead > tr > th");
+      if (!ths.length) continue;
+
+      var lignes = t.querySelectorAll("tbody > tr");
+      var motifComplet = lignes.length > 0;
+      for (var j = 0; j < lignes.length && motifComplet; j++) {
+        if (lignes[j].children.length !== ths.length) motifComplet = false;
+      }
+      if (!motifComplet) continue;
+
+      for (var m = 0; m < lignes.length; m++) {
+        var cellules = lignes[m].children;
+        for (var k = 0; k < cellules.length; k++) {
+          if (!cellules[k].hasAttribute("data-label")) {
+            cellules[k].setAttribute("data-label", (ths[k].textContent || "").trim());
+          }
+        }
+      }
+      t.classList.add("sm-cartes");
+      var cadre = t.closest ? t.closest(".table-wrap") : null;
+      if (cadre) cadre.classList.add("sm-cartes");
+    }
+  }
+
+  function planifierEtiquetage() {
+    if (MINUTERIE_TABLEAUX) return;
+    MINUTERIE_TABLEAUX = window.setTimeout(function () {
+      MINUTERIE_TABLEAUX = null;
+      etiqueterTableaux();
+    }, 60);
+  }
+
+  function surveillerTableaux() {
+    planifierEtiquetage();
+    if (SURVEILLANCE_TABLEAUX || typeof MutationObserver !== "function") return;
+    SURVEILLANCE_TABLEAUX = true;
+    // On n'observe que les changements de structure : l'étiquetage lui-même
+    // ne pose que des attributs, il ne peut donc pas se rappeler lui-même.
+    new MutationObserver(planifierEtiquetage).observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
   /* ---------- Libellé du mode de données (toujours le serveur) ---------- */
   function modeApi() { return window.SM_MODE === "api"; }
   function modeLabel() { return "API"; }
@@ -391,6 +458,9 @@
 
     // Micro-animations (apparitions, compteurs, onde au clic)
     animerInterface();
+
+    // Tableaux de la page : préparation de la lecture sur téléphone.
+    surveillerTableaux();
   }
 
   /* ---------- Actions autorisées ----------

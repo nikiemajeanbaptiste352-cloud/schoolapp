@@ -105,6 +105,16 @@
     "html.sm-app-shell .main{height:100%;min-height:0}",
     "html.sm-app-shell .sidebar{height:100%}",
     "html.sm-app-shell .topbar{flex:0 0 auto}",
+    /* Barre d'etat du telephone (heure, batterie...). Le systeme peut laisser
+       la page se dessiner dessous, notamment sur Android 15 et suivants ou
+       l'affichage « bord a bord » est impose : sans precaution, le titre de
+       l'ecran passe sous l'heure du telephone. On reserve donc la hauteur
+       annoncee par le systeme. Si elle vaut 0 (page deja cadree), rien ne
+       change. Le retrait est applique au bandeau lui-meme et non a son
+       contenu, pour que le fond bleu continue de remplir la zone. */
+    "html.sm-app-shell .topbar{padding-top:env(safe-area-inset-top,0px);",
+    "height:calc(var(--topbar-h,64px) + env(safe-area-inset-top,0px))}",
+    "html.sm-app-shell .sidebar{padding-top:env(safe-area-inset-top,0px)}",
     "html.sm-app-shell .content{flex:1 1 auto;min-height:0;overflow-y:auto;",
     "-webkit-overflow-scrolling:touch;overscroll-behavior:contain;",
     "padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px)}",
@@ -132,6 +142,18 @@
       /* a) Les ecrans de l'application : le cadre ne bouge plus, seule la
             zone de contenu defile. */
       if (document.querySelector(".app")) {
+        /* Les zones reservees par le systeme (barre d'etat, barre de gestes)
+           ne sont annoncees a la page que si le cadrage « bord a bord » est
+           demande. Les pages de l'application sont recopiees telles quelles
+           depuis le site : elles ne portent pas cette option, on l'ajoute
+           ici, sans toucher au reste de leur cadrage. */
+        var meta = document.querySelector('meta[name="viewport"]');
+        if (meta) {
+          var cadrage = meta.getAttribute("content") || "";
+          if (cadrage.indexOf("viewport-fit") === -1) {
+            meta.setAttribute("content", cadrage + ", viewport-fit=cover");
+          }
+        }
         var style = document.createElement("style");
         style.id = "sm-coque-app";
         style.appendChild(document.createTextNode(COQUE_CSS));
