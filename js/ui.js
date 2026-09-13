@@ -245,7 +245,16 @@
 
       // Événements topbar
       var btnMenu = document.getElementById("btnMenu");
-      if (btnMenu) btnMenu.addEventListener("click", function () { document.body.classList.toggle("sidebar-open"); });
+      // `stopPropagation` est indispensable : le gestionnaire « clic ailleurs »
+      // défini plus bas dans ce bloc referme le panneau dès que la cible du clic
+      // n'est pas DANS `.sidebar` — ce qui est le cas du bouton ☰, situé dans la
+      // barre du haut. Sans lui, le clic ouvrait puis refermait le tiroir dans le
+      // même geste : la navigation restait inaccessible au doigt (téléphone et
+      // application Android, où `.sidebar` est un panneau glissant).
+      if (btnMenu) btnMenu.addEventListener("click", function (e) {
+        e.stopPropagation();
+        document.body.classList.toggle("sidebar-open");
+      });
       var btnNotif = document.getElementById("btnNotif");
       if (btnNotif) btnNotif.addEventListener("click", function (e) { e.stopPropagation(); toggleDropdown("menuNotif"); });
       var btnUser = document.getElementById("btnUser");

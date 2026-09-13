@@ -54,8 +54,8 @@ mise à jour de l'application.
 | **Clé de signature** | `mobile/android/keystore/schoolmanager.jks` | **non — confidentiel** |
 | **Mot de passe de la clé** | `mobile/android/key.properties` | **non — confidentiel** |
 | Copie de sauvegarde de la clé | `Documents\SchoolManager-SIGNATURE\` | **hors dépôt** |
-| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.1.aab` | non |
-| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.1.apk` | non |
+| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.2.aab` | non |
+| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.2.apk` | non |
 
 > ⚠️ `supabase/`, `backend/`, `docs/` et tout fichier `.env` sont **volontairement exclus**
 > de l'application. Le script `assembler-www.js` vérifie cette exclusion et s'arrête
@@ -69,8 +69,8 @@ mise à jour de l'application.
 |---|---|
 | Nom affiché | SchoolManager |
 | Identifiant (paquet) | `com.schoolapp.mobile` |
-| Code de version | `2` |
-| Nom de version | `1.1` |
+| Code de version | `3` |
+| Nom de version | `1.2` |
 | Android minimal | 7.0 (niveau d'API 24) |
 | Android ciblé | API 36 (Android 16) |
 | Alias de signature | `schoolmanager` |
@@ -219,20 +219,26 @@ sur Vercel n'est jamais touché.
 
 Les autres adaptations sont regroupées dans `mobile/surcharges/js/mobile-config.js`,
 injecté automatiquement dans chaque page par l'assembleur. **Aucun fichier du site
-lui-même n'a été modifié pour l'application, à une exception près** (`js/live.js`,
-voir plus bas).
+lui-même n'a été modifié pour l'application, à deux exceptions près** (`js/live.js` et
+`js/ui.js`, voir plus bas).
 
 | Adaptation | Pourquoi |
 |---|---|
 | L'adresse du serveur est fixée explicitement | Dans l'application, les pages ne sont plus servies par le serveur : elles sont locales. Les chemins relatifs ne peuvent plus fonctionner. |
 | `sessionStorage` est redirigé vers `localStorage` | Sur mobile, « session » signifie « tant que l'application n'est pas tuée ». La session aurait été perdue à chaque fermeture. Ce détour la conserve, sans toucher aux fichiers du site. |
 | L'écran de démarrage est masqué dès que la page est prête | Sinon l'image de démarrage resterait affichée pendant que la page charge. |
+| Les écrans sont encadrés comme une vraie application | Sans cela, la page entière défilait (barre latérale, en-tête et menu partaient vers le haut) : on voyait un site web, pas une application. Une « coque » est posée : la hauteur de l'écran est fixée et **seule la zone de contenu défile**. |
 
 `js/live.js` a reçu deux corrections utiles à l'application : un appel à
 `window.SM_MASQUER_DEMARRAGE` lorsque la page est affichée (sans effet sur le site, où
 cette fonction n'existe pas), et l'effacement de `sm_session` en même temps qu'un jeton
 invalide — sans quoi l'application renvoyait sans fin de l'écran de connexion au
 tableau de bord, puis du tableau de bord à l'écran de connexion.
+
+`js/ui.js` a reçu une correction utile au site autant qu'à l'application : le bouton
+**☰** du menu interrompt désormais la propagation de son clic. Sans cela, le gestionnaire
+« cliquez ailleurs pour fermer » du document refermait le tiroir au moment même de
+l'ouvrir : sur un écran étroit (téléphone), le menu latéral ne s'ouvrait pas.
 
 ### Conséquence à connaître
 
@@ -295,7 +301,7 @@ déléguées.
 ### Téléversement
 
 Play Console → votre application → **Production** (ou **Test fermé**) → **Créer une
-version** → déposer `SchoolManager-1.1.aab` → écrire les notes de version → envoyer
+version** → déposer `SchoolManager-1.2.aab` → écrire les notes de version → envoyer
 pour examen. Le premier examen prend généralement quelques jours.
 
 ---
@@ -314,7 +320,7 @@ Le `versionCode` suit une progression stricte : 1, 2, 3… sans retour en arriè
 
 ## 11. Installer sur un téléphone sans passer par Google Play
 
-1. Copier `SchoolManager-1.1.apk` sur le téléphone (câble, courriel, ou `adb install`).
+1. Copier `SchoolManager-1.2.apk` sur le téléphone (câble, courriel, ou `adb install`).
 2. Sur le téléphone : Paramètres → Sécurité → autoriser l'installation
    d'applications de sources inconnues pour l'application utilisée.
 3. Ouvrir le fichier `.apk` et confirmer.
@@ -323,7 +329,7 @@ Avec le câble, depuis un terminal :
 
 ```powershell
 & "$env:USERPROFILE\AndroidToolchain\sdk\platform-tools\adb.exe" install -r `
-  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.1.apk"
+  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.2.apk"
 ```
 
 Cette voie convient aux tests et aux utilisateurs avertis. Pour une diffusion large,
@@ -351,7 +357,7 @@ Get-Content "$env:USERPROFILE\AndroidToolchain\journaux\release.log" -Tail 50
 
 ---
 
-## 13. Limites connues de la version 1.1
+## 13. Limites connues de la version 1.2
 
 * **Android uniquement.** Une version iOS exigerait un Mac et un compte Apple
   Developer (99 USD par an) : la même base web est réutilisable, mais le travail
