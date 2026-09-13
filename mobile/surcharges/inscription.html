@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Créer un compte — SchoolManager</title>
+  <!-- ============================================================
+       SchoolManager — Écran d'INSCRIPTION de l'APPLICATION mobile
+       ------------------------------------------------------------
+       Ce fichier n'existe QUE dans mobile/ : outils/assembler-www.js
+       le copie dans www/inscription.html.
+
+       Pourquoi : jusqu'ici, le lien « Autres accès » de l'écran de
+       connexion ouvrait `site.html`, c'est-à-dire la page publique
+       du site web (bandeau, photo, FAQ, pied de page, formulaire
+       d'inscription tout en bas). Dans l'application, cela donnait
+       l'impression de « sortir » de l'application pour s'inscrire.
+
+       Cet écran reprend exactement la charte de l'écran de connexion
+       et propose les deux inscriptions publiques de l'API :
+
+         - Établissement → POST /auth/inscription-etablissement
+                           (crée le compte Administrateur) ;
+         - Parent        → POST /auth/inscription
+                           (crée le compte Parent).
+
+       Dans les deux cas l'utilisateur est connecté aussitôt et
+       arrive sur le tableau de bord.
+
+       La page publique du site reste accessible par un lien discret
+       (connexion Google, code reçu par email) : ces parcours-là ont
+       besoin des redirections du site.
+
+       Le site web publié (Vercel) n'est pas concerné.
+       ============================================================ -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#071226" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="icon" href="assets/logo.svg" />
+  <style>
+    :root {
+      --nuit: #071226;
+      --or: #f2b33d;
+      --texte: #eaf0fb;
+      --texte-2: #93a6c4;
+      --bord: rgba(255, 255, 255, .10);
+      --ok: #3ddc97;
+      --ko: #ff8f8f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      background: var(--nuit);
+      color: var(--texte);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      /* Écran d'application : la page ne défile pas (contrairement à un site) */
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    [hidden] { display: none !important; }
+
+    .sm-app {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      padding: calc(env(safe-area-inset-top, 0px) + 22px) 20px calc(env(safe-area-inset-bottom, 0px) + 14px);
+      background:
+        radial-gradient(520px 300px at 50% -6%, rgba(37, 99, 235, .40), transparent 68%),
+        radial-gradient(420px 260px at 104% 106%, rgba(242, 179, 61, .16), transparent 72%),
+        linear-gradient(180deg, #071226 0%, #0a1a33 55%, #071226 100%);
+    }
+
+    /* ---------- En-tête ---------- */
+    .sm-tete { flex: none; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 2px; }
+    .sm-logo { width: 58px; height: 58px; display: block; border-radius: 16px; box-shadow: 0 12px 26px rgba(0, 0, 0, .45); }
+    .sm-nom { margin: 12px 0 3px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
+    .sm-sous { margin: 0; color: var(--texte-2); font-size: 12.5px; }
+
+    /* ---------- Zone centrale : seule zone défilante ---------- */
+    .sm-corps {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 16px 0;
+    }
+    .sm-carte {
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+      background: rgba(255, 255, 255, .055);
+      border: 1px solid var(--bord);
+      border-radius: 20px;
+      padding: 16px 16px 16px;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, .35);
+    }
+
+    /* ---------- Choix établissement / parent ---------- */
+    .sm-onglets {
+      display: flex;
+      gap: 6px;
+      padding: 4px;
+      margin-bottom: 16px;
+      background: rgba(0, 0, 0, .28);
+      border: 1px solid var(--bord);
+      border-radius: 14px;
+    }
+    .sm-onglet {
+      flex: 1 1 0;
+      min-height: 44px;
+      padding: 0 8px;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--texte-2);
+      background: none;
+      border: 0;
+      border-radius: 11px;
+      cursor: pointer;
+    }
+    .sm-onglet.is-actif {
+      color: #231603;
+      background: linear-gradient(180deg, #f7c458, #e0a52c);
+    }
+
+    .sm-champ { display: block; margin-bottom: 13px; }
+    .sm-champ span { display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 700; letter-spacing: .2px; color: var(--texte-2); }
+    .sm-champ input {
+      width: 100%;
+      height: 50px;
+      padding: 0 14px;
+      font-family: inherit;
+      font-size: 16px; /* 16px : le clavier ne zoome pas */
+      color: var(--texte);
+      background: #0a1830;
+      border: 1px solid #1c3255;
+      border-radius: 13px;
+      outline: none;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .sm-champ input::placeholder { color: #5d7396; }
+    .sm-champ input:focus { border-color: var(--or); box-shadow: 0 0 0 3px rgba(242, 179, 61, .16); }
+
+    .sm-erreur {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #ffb9b9;
+      background: rgba(255, 90, 90, .12);
+      border: 1px solid rgba(255, 120, 120, .34);
+      border-radius: 11px;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    .sm-btn {
+      width: 100%;
+      height: 54px;
+      border: 0;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 800;
+      color: #231603;
+      background: linear-gradient(180deg, #f7c458, #e0a52c);
+      box-shadow: 0 10px 22px rgba(224, 165, 44, .28);
+      cursor: pointer;
+    }
+    .sm-btn:active { transform: translateY(1px); }
+    .sm-btn:disabled { opacity: .72; cursor: default; }
+
+    .sm-etat { margin: 12px 0 0; text-align: center; font-size: 12px; line-height: 1.5; color: var(--texte-2); }
+    .sm-etat.ok { color: var(--ok); }
+    .sm-etat.ko { color: var(--ko); }
+
+    /* ---------- Pied d'écran ---------- */
+    .sm-pied { flex: none; display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+    .sm-lien {
+      padding: 8px 6px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--or);
+      text-decoration: none;
+      background: none;
+      border: 0;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .sm-lien-2 { font-size: 12.5px; font-weight: 600; color: var(--texte-2); }
+    .sm-note { margin: 2px 0 0; font-size: 11.5px; color: #5d7396; }
+
+    /* Téléphone en paysage : on compacte l'en-tête */
+    @media (max-height: 620px) {
+      .sm-logo { display: none; }
+      .sm-nom { margin-top: 4px; }
+      .sm-corps { padding: 8px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sm-app">
+    <header class="sm-tete">
+      <img class="sm-logo" src="assets/logo.svg" alt="" />
+      <h1 class="sm-nom">Créer un compte</h1>
+      <p class="sm-sous">Établissement ou parent — directement dans l'application</p>
+    </header>
+
+    <main class="sm-corps">
+      <div class="sm-carte">
+        <div class="sm-onglets" role="tablist">
+          <button class="sm-onglet is-actif" id="ongletEtab" type="button" role="tab" aria-selected="true">Établissement</button>
+          <button class="sm-onglet" id="ongletParent" type="button" role="tab" aria-selected="false">Parent</button>
+        </div>
+
+        <!-- ---------- Compte de direction (établissement) ---------- -->
+        <form id="formEtab" novalidate>
+          <label class="sm-champ">
+            <span>Nom de l'établissement</span>
+            <input id="etabEcole" type="text" autocomplete="organization" enterkeyhint="next" placeholder="Ex. Lycée Le Savoir" />
+          </label>
+          <label class="sm-champ">
+            <span>Votre nom complet</span>
+            <input id="etabNom" type="text" autocomplete="name" enterkeyhint="next" placeholder="Ex. Ouédraogo Jean" />
+          </label>
+          <label class="sm-champ">
+            <span>Adresse email</span>
+            <input id="etabEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="nom@etablissement.com" />
+          </label>
+          <label class="sm-champ">
+            <span>Mot de passe (6 caractères minimum)</span>
+            <input id="etabMdp" type="password" autocomplete="new-password" enterkeyhint="go" placeholder="••••••••" />
+          </label>
+
+          <p class="sm-erreur" id="etabErreur" hidden></p>
+
+          <button class="sm-btn" id="etabBtn" type="submit">Créer mon établissement</button>
+          <p class="sm-etat" id="etabEtat">Le compte créé est administrateur de l'établissement.</p>
+        </form>
+
+        <!-- ---------- Compte Parent ---------- -->
+        <form id="formParent" novalidate hidden>
+          <label class="sm-champ">
+            <span>Votre nom complet</span>
+            <input id="parentNom" type="text" autocomplete="name" enterkeyhint="next" placeholder="Ex. Kaboré Awa" />
+          </label>
+          <label class="sm-champ">
+            <span>Adresse email</span>
+            <input id="parentEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="nom@exemple.com" />
+          </label>
+          <label class="sm-champ">
+            <span>Mot de passe (6 caractères minimum)</span>
+            <input id="parentMdp" type="password" autocomplete="new-password" enterkeyhint="go" placeholder="••••••••" />
+          </label>
+
+          <p class="sm-erreur" id="parentErreur" hidden></p>
+
+          <button class="sm-btn" id="parentBtn" type="submit">Créer mon compte parent</button>
+          <p class="sm-etat" id="parentEtat">Vous suivrez les notes, absences et paiements de vos enfants.</p>
+        </form>
+      </div>
+    </main>
+
+    <footer class="sm-pied">
+      <a class="sm-lien" href="index.html">← Revenir à la connexion</a>
+      <a class="sm-lien sm-lien-2" href="site.html">Connexion Google ou par code email</a>
+      <p class="sm-note">Version 1.3 · Application Android</p>
+    </footer>
+  </div>
+
+  <!-- js/api.js est chargé ici : l'assemblage insère juste avant lui
+       js/mobile-config.js, qui fixe l'adresse du serveur et rend la
+       session persistante. Ne pas changer cet ordre. -->
+  <script src="js/api.js"></script>
+  <script>
+    /* ============================================================
+       Écran d'inscription de l'application — logique
+       ------------------------------------------------------------
+       Les deux inscriptions publiques de l'API renvoient un jeton :
+       l'utilisateur est connecté dès la création du compte, on écrit
+       la même session que l'écran de connexion (sm_session) puis on
+       ouvre le tableau de bord.
+       ============================================================ */
+    (function () {
+      "use strict";
+
+      var CLE_JETON = "sm_token";
+      var CLE_SESSION = "sm_session";
+      var TABLEAU_DE_BORD = "pages/dashboard.html";
+      var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      function lire(cle) {
+        try { return sessionStorage.getItem(cle); } catch (e) { return null; }
+      }
+
+      /* Déjà connecté ? On ne demande pas de créer un compte. */
+      if (lire(CLE_JETON) && lire(CLE_SESSION)) {
+        window.location.replace(TABLEAU_DE_BORD);
+        return;
+      }
+
+      /* ---------- Onglets Établissement / Parent ---------- */
+      var ongletEtab = document.getElementById("ongletEtab");
+      var ongletParent = document.getElementById("ongletParent");
+      var formEtab = document.getElementById("formEtab");
+      var formParent = document.getElementById("formParent");
+
+      function afficher(vue) {
+        var etab = vue !== "parent";
+        formEtab.hidden = !etab;
+        formParent.hidden = etab;
+        ongletEtab.className = "sm-onglet" + (etab ? " is-actif" : "");
+        ongletParent.className = "sm-onglet" + (etab ? "" : " is-actif");
+        ongletEtab.setAttribute("aria-selected", etab ? "true" : "false");
+        ongletParent.setAttribute("aria-selected", etab ? "false" : "true");
+        var premier = (etab ? formEtab : formParent).querySelector("input");
+        if (premier) premier.focus();
+      }
+      ongletEtab.addEventListener("click", function () { afficher("etab"); });
+      ongletParent.addEventListener("click", function () { afficher("parent"); });
+
+      /* ---------- Validation ---------- */
+      function message(el, texte) {
+        if (!texte) { el.textContent = ""; el.hidden = true; return false; }
+        el.textContent = texte;
+        el.hidden = false;
+        return true;
+      }
+      function statut(el, texte, classe) {
+        el.textContent = texte;
+        el.className = "sm-etat" + (classe ? " " + classe : "");
+      }
+
+      /* Verifie les champs communs : nom, email, mot de passe.
+         `ecoleObligatoire` : le nom de l'etablissement n'est demande qu'a la
+         creation du compte de direction. */
+      function verifier(nom, email, mdp, ecole, ecoleObligatoire, err) {
+        if (ecoleObligatoire && !ecole.value.trim()) {
+          return message(err, "Saisissez le nom de votre établissement.") || true;
+        }
+        if (!nom.value.trim()) return message(err, "Saisissez votre nom complet.") || true;
+        if (!EMAIL.test((email.value || "").trim())) {
+          return message(err, "Saisissez une adresse email valide (ex. nom@etablissement.com).") || true;
+        }
+        if ((mdp.value || "").length < 6) {
+          return message(err, "Le mot de passe doit contenir au moins 6 caractères.") || true;
+        }
+        return false;
+      }
+
+      function enregistrerSession(data, emailSaisi) {
+        var user = (data && data.user) || {};
+        try {
+          sessionStorage.setItem(CLE_SESSION, JSON.stringify({
+            role: user.role || "Parent",
+            email: user.email || emailSaisi,
+            nom: user.nom || ""
+          }));
+        } catch (e) { /* stockage indisponible : la session reste en mémoire */ }
+      }
+
+      function brancher(options) {
+        var form = options.form;
+        var btn = options.btn;
+        var err = options.erreur;
+        var etat = options.etat;
+        var occupe = false;
+
+        /* On efface le message d'erreur des que l'on corrige un champ. */
+        options.champs.forEach(function (c) {
+          c.addEventListener("input", function () { message(err, ""); });
+        });
+
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          if (occupe) return;
+          if (verifier(options.nom, options.email, options.mdp, options.ecole,
+                       options.ecoleObligatoire, err)) return;
+          if (!window.API) { statut(etat, "Application incomplète : js/api.js manquant.", "ko"); return; }
+
+          var courriel = options.email.value.trim();
+          message(err, "");
+          occupe = true;
+          btn.disabled = true;
+          btn.textContent = "Création du compte…";
+          statut(etat, "Envoi au serveur…");
+
+          options.appel(courriel).then(function (data) {
+            enregistrerSession(data, courriel);
+            statut(etat, "Compte créé. Ouverture…", "ok");
+            window.location.replace(TABLEAU_DE_BORD);
+          }).catch(function (echec) {
+            occupe = false;
+            btn.disabled = false;
+            btn.textContent = options.libelleBouton;
+            if (echec && echec.reseau) {
+              statut(etat, "Serveur injoignable.", "ko");
+              message(err, "Impossible de joindre le serveur. Vérifiez votre connexion internet, puis réessayez.");
+            } else {
+              statut(etat, "", "");
+              message(err, (echec && echec.detail) || "La création du compte a échoué.");
+            }
+          });
+        });
+      }
+
+      /* ---------- Compte de direction ---------- */
+      var etabChamps = [
+        document.getElementById("etabEcole"),
+        document.getElementById("etabNom"),
+        document.getElementById("etabEmail"),
+        document.getElementById("etabMdp")
+      ];
+      brancher({
+        form: formEtab,
+        btn: document.getElementById("etabBtn"),
+        libelleBouton: "Créer mon établissement",
+        erreur: document.getElementById("etabErreur"),
+        etat: document.getElementById("etabEtat"),
+        nom: etabChamps[1],
+        email: etabChamps[2],
+        mdp: etabChamps[3],
+        ecole: etabChamps[0],
+        ecoleObligatoire: true,
+        champs: etabChamps,
+        appel: function (courriel) {
+          return window.API.inscriptionEtablissement(
+            etabChamps[0].value.trim(), etabChamps[1].value.trim(), courriel, etabChamps[3].value
+          );
+        }
+      });
+
+      /* ---------- Compte Parent ---------- */
+      var parentChamps = [
+        document.getElementById("parentNom"),
+        document.getElementById("parentEmail"),
+        document.getElementById("parentMdp")
+      ];
+      brancher({
+        form: formParent,
+        btn: document.getElementById("parentBtn"),
+        libelleBouton: "Créer mon compte parent",
+        erreur: document.getElementById("parentErreur"),
+        etat: document.getElementById("parentEtat"),
+        nom: parentChamps[0],
+        email: parentChamps[1],
+        mdp: parentChamps[2],
+        ecole: parentChamps[0], /* sans objet : l'etablissement n'est pas demande */
+        ecoleObligatoire: false,
+        champs: parentChamps,
+        appel: function (courriel) {
+          return window.API.inscription(
+            parentChamps[0].value.trim(), courriel, parentChamps[2].value
+          );
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

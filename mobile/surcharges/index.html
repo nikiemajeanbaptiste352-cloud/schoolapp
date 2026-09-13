@@ -15,8 +15,11 @@
        défilement de page, aux couleurs de l'application.
 
        La page publique du site reste disponible dans l'application
-       sous le nom « site.html » (inscription établissement, code
-       reçu par email, connexion Google).
+       sous le nom « site.html » (connexion Google, code reçu par
+       email). L'inscription a, elle, son propre écran d'application
+       (inscription.html) : sans cela, s'inscrire ouvrait la page
+       publique du site, avec son bandeau et son formulaire tout en
+       bas.
 
        Le site web publié (Vercel) garde son index.html : rien n'est
        modifié côté web.
@@ -153,6 +156,7 @@
       font-family: inherit;
       cursor: pointer;
     }
+    .sm-lien-2 { font-size: 12.5px; font-weight: 600; color: var(--texte-2); }
     .sm-note { margin: 2px 0 0; font-size: 11.5px; color: #5d7396; }
 
     /* Petits écrans (téléphone en paysage) : on compacte l'en-tête */
@@ -195,9 +199,10 @@
     </main>
 
     <footer class="sm-pied">
-      <a class="sm-lien" href="site.html">Autres accès : Google, inscription, code</a>
+      <a class="sm-lien" href="inscription.html">Créer un compte (établissement ou parent)</a>
+      <a class="sm-lien sm-lien-2" href="site.html">Connexion Google ou par code email</a>
       <button class="sm-lien" id="btnAide" type="button">Mot de passe oublié</button>
-      <p class="sm-note">Version 1.2 · Application Android</p>
+      <p class="sm-note">Version 1.3 · Application Android</p>
     </footer>
   </div>
 

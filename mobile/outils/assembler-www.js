@@ -22,9 +22,13 @@
        email / mot de passe). La page publique du site ne peut pas servir
        d'écran d'accueil : bandeau, photo, FAQ et pied de page font
        « site web », pas « application » ;
+     - inscription.html : l'écran de création de compte (établissement ou
+       parent), avec ses deux onglets. Il remplace le formulaire du site :
+       s'inscrire ouvrait la page publique, qu'il fallait faire défiler
+       jusqu'en bas — déroutant dans une application ;
      - la page publique du site (index.html) est conservée sous le nom
-       site.html : inscription établissement, code reçu par email et
-       connexion Google restent accessibles depuis l'application.
+       site.html : code reçu par email et connexion Google restent
+       accessibles depuis l'application.
 
    Usage :  node outils/assembler-www.js
    ============================================================ */
@@ -45,7 +49,7 @@ const INCLUS = ["index.html", "css", "js", "pages", "assets"];
 /* Écrans fournis par la version mobile, absents du site : ils s'ajoutent
    aux pages du site et doivent donc recevoir la configuration mobile eux
    aussi (js/mobile-config.js). */
-const PAGES_MOBILE = ["index.html"];
+const PAGES_MOBILE = ["index.html", "inscription.html"];
 
 /* Fichiers qui ne doivent JAMAIS se retrouver dans l'application */
 const INTERDITS = [

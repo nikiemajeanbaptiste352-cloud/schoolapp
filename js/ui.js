@@ -125,6 +125,79 @@
   PAGES.forEach(function (p) { TITRES[p.key] = p.titre; });
   TITRES["student-profile"] = "Fiche élève";
 
+  /* ---------- Barre de navigation du téléphone ----------
+     Le tiroir latéral (bouton ☰) reste le menu complet. Mais sur un
+     téléphone, l'ouvrir à chaque changement d'écran est pénible : une
+     barre fixe au bas de l'écran propose les quatre écrans les plus
+     utilisés du profil, plus l'accès au menu complet.
+
+     Elle n'est visible que sur les petits écrans (voir css/responsive.css,
+     règle `.sm-navbas`) : sur ordinateur, le menu latéral suffit et rien
+     ne change.
+
+     Les écrans sont choisis par rôle, puis filtrés par la liste autorisée
+     du serveur (`capacites`) exactement comme le menu latéral : une entrée
+     non autorisée n'est jamais proposée. */
+  var NAVBAS = {
+    "Administrateur": ["dashboard", "students", "grades", "payments"],
+    "Professeur": ["dashboard", "mes-seances", "grades", "ma-paie"],
+    "Surveillant": ["dashboard", "students", "vie-scolaire", "timetable"],
+    "Élève": ["dashboard", "grades", "report-cards", "payments"],
+    "Parent": ["dashboard", "students", "grades", "payments"]
+  };
+
+  /* Libellés propres à la barre : le premier écran s'appelle « Accueil ». */
+  var NAVBAS_LIBELLES = { dashboard: "Accueil" };
+
+  /* Écrans rattachés à une entrée de la barre (fiche élève → Élèves). */
+  var NAVBAS_RATTACHEMENT = { "student-profile": "students" };
+
+  function definitionPage(key) {
+    for (var i = 0; i < PAGES.length; i++) {
+      if (PAGES[i].key === key) return PAGES[i];
+    }
+    return null;
+  }
+
+  function construireNavBas(page, pagesServeur) {
+    var principale = document.querySelector(".main");
+    if (!principale || document.getElementById("navbas")) return;
+
+    var cles = NAVBAS[roleCourant()] || NAVBAS["Administrateur"];
+    var courante = NAVBAS_RATTACHEMENT[page] || page;
+    var html = "";
+
+    cles.forEach(function (key) {
+      if (pagesServeur && pagesServeur.indexOf(key) === -1) return;
+      var def = definitionPage(key);
+      if (!def) return;
+      var libelle = NAVBAS_LIBELLES[key] || titrePage(key, def.titre);
+      html += '<a class="navbas-item' + (courante === key ? " is-actif" : "") + '" href="' + def.lien + '">' +
+              '<span class="navbas-ico">' + def.icone + "</span>" +
+              '<span class="navbas-txt">' + escapeHtml(libelle) + "</span></a>";
+    });
+
+    // Toujours une entrée : le menu complet, sans quitter l'écran courant.
+    html += '<button class="navbas-item" id="btnNavbasMenu" type="button">' +
+            '<span class="navbas-ico">☰</span>' +
+            '<span class="navbas-txt">Menu</span></button>';
+
+    var nav = document.createElement("nav");
+    nav.id = "navbas";
+    nav.className = "sm-navbas";
+    nav.setAttribute("aria-label", "Navigation rapide");
+    nav.innerHTML = html;
+    principale.appendChild(nav);
+
+    // `stopPropagation` : le gestionnaire « clic ailleurs » referme le tiroir
+    // dès que la cible n'est pas DANS `.sidebar` (même raison que le bouton ☰).
+    var btnMenu = document.getElementById("btnNavbasMenu");
+    if (btnMenu) btnMenu.addEventListener("click", function (e) {
+      e.stopPropagation();
+      document.body.classList.toggle("sidebar-open");
+    });
+  }
+
   /* ---------- Libellé du mode de données (toujours le serveur) ---------- */
   function modeApi() { return window.SM_MODE === "api"; }
   function modeLabel() { return "API"; }
@@ -283,6 +356,9 @@
         });
       });
     }
+
+    // Barre de navigation du téléphone (masquée sur ordinateur).
+    construireNavBas(page, pagesServeur);
 
     // Actions interdites : masquées. On masque au lieu de retirer, car les
     // scripts de page attachent leurs écouteurs à ces boutons au chargement.

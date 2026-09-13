@@ -46,6 +46,7 @@ mise à jour de l'application.
 | Configuration Capacitor | `mobile/capacitor.config.json` | oui |
 | Adaptations mobiles | `mobile/surcharges/js/mobile-config.js` | oui |
 | Écran d'accueil de l'application | `mobile/surcharges/index.html` | oui |
+| Écran de création de compte | `mobile/surcharges/inscription.html` | oui |
 | Script d'assemblage | `mobile/outils/assembler-www.js` | oui |
 | Script d'identité (icônes) | `mobile/outils/generer-identite.js` | oui |
 | Script de signature | `mobile/outils/creer-cle-signature.js` | oui |
@@ -54,8 +55,8 @@ mise à jour de l'application.
 | **Clé de signature** | `mobile/android/keystore/schoolmanager.jks` | **non — confidentiel** |
 | **Mot de passe de la clé** | `mobile/android/key.properties` | **non — confidentiel** |
 | Copie de sauvegarde de la clé | `Documents\SchoolManager-SIGNATURE\` | **hors dépôt** |
-| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.2.aab` | non |
-| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.2.apk` | non |
+| Paquet à publier (`.aab`) | `Documents\schoolapp-mobile\SchoolManager-1.3.aab` | non |
+| Fichier à installer (`.apk`) | `Documents\schoolapp-mobile\SchoolManager-1.3.apk` | non |
 
 > ⚠️ `supabase/`, `backend/`, `docs/` et tout fichier `.env` sont **volontairement exclus**
 > de l'application. Le script `assembler-www.js` vérifie cette exclusion et s'arrête
@@ -69,8 +70,8 @@ mise à jour de l'application.
 |---|---|
 | Nom affiché | SchoolManager |
 | Identifiant (paquet) | `com.schoolapp.mobile` |
-| Code de version | `3` |
-| Nom de version | `1.2` |
+| Code de version | `4` |
+| Nom de version | `1.3` |
 | Android minimal | 7.0 (niveau d'API 24) |
 | Android ciblé | API 36 (Android 16) |
 | Alias de signature | `schoolmanager` |
@@ -215,7 +216,8 @@ sur Vercel n'est jamais touché.
 | Écran | Fichier | Rôle |
 |---|---|---|
 | Écran d'accueil | `mobile/surcharges/index.html` | Remplace `www/index.html`. C'est le premier écran de l'application : logo, nom, formulaire de connexion, état du serveur. Aucun menu de site, aucun défilement de page, aucune photo de présentation. |
-| Page publique | `www/site.html` | L'ancienne page d'accueil du site, conservée sous ce nom et atteignable par le lien **« Autres accès »** de l'écran d'accueil. Elle sert aux inscriptions et aux connexions Google ou par code. |
+| Création de compte | `mobile/surcharges/inscription.html` | Écran d'inscription de l'application, avec deux onglets : **Établissement** et **Parent**. Il s'ouvre depuis « Créer un compte » sur l'écran d'accueil. Sans lui, s'inscrire ouvrait la page publique du site (`site.html`) et il fallait la faire défiler jusqu'en bas : on ne se croyait plus dans une application. |
+| Page publique | `www/site.html` | L'ancienne page d'accueil du site, conservée sous ce nom. Elle reste accessible depuis les deux écrans de l'application, par le lien discret **« Connexion Google ou par code email »**, et sert aux connexions Google ou par code reçu par email. |
 
 Les autres adaptations sont regroupées dans `mobile/surcharges/js/mobile-config.js`,
 injecté automatiquement dans chaque page par l'assembleur. **Aucun fichier du site
@@ -228,6 +230,7 @@ lui-même n'a été modifié pour l'application, à deux exceptions près** (`js
 | `sessionStorage` est redirigé vers `localStorage` | Sur mobile, « session » signifie « tant que l'application n'est pas tuée ». La session aurait été perdue à chaque fermeture. Ce détour la conserve, sans toucher aux fichiers du site. |
 | L'écran de démarrage est masqué dès que la page est prête | Sinon l'image de démarrage resterait affichée pendant que la page charge. |
 | Les écrans sont encadrés comme une vraie application | Sans cela, la page entière défilait (barre latérale, en-tête et menu partaient vers le haut) : on voyait un site web, pas une application. Une « coque » est posée : la hauteur de l'écran est fixée et **seule la zone de contenu défile**. |
+| Une barre de navigation fixe en bas de l'écran | Sur un téléphone, la barre latérale devient un tiroir : il fallait ouvrir ☰ puis choisir un écran, à chaque fois. `js/ui.js` ajoute donc une barre en bas (**Accueil**, les écrans les plus utilisés du profil, puis **Menu**) sur les écrans de moins de 900 px de large. Elle est masquée sur ordinateur, et son contenu est filtré par les mêmes autorisations que la barre latérale : aucune entrée non permise n'apparaît. |
 
 `js/live.js` a reçu deux corrections utiles à l'application : un appel à
 `window.SM_MASQUER_DEMARRAGE` lorsque la page est affichée (sans effet sur le site, où
@@ -301,7 +304,7 @@ déléguées.
 ### Téléversement
 
 Play Console → votre application → **Production** (ou **Test fermé**) → **Créer une
-version** → déposer `SchoolManager-1.2.aab` → écrire les notes de version → envoyer
+version** → déposer `SchoolManager-1.3.aab` → écrire les notes de version → envoyer
 pour examen. Le premier examen prend généralement quelques jours.
 
 ---
@@ -320,7 +323,7 @@ Le `versionCode` suit une progression stricte : 1, 2, 3… sans retour en arriè
 
 ## 11. Installer sur un téléphone sans passer par Google Play
 
-1. Copier `SchoolManager-1.2.apk` sur le téléphone (câble, courriel, ou `adb install`).
+1. Copier `SchoolManager-1.3.apk` sur le téléphone (câble, courriel, ou `adb install`).
 2. Sur le téléphone : Paramètres → Sécurité → autoriser l'installation
    d'applications de sources inconnues pour l'application utilisée.
 3. Ouvrir le fichier `.apk` et confirmer.
@@ -329,7 +332,7 @@ Avec le câble, depuis un terminal :
 
 ```powershell
 & "$env:USERPROFILE\AndroidToolchain\sdk\platform-tools\adb.exe" install -r `
-  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.2.apk"
+  "C:\Users\USER\Documents\schoolapp-mobile\SchoolManager-1.3.apk"
 ```
 
 Cette voie convient aux tests et aux utilisateurs avertis. Pour une diffusion large,
@@ -346,6 +349,7 @@ Google Play reste la seule solution raisonnable.
 | La session est perdue à chaque ouverture | L'adaptation `sessionStorage` n'a pas été appliquée | Vérifier que `js/mobile-config.js` est présent dans `www/` |
 | L'écran de démarrage ne disparaît pas | `js/live.js` n'appelle pas `SM_MASQUER_DEMARRAGE` | Comparer avec la version du dépôt |
 | L'application s'ouvre sur la page d'accueil du site web | La surcharge de l'écran d'accueil n'a pas été appliquée | Vérifier la présence de `mobile/surcharges/index.html`, puis relancer `npm run www` et `npm run sync` |
+| La barre de navigation du bas n'apparaît pas | L'écran mesure plus de 900 px de large (tablette, paysage) | Normal : au-delà de 900 px la barre latérale suffit — réduire la fenêtre pour la voir |
 | `key.properties not found` à la compilation | Normal : aucun paquet signé ne sera produit | Recopier la clé depuis la sauvegarde, ou travailler en `.apk` de test |
 | La compilation échoue après une modification de `build.gradle` | Syntaxe Gradle invalide | Revenir à la version du dépôt : `git checkout mobile/android/app/build.gradle` |
 
@@ -357,7 +361,7 @@ Get-Content "$env:USERPROFILE\AndroidToolchain\journaux\release.log" -Tail 50
 
 ---
 
-## 13. Limites connues de la version 1.2
+## 13. Limites connues de la version 1.3
 
 * **Android uniquement.** Une version iOS exigerait un Mac et un compte Apple
   Developer (99 USD par an) : la même base web est réutilisable, mais le travail

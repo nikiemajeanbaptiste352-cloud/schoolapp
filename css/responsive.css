@@ -117,3 +117,28 @@
   .btn-primary::before,
   .btn-success::before { display: none; }
 }
+
+/* ============================================================
+   Barre de navigation du téléphone (<= 900px)
+   ============================================================
+   js/ui.js insère `.sm-navbas` en bas du flux applicatif ; elle n'est
+   visible et utile que sur un écran de téléphone. Comme elle est fixe,
+   il faut lui réserver de la place, sinon le dernier élément du contenu
+   (bouton, dernière ligne d'un tableau) passerait dessous sans qu'on
+   puisse l'atteindre.
+
+   Ce bloc est volontairement placé en fin de fichier : à spécificité
+   égale, il doit l'emporter sur les règles `.content` des blocs
+   précédents (720px, etc.). */
+@media (max-width: 900px) {
+  .sm-navbas { display: flex; }
+  .content { padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Téléphone couché : la barre reste utilisable, on réduit juste les
+   textes pour ne pas manger la hauteur. */
+@media (max-width: 900px) and (max-height: 480px) {
+  .navbas-item { min-height: 44px; font-size: 10px; }
+  .navbas-ico { font-size: 17px; }
+  .content { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}

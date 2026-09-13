@@ -108,6 +108,15 @@
     "html.sm-app-shell .content{flex:1 1 auto;min-height:0;overflow-y:auto;",
     "-webkit-overflow-scrolling:touch;overscroll-behavior:contain;",
     "padding-bottom:calc(env(safe-area-inset-bottom,0px) + 40px)}",
+    "}",
+    /* Barre de navigation du telephone (js/ui.js) : elle est fixe au bas de
+       l'ecran, donc il faut lui reserver de la place, sinon la derniere
+       ligne d'un tableau ou un bouton resterait cache dessous. */
+    "@media screen and (max-width:900px){",
+    "html.sm-app-shell .content{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 74px)}",
+    "}",
+    "@media screen and (max-width:900px) and (max-height:480px){",
+    "html.sm-app-shell .content{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 64px)}",
     "}"
   ].join("");
 

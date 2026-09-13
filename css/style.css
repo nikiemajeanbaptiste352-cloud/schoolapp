@@ -282,6 +282,67 @@ h3 { font-size: 17px; }
 
 .menu-btn { display: none; }
 
+/* ============ Barre de navigation du téléphone ============
+   Masquée ici : elle n'apparaît que sur les petits écrans, où le menu
+   latéral devient un tiroir (voir css/responsive.css, `max-width: 900px`).
+   Elle est construite par js/ui.js selon le rôle : Accueil, les écrans les
+   plus utilisés du profil, puis l'accès au menu complet. */
+.sm-navbas {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45; /* sous la barre du haut (50) et le tiroir (60) */
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 4px 4px calc(env(safe-area-inset-bottom, 0px) + 4px);
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.10);
+}
+
+.navbas-item {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-muted);
+  text-align: center;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navbas-item:active { background: var(--primary-050); }
+
+.navbas-item.is-actif {
+  color: var(--primary);
+  background: var(--primary-050);
+}
+
+.navbas-ico { font-size: 19px; line-height: 1; }
+
+.navbas-txt {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .page-title {
   font-size: 18px;
   font-weight: 600;
