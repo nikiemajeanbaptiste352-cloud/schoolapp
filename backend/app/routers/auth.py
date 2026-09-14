@@ -3,6 +3,8 @@ comptes (admin), connexion par code email et « Se connecter avec Google »."""
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import secrets
 from datetime import timedelta
@@ -69,6 +71,17 @@ ROLES_CREABLES = ("Administrateur", "Professeur", "Surveillant", "Élève", "Par
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
+
+
+def _defi_pkce(verificateur: str) -> str:
+    """Condensé SHA-256 (base64url, sans « = ») du vérificateur PKCE.
+
+    RFC 7636 : seul ce condensé voyage vers Google ; le vérificateur reste
+    dans l'état signé. Un code d'autorisation intercepté devient donc
+    inexploitable par un tiers.
+    """
+    condensat = hashlib.sha256(verificateur.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(condensat).decode("ascii").rstrip("=")
 
 
 def _token_pour(user: User, db: Session) -> TokenOut:
@@ -369,8 +382,11 @@ def connexion_google(request: Request) -> RedirectResponse:
             detail="La connexion Google n'est pas configurée (identifiants manquants).",
         )
     redirect_uri = settings.google_redirect_uri or str(request.url_for("google_callback"))
+    verificateur = secrets.token_urlsafe(64)
     etat = create_access_token(
-        "etat-oauth", extra={"usage": "oauth-state"}, expire_minutes=10
+        "etat-oauth",
+        extra={"usage": "oauth-state", "cv": verificateur},
+        expire_minutes=10,
     )
     parametres = urlencode(
         {
@@ -381,6 +397,8 @@ def connexion_google(request: Request) -> RedirectResponse:
             "access_type": "online",
             "prompt": "select_account",
             "state": etat,
+            "code_challenge": _defi_pkce(verificateur),
+            "code_challenge_method": "S256",
         }
     )
     return RedirectResponse(f"{GOOGLE_AUTH_URL}?{parametres}")
@@ -430,15 +448,19 @@ def google_callback(
 
     # Échange du code d'autorisation contre un jeton d'accès.
     redirect_uri = settings.google_redirect_uri or str(request.url_for("google_callback"))
-    corps = urlencode(
-        {
-            "code": code,
-            "client_id": settings.google_client_id,
-            "client_secret": settings.google_client_secret,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code",
-        }
-    ).encode("utf-8")
+    donnees = {
+        "code": code,
+        "client_id": settings.google_client_id,
+        "client_secret": settings.google_client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }
+    # PKCE : le vérificateur conservé dans l'état signé prouve au serveur de
+    # jetons que c'est bien ce navigateur qui a initié la demande.
+    verificateur = payload.get("cv") or ""
+    if verificateur:
+        donnees["code_verifier"] = verificateur
+    corps = urlencode(donnees).encode("utf-8")
     try:
         with urlopen(
             UrlRequest(

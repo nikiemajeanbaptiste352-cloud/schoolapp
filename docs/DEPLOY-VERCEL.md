@@ -161,6 +161,18 @@ curl https://<alias>/api/v1/auth/options   # attendu : {"google":true,"code_emai
 
 ### Côté Google Cloud Console
 
+> ⚠️ **Le client OAuth doit être de type « Application Web ».** Les autres
+> types sont inutilisables ici — vérifié le 2026-09-14 avec un client
+> « Application de bureau » (JSON téléchargé `{"installed": …}`) :
+> - redirection de production → `Error 400: redirect_uri_mismatch` : ce type
+>   n'accepte pas qu'on enregistre une URL `https://…` ;
+> - redirection locale → `Error 400: invalid_request — The loopback flow has
+>   been blocked…` : le flux *loopback* (`http://127.0.0.1:…`) est refusé pour
+>   ce type de client.
+>
+> Ce client ne peut donc servir **ni en production ni en développement**.
+> Le secours est de créer un client **Application Web** dans le même projet.
+
 1. **API et services → Identifiants → Créer un identifiant → ID client OAuth**
    → type **Application Web**.
 2. **URI de redirection autorisés** — ajouter les deux :
@@ -170,6 +182,10 @@ curl https://<alias>/api/v1/auth/options   # attendu : {"google":true,"code_emai
    « Test », qui limite la connexion aux comptes de test déclarés).
 4. Copier le *client ID* et le *client secret* → `_configurer_connexion.ps1`
    ou dashboard Vercel → Settings → Environment Variables → Production.
+
+Le flux est protégé par **PKCE** (`code_challenge` S256, vérificateur conservé
+dans l'état signé) : rien à configurer côté Google, cela fonctionne avec
+n'importe quel client OAuth.
 
 ## Rappels
 

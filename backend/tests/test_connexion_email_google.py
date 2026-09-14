@@ -7,11 +7,17 @@ envoyé pendant les tests.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 
 from app import models
 from app.config import settings
 from app.database import SessionLocal
+from app.routers import auth as auth_router
+from app.security import decode_token
 from app.services import email as email_service
 
 # Code « fixe » injecté par les tests (au lieu d'un tirage aléatoire).
@@ -202,3 +208,88 @@ def test_google_callback_etat_invalide_401(client, monkeypatch):
         params={"code": "xyz", "state": "etat-falsifie"},
     )
     assert resp.status_code == 401
+
+
+def _redirection_google(client, monkeypatch) -> tuple[dict, str]:
+    """Prépare un état OAuth valide et renvoie (paramètres, URL brute)."""
+    monkeypatch.setattr(settings, "google_client_id", "CLIENT_TEST.apps.googleusercontent.com")
+    monkeypatch.setattr(settings, "google_client_secret", "SECRET_TEST")
+    monkeypatch.setattr(
+        settings,
+        "google_redirect_uri",
+        "http://testserver/api/v1/auth/google/callback",
+    )
+    resp = client.get("/api/v1/auth/google", follow_redirects=False)
+    assert resp.status_code in (302, 307)
+    location = resp.headers["location"]
+    return parse_qs(urlparse(location).query), location
+
+
+def test_google_utilise_pkce(client, monkeypatch):
+    """Le défi PKCE (S256) part chez Google, le vérificateur non.
+
+    Sans PKCE, un code d'autorisation intercepté sur le réseau resterait
+    échangeable par un tiers. Le vérificateur est rangé dans l'état signé :
+    il ne doit donc jamais apparaître dans l'URL de redirection.
+    """
+    requete, location = _redirection_google(client, monkeypatch)
+    assert requete["code_challenge_method"] == ["S256"]
+
+    defi = requete["code_challenge"][0]
+    assert 43 <= len(defi) <= 128
+    assert "=" not in defi  # base64url sans remplissage
+
+    verificateur = decode_token(requete["state"][0])["cv"]
+    assert len(verificateur) >= 43
+    attendu = (
+        base64.urlsafe_b64encode(hashlib.sha256(verificateur.encode("ascii")).digest())
+        .decode("ascii")
+        .rstrip("=")
+    )
+    assert defi == attendu  # le défi correspond bien au vérificateur transmis
+    assert verificateur not in location  # ...et le vérificateur ne fuit pas
+
+
+def test_google_callback_transmet_le_verificateur(client, monkeypatch):
+    """L'échange du code auprès de Google porte bien le code_verifier."""
+    requete, _ = _redirection_google(client, monkeypatch)
+    etat = requete["state"][0]
+    verificateur = decode_token(etat)["cv"]
+    corps_envoyes: list[str] = []
+
+    class _Reponse:
+        def __init__(self, donnees: dict) -> None:
+            self._donnees = donnees
+
+        def __enter__(self) -> "_Reponse":
+            return self
+
+        def __exit__(self, *_exc) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps(self._donnees).encode("utf-8")
+
+    def _faux_urlopen(requete_http, timeout=None):
+        donnees = getattr(requete_http, "data", None)
+        if donnees is None:  # appel au profil Google (userinfo)
+            return _Reponse(
+                {
+                    "email": "eleve.google@schoolmanager.test",
+                    "email_verified": True,
+                    "name": "Eleve Google",
+                }
+            )
+        corps_envoyes.append(donnees.decode("utf-8"))
+        return _Reponse({"access_token": "jeton-google-de-test"})
+
+    monkeypatch.setattr(auth_router, "urlopen", _faux_urlopen)
+    resp = client.get(
+        "/api/v1/auth/google/callback",
+        params={"code": "code-de-test", "state": etat},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 307)
+    assert "#token=" in resp.headers["location"]
+    assert len(corps_envoyes) == 1
+    assert f"code_verifier={verificateur}" in corps_envoyes[0]
