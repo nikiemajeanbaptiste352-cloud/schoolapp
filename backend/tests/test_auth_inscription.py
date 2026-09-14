@@ -42,6 +42,20 @@ def test_inscription_exige_mot_de_passe_minimum(client):
     assert resp.status_code == 422
 
 
+def test_inscription_refuse_email_invalide(client):
+    """Une adresse sans `@` ni domaine est refusée (422) au lieu d'être créée.
+
+    Régression : `/auth/inscription` ne validait pas le format et créait un
+    compte avec n'importe quelle chaîne (constaté en production).
+    """
+    resp = client.post(
+        "/api/v1/auth/inscription",
+        json={"nom": "Sans Domaine", "email": "pas-un-email", "password": "Secret123!"},
+    )
+    assert resp.status_code == 422
+    assert "invalide" in resp.json()["detail"].lower()
+
+
 def test_admin_cree_compte_et_liste(client, admin_token):
     """L'admin crée un compte Professeur puis le retrouve dans la liste."""
     from tests.conftest import h

@@ -122,6 +122,55 @@ ici `https://schoolapp-flame-six.vercel.app`) et se connecter avec
 > Vercel ») — c'est **normal**. L'alias de production (`schoolapp-*.vercel.app`
 > ou le domaine personnalisé) reste **public** : c'est celui à diffuser.
 
+## 3 bis. Connexion Google et code par email (optionnel)
+
+Le backend est autonome : la connexion Google est une implémentation OAuth 2.0
+**maison** (`app/routers/auth.py`) qui lit des variables d'environnement.
+Supabase ne sert ici que de base PostgreSQL — activer Google dans Supabase Auth
+**n'a aucun effet** sur cette application.
+
+Variables lues par `app/config.py` :
+
+| Variable | Rôle | Confidentialité |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | identifiant du client OAuth (Google Cloud) | publique (visible dans l'URL) |
+| `GOOGLE_CLIENT_SECRET` | secret du client OAuth | **strictement confidentiel** |
+| `GOOGLE_REDIRECT_URI` | URL de retour (déjà posée en prod) | publique |
+| `EMAIL_FROM` | expéditeur des codes (`SchoolManager <no-reply@…>`) | publique |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | envoi SMTP (Gmail : `smtp.gmail.com` / `587` / mot de passe d'application) | `SMTP_PASS` confidentiel |
+| `RESEND_API_KEY` | alternative à SMTP (prioritaire si présente) | confidentiel |
+
+Sans `GOOGLE_CLIENT_ID` **et** `GOOGLE_CLIENT_SECRET`, `/api/v1/auth/google`
+répond `503` et `/api/v1/auth/options` renvoie `"google": false` (les boutons
+restent alors masqués dans l'interface). Idem pour `code_email`.
+
+### Poser les variables sans écrire aucun secret sur le disque
+
+```powershell
+# Depuis la racine du projet. Le client ID s'affiche, le secret est saisi
+# masqué (Read-Host -AsSecureString) et envoyé directement à Vercel.
+powershell -ExecutionPolicy Bypass -File .\_configurer_connexion.ps1
+```
+
+Puis **redéployer** (Vercel ne relit les variables qu'au déploiement suivant) :
+
+```powershell
+vercel deploy --prod
+curl https://<alias>/api/v1/auth/options   # attendu : {"google":true,"code_email":true}
+```
+
+### Côté Google Cloud Console
+
+1. **API et services → Identifiants → Créer un identifiant → ID client OAuth**
+   → type **Application Web**.
+2. **URI de redirection autorisés** — ajouter les deux :
+   - `https://schoolapp-flame-six.vercel.app/api/v1/auth/google/callback`
+   - `http://127.0.0.1:8000/api/v1/auth/google/callback` (développement local)
+3. **Écran de consentement OAuth** : le passer en **Publié** (hors mode
+   « Test », qui limite la connexion aux comptes de test déclarés).
+4. Copier le *client ID* et le *client secret* → `_configurer_connexion.ps1`
+   ou dashboard Vercel → Settings → Environment Variables → Production.
+
 ## Rappels
 
 - Vérifier en local avant chaque déploiement : `.venv\Scripts\python.exe -X utf8 -m pytest` dans `backend/`.

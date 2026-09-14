@@ -79,7 +79,10 @@ def creer_user(
     (`actif` pour une création directe, `invite` pour une invitation).
     """
     nom = nom.strip()
-    email = email.strip().lower()
+    # Validation du format centralisée : `/auth/inscription` et
+    # `/auth/inscription-etablissement` n'ont aucune autre barrière et
+    # acceptaient auparavant des adresses sans `@` ni domaine (2026-02-27).
+    email = valider_email(email)
     if not nom:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "Le nom est obligatoire."
