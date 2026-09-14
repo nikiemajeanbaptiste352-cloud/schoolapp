@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 #  SchoolManager — assistant de configuration de la connexion
 #
 #  Ajoute dans Vercel (Production) les variables d'environnement nécessaires à
@@ -15,8 +15,14 @@
 #  saisies en mode masqué : elles ne s'affichent jamais à l'écran et ne sont
 #  écrites nulle part sur le disque.
 #
-#  Usage :
-#    powershell -ExecutionPolicy Bypass -File .\_configurer_connexion.ps1
+#  Usage (le plus simple) :
+#    double-cliquez sur « Configurer-la-connexion.cmd » (meme dossier), ou
+#    dans un terminal :  .\Configurer-la-connexion.cmd
+#
+#  ⚠️ NE TAPEZ RIEN A L'INVITE POWERSHELL VOUS-MEME : le script pose lui-meme
+#  ses questions. Si vous voyez « Erreur », « Jeton inattendu » ou « n'est pas
+#  reconnu », c'est que vous avez tape une valeur au mauvais endroit :
+#  relancez le script et repondez AU MOMENT ou il demande.
 # =============================================================================
 
 $ErrorActionPreference = "Continue"
@@ -38,7 +44,19 @@ function PoserVariable {
     }
     & $Vercel env rm $Nom production -y --no-color *> $null
     $Valeur | & $Vercel env add $Nom production --type $Type --no-color *> $null
-    Write-Host ("  [ok]     {0}" -f $Nom) -ForegroundColor Green
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ("  [ok]     {0}" -f $Nom) -ForegroundColor Green
+    } else {
+        Write-Host ("  [ECHEC]  {0}  (la commande Vercel a renvoye le code {1})" -f $Nom, $LASTEXITCODE) -ForegroundColor Red
+        Write-Host "           La variable n'a PAS ete enregistree." -ForegroundColor DarkGray
+    }
+}
+
+# Accepte o / oui / y / yes (majuscules comprises) comme une reponse positive.
+function EstOui {
+    param([string]$Reponse)
+    if ([string]::IsNullOrWhiteSpace($Reponse)) { return $false }
+    return ($Reponse.Trim() -match '^(o|oui|y|yes|ok)$')
 }
 
 function LireMasque {
@@ -68,14 +86,18 @@ Write-Host "1. Connexion Google" -ForegroundColor Yellow
 Write-Host "   Console Google Cloud > APIs et services > Identifiants" -ForegroundColor DarkGray
 Write-Host "   > votre ID client OAuth « Application Web » > copier les 2 valeurs." -ForegroundColor DarkGray
 Write-Host ""
-$idClient = Read-Host "   Identifiant client (se termine par .apps.googleusercontent.com)"
+Write-Host "   Collez la valeur qui se termine par .apps.googleusercontent.com" -ForegroundColor DarkGray
+Write-Host "   (clic droit dans la fenetre = coller, puis appuyez sur Entree)" -ForegroundColor DarkGray
+$idClient = (Read-Host "   Identifiant client").Trim()
 
 if ([string]::IsNullOrWhiteSpace($idClient)) {
     Write-Host "   [ignore] Aucun identifiant saisi : la connexion Google restera desactivee." -ForegroundColor DarkGray
 } elseif ($idClient -notlike "*.apps.googleusercontent.com") {
     Write-Host "   ATTENTION : cette valeur ne ressemble pas a un identifiant client Google." -ForegroundColor Red
+    Write-Host "   Un identifiant client fait environ 73 caracteres et se termine" -ForegroundColor DarkGray
+    Write-Host "   obligatoirement par .apps.googleusercontent.com" -ForegroundColor DarkGray
     $confirme = Read-Host "   Continuer quand meme ? (o/n)"
-    if ($confirme -ne "o") { $idClient = "" }
+    if (-not (EstOui $confirme)) { $idClient = "" }
 }
 
 $codeClient = ""
@@ -91,9 +113,9 @@ if (-not [string]::IsNullOrWhiteSpace($idClient)) {
 #  d'envoyer. Le plus simple est Gmail avec un « mot de passe d'application ».
 Write-Host ""
 Write-Host "2. Connexion par code envoye par email" -ForegroundColor Yellow
-$reponse = Read-Host "   La configurer maintenant ? (o/n)"
+$reponse = Read-Host "   La configurer maintenant ? (o = oui / n = non)"
 
-if ($reponse -eq "o") {
+if (EstOui $reponse) {
     $expediteur = Read-Host "   Adresse d'expedition (ex. SchoolManager <vous@gmail.com>)"
     PoserVariable "EMAIL_FROM" $expediteur.Trim() "config"
 
@@ -107,7 +129,7 @@ if ($reponse -eq "o") {
     Write-Host "     g = Gmail      (le plus simple : une seule question ensuite)" -ForegroundColor DarkGray
     Write-Host "     a = autre SMTP (serveur, port et utilisateur a saisir)" -ForegroundColor DarkGray
     Write-Host "     r = Resend     (exige un domaine verifie sur resend.com)" -ForegroundColor DarkGray
-    $mode = Read-Host "   Votre choix (g/a/r)"
+    $mode = (Read-Host "   Votre choix (g/a/r)  [Entree = g]").Trim().ToLower()
 
     if ($mode -eq "r") {
         $cle = LireMasque "   Cle API Resend (saisie masquee)"
@@ -142,6 +164,12 @@ Write-Host "3. Etat des variables de production" -ForegroundColor Yellow
 & $Vercel env ls production --no-color
 
 Write-Host ""
+Write-Host "Verifiez ci-dessus que les lignes GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET," -ForegroundColor Cyan
+Write-Host "EMAIL_FROM et SMTP_* sont bien presentes." -ForegroundColor Cyan
+Write-Host ""
 Write-Host "Termine. Un changement de variable ne s'applique qu'au" -ForegroundColor Cyan
 Write-Host "DEPLOIEMENT SUIVANT : il faut redeployer la production." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Etape suivante : dites simplement « c'est fait » a l'assistant, il" -ForegroundColor Yellow
+Write-Host "redeclenchera le deploiement et verifiera les 2 boutons de connexion." -ForegroundColor Yellow
 Write-Host ""
