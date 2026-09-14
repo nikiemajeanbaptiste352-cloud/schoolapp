@@ -86,33 +86,50 @@ if (-not [string]::IsNullOrWhiteSpace($idClient)) {
 }
 
 # --- 2. Connexion par code envoye par email ---------------------------------
+#  Le visiteur saisit son adresse, recoit un code a 6 chiffres (valable 10 min)
+#  et se connecte avec. Il faut donc : une adresse d'expedition + un moyen
+#  d'envoyer. Le plus simple est Gmail avec un « mot de passe d'application ».
 Write-Host ""
-Write-Host "2. Connexion par code envoye par email (facultatif)" -ForegroundColor Yellow
+Write-Host "2. Connexion par code envoye par email" -ForegroundColor Yellow
 $reponse = Read-Host "   La configurer maintenant ? (o/n)"
 
 if ($reponse -eq "o") {
     $expediteur = Read-Host "   Adresse d'expedition (ex. SchoolManager <vous@gmail.com>)"
     PoserVariable "EMAIL_FROM" $expediteur.Trim() "config"
 
+    # Adresse seule (sans le « Nom <> ») : sert d'utilisateur SMTP.
+    $adresseSeule = $expediteur.Trim()
+    if ($adresseSeule -match "<([^>]+)>") { $adresseSeule = $matches[1] }
+    $adresseSeule = $adresseSeule.Trim()
+
     Write-Host ""
     Write-Host "   Mode d'envoi :" -ForegroundColor DarkGray
-    Write-Host "     g = Gmail / autre SMTP  (marche tout de suite, gratuit)" -ForegroundColor DarkGray
-    Write-Host "     r = Resend              (exige un domaine verifie)" -ForegroundColor DarkGray
-    $mode = Read-Host "   Votre choix (g/r)"
+    Write-Host "     g = Gmail      (le plus simple : une seule question ensuite)" -ForegroundColor DarkGray
+    Write-Host "     a = autre SMTP (serveur, port et utilisateur a saisir)" -ForegroundColor DarkGray
+    Write-Host "     r = Resend     (exige un domaine verifie sur resend.com)" -ForegroundColor DarkGray
+    $mode = Read-Host "   Votre choix (g/a/r)"
 
     if ($mode -eq "r") {
         $cle = LireMasque "   Cle API Resend (saisie masquee)"
         PoserVariable "RESEND_API_KEY" $cle.Trim() "secret"
-    } else {
-        $hote = Read-Host "   Serveur SMTP [smtp.gmail.com]"
-        if ([string]::IsNullOrWhiteSpace($hote)) { $hote = "smtp.gmail.com" }
+    } elseif ($mode -eq "a") {
+        $hote = Read-Host "   Serveur SMTP (ex. mail.mondomaine.com)"
         $port = Read-Host "   Port [587]"
         if ([string]::IsNullOrWhiteSpace($port)) { $port = "587" }
-        $utilisateur = Read-Host "   Nom d'utilisateur SMTP (votre adresse email)"
-        $motDePasse = LireMasque "   Mot de passe d'application (16 caracteres, saisie masquee)"
+        $utilisateur = Read-Host "   Nom d'utilisateur SMTP"
+        $motDePasse = LireMasque "   Mot de passe (saisie masquee)"
         PoserVariable "SMTP_HOST" $hote.Trim() "config"
         PoserVariable "SMTP_PORT" $port.Trim() "config"
         PoserVariable "SMTP_USER" $utilisateur.Trim() "config"
+        PoserVariable "SMTP_PASS" $motDePasse.Trim() "secret"
+    } else {
+        # Gmail : serveur, port et utilisateur sont toujours identiques — on les
+        # deduit de l'adresse, il ne reste donc que le mot de passe a saisir.
+        PoserVariable "SMTP_HOST" "smtp.gmail.com" "config"
+        PoserVariable "SMTP_PORT" "587" "config"
+        PoserVariable "SMTP_USER" $adresseSeule "config"
+        Write-Host ("   Utilisateur SMTP deduit de l'adresse : {0}" -f $adresseSeule) -ForegroundColor DarkGray
+        $motDePasse = LireMasque "   Mot de passe d'application Gmail (16 caracteres, saisie masquee)"
         PoserVariable "SMTP_PASS" $motDePasse.Trim() "secret"
     }
 } else {
