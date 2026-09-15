@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
@@ -293,3 +294,41 @@ def test_google_callback_transmet_le_verificateur(client, monkeypatch):
     assert "#token=" in resp.headers["location"]
     assert len(corps_envoyes) == 1
     assert f"code_verifier={verificateur}" in corps_envoyes[0]
+
+
+def test_google_callback_refus_remonte_le_motif(client, monkeypatch):
+    """Un refus de Google est expliqué à l'utilisateur, pas une erreur 502 muette.
+
+    Google distingue « invalid_client » (secret OAuth refusé) de
+    « invalid_grant » (code déjà consommé). Le motif doit donc accompagner la
+    redirection, sinon les deux pannes restent indiscernables en production.
+    """
+    requete, _ = _redirection_google(client, monkeypatch)
+    etat = requete["state"][0]
+
+    def _faux_urlopen(requete_http, timeout=None):
+        raise auth_router.UrlHTTPError(
+            auth_router.GOOGLE_TOKEN_URL,
+            400,
+            "Bad Request",
+            {},
+            io.BytesIO(
+                json.dumps(
+                    {
+                        "error": "invalid_client",
+                        "error_description": "Unauthorized",
+                    }
+                ).encode("utf-8")
+            ),
+        )
+
+    monkeypatch.setattr(auth_router, "urlopen", _faux_urlopen)
+    resp = client.get(
+        "/api/v1/auth/google/callback",
+        params={"code": "code-de-test", "state": etat},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 307)
+    location = resp.headers["location"]
+    assert "erreur=google_refuse" in location
+    assert "invalid_client" in location

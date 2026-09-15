@@ -71,6 +71,8 @@
             var p = new URLSearchParams(fragment);
             var token = p.get("token");
             var erreur = p.get("erreur") || "";
+            // Motif renvoyé par Google (« invalid_client », « invalid_grant »…).
+            var raison = p.get("raison") || "";
 
             if (token) {
                 connecter(token, p.get("email"), p.get("role"), p.get("nom"));
@@ -92,6 +94,11 @@
                     t: "Compte désactivé",
                     m: "Ce compte a été désactivé sur SchoolManager.",
                     d: "Contactez l'administration de l'établissement."
+                },
+                google_refuse: {
+                    t: "Google a refusé la connexion",
+                    m: "Google n'a pas accepté d'échanger le code d'autorisation.",
+                    d: raison || "Réessayez depuis la page de connexion."
                 }
             };
             var l = libelles[erreur] || {

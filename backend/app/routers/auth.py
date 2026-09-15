@@ -84,6 +84,26 @@ def _defi_pkce(verificateur: str) -> str:
     return base64.urlsafe_b64encode(condensat).decode("ascii").rstrip("=")
 
 
+def _raison_google(exc: UrlHTTPError) -> str:
+    """Motif textuel renvoyé par Google, sans aucune donnée secrète.
+
+    Google distingue deux échecs très différents au moment de l'échange du
+    code : « invalid_client » (identifiant/secret OAuth refusés, secret
+    régénéré ou fiche cliente différente) et « invalid_grant » (code déjà
+    consommé, expiré, ou vérificateur PKCE absent). Sans ce motif, les deux
+    cas sont indiscernables en production ; le renvoyer est inoffensif.
+    """
+    try:
+        corps = json.loads(exc.read().decode("utf-8", "replace"))
+    except Exception:
+        return f"HTTP {exc.code}"
+    raison = str(corps.get("error") or "").strip()
+    description = str(corps.get("error_description") or "").strip()
+    if raison and description:
+        return f"{raison} — {description}"
+    return raison or description or f"HTTP {exc.code}"
+
+
 def _token_pour(user: User, db: Session) -> TokenOut:
     return token_pour(user, db)
 
@@ -471,11 +491,17 @@ def google_callback(
             timeout=20,
         ) as rep:
             jeton = json.load(rep)
-    except UrlHTTPError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Google a refusé le code d'autorisation.",
+    except UrlHTTPError as exc:
+        # Diagnostic : le motif exact de Google accompagne la redirection et
+        # les journaux gardent la fiche cliente utilisée (identifiant public).
+        raison = _raison_google(exc)
+        print(
+            "[oauth/google] echec de l'echange du code : "
+            f"{raison} ; client_id=…{settings.google_client_id[-24:]} ; "
+            f"redirect_uri={redirect_uri}",
+            flush=True,
         )
+        return vers_front({"erreur": "google_refuse", "raison": raison})
     acces = jeton.get("access_token")
     if not acces:
         raise HTTPException(
@@ -493,10 +519,10 @@ def google_callback(
             timeout=20,
         ) as rep:
             info = json.load(rep)
-    except UrlHTTPError:
+    except UrlHTTPError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Impossible de récupérer le profil Google.",
+            detail=f"Impossible de récupérer le profil Google ({_raison_google(exc)}).",
         )
 
     email = (info.get("email") or "").strip().lower()
