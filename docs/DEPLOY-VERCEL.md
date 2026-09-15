@@ -144,6 +144,16 @@ Sans `GOOGLE_CLIENT_ID` **et** `GOOGLE_CLIENT_SECRET`, `/api/v1/auth/google`
 répond `503` et `/api/v1/auth/options` renvoie `"google": false` (les boutons
 restent alors masqués dans l'interface). Idem pour `code_email`.
 
+> **Repère d'interface.** Le bouton « Se connecter avec Google », le lien
+> « Connexion par code email (sans mot de passe) » et le lien « Créer un compte
+> Parent » sont affichés sur **les trois onglets** de la page de connexion
+> (🏫 Établissement, 👨‍🏫 Enseignant, 👨‍👩‍👧 Parent) — l'onglet ouvert par défaut
+> reste **Établissement**. Ils restent conditionnés par `/auth/options` : si le
+> serveur ne les annonce pas actifs, ils ne s'affichent nulle part. Le compte
+> Google ouvre toujours un espace **Parent** (le callback crée un compte Parent
+> quand l'adresse est inconnue), ce qu'une note sous le bouton rappelle sur les
+> onglets Établissement et Enseignant.
+
 ### Poser les variables sans écrire aucun secret sur le disque
 
 ```powershell
