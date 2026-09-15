@@ -117,6 +117,14 @@
 
   /* ---------- Choix du profil d'entrée : « Établissement », « Enseignant » ou « Parent » ---------- */
   var profilActuel = "etablissement"; // "etablissement" | "enseignant" | "parent"
+  // L'inscription publique d'un compte de direction (« Premier accès de
+  // l'école ? ») n'existe qu'au TOUT PREMIER démarrage d'un déploiement, tant
+  // qu'aucune fiche École n'est en base. Ensuite l'API répond 409 : sans ce
+  // verrou, n'importe qui pourrait se créer un compte Administrateur de
+  // l'établissement. C'est /auth/options qui l'annonce
+  // (`etablissement_ouvert`) ; tant qu'on ne l'a pas reçu, on n'affiche pas
+  // le lien.
+  var etablissementOuvert = false;
   var btnModeEtab = document.getElementById("btnModeEtab");
   var btnModeEnseignant = document.getElementById("btnModeEnseignant");
   var btnModeParent = document.getElementById("btnModeParent");
@@ -170,7 +178,10 @@
       btnModeParent.classList.toggle("is-actif", estParent);
       btnModeParent.setAttribute("aria-selected", estParent ? "true" : "false");
     }
-    if (actionEtab) { if (estEtab) actionEtab.removeAttribute("hidden"); else actionEtab.setAttribute("hidden", ""); }
+    if (actionEtab) {
+      if (estEtab && etablissementOuvert) actionEtab.removeAttribute("hidden");
+      else actionEtab.setAttribute("hidden", "");
+    }
     // « Créer un compte Parent » n'est jamais masqué : c'est la porte d'entrée
     // du plus grand nombre et l'onglet ouvert par défaut est « Établissement ».
     if (actionParent) actionParent.removeAttribute("hidden");
@@ -286,6 +297,7 @@
     if (!window.API || !window.API.optionsAuth) return;
     window.API.optionsAuth().then(function (o) {
       optionsAuthMemorisees = o || {};
+      etablissementOuvert = optionsAuthMemorisees.etablissement_ouvert === true;
       appliquerAffichageProfil(); // réaffiche selon le profil Établissement / Enseignant / Parent
     }).catch(function () { /* silencieux : méthodes laissées masquées */ });
   }

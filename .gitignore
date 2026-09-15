@@ -66,3 +66,13 @@ temp/
 .env*
 # apercu local (QR code de test)
 _apercu-telephone/
+
+# fiche de saisie des secrets de connexion (jamais versionnee)
+_connexion-a-remplir.txt
+_connexion-assistant.log
+# memoire locale de l'identifiant client Google (valeur publique, mais locale)
+.google-client-id.txt
+# empreintes des codes clients deja refuses par Google (8 car. de SHA-256,
+# pas les valeurs elles-memes)
+.google-secrets-refuses.txt
+

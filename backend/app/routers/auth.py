@@ -165,29 +165,44 @@ def inscription(body: InscriptionIn, db: Session = Depends(get_db)) -> TokenOut:
 def inscription_etablissement(
     body: InscriptionEtablissementIn, db: Session = Depends(get_db)
 ) -> TokenOut:
-    """Crée le compte de direction d'un établissement (rôle Administrateur) puis connecte.
+    """Crée le compte de direction au **premier démarrage** d'un déploiement, puis connecte.
 
-    L'application est mono-école : si aucune fiche École n'existe encore en base
-    (bootstrap d'un nouveau déploiement), une fiche est créée avec le nom saisi —
-    l'équipe la complète ensuite depuis Réglages. Si l'école est déjà configurée,
-    le compte rejoint simplement l'équipe de direction.
+    L'application est mono-école : cette route publique ne sert qu'au
+    *bootstrap*. Si aucune fiche École n'existe encore en base, elle est créée
+    avec le nom saisi — l'équipe la complète ensuite depuis Réglages — et le
+    compte devient Administrateur.
+
+    Dès qu'un établissement existe, la route est **fermée** (409). Sans ce
+    verrou, n'importe qui pouvait se créer un compte Administrateur sur
+    l'école de production en remplissant l'onglet « Établissement » : c'était
+    une élévation de privilèges ouverte à tout Internet. Les comptes de
+    direction suivants passent par un administrateur — création directe
+    (`POST /auth/comptes`) ou invitation (`POST /membres`) — ce qui laisse une
+    trace et un contrôle.
     """
-    ecole = db.scalar(select(Ecole).limit(1))
-    if ecole is None:
-        nom_ecole = (body.ecole or "").strip()[:120] or "Mon établissement"
-        db.add(Ecole(
-            nom=nom_ecole,
-            sigle="",
-            slogan="",
-            annee="",
-            devise="FCFA",
-            telephone="",
-            email="",
-            adresse="",
-            version="1.0.0",
-        ))
-        db.commit()
-    # Le compte de direction rejoint l'établissement (existant ou tout juste créé).
+    if db.scalar(select(Ecole).limit(1)) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Un établissement est déjà configuré : la création d'un compte de "
+                "direction se fait par invitation. Demandez une invitation à "
+                "l'administration de votre établissement."
+            ),
+        )
+    nom_ecole = (body.ecole or "").strip()[:120] or "Mon établissement"
+    db.add(Ecole(
+        nom=nom_ecole,
+        sigle="",
+        slogan="",
+        annee="",
+        devise="FCFA",
+        telephone="",
+        email="",
+        adresse="",
+        version="1.0.0",
+    ))
+    db.commit()
+    # Compte de direction du déploiement tout juste initialisé.
     # Résolution non stricte : route publique, sans contexte école disponible.
     sid = sd.ecole_principale(db)
     user = _creer_user(db, body.nom, body.email, body.password, ROLE_ADMIN, school_id=sid)
@@ -253,11 +268,20 @@ def creer_compte(
     "/options",
     summary="Méthodes de connexion actives (front)",
 )
-def options_auth() -> dict:
-    """Indique au front quelles méthodes de connexion sont disponibles."""
+def options_auth(db: Session = Depends(get_db)) -> dict:
+    """Indique au front quelles méthodes de connexion sont disponibles.
+
+    `etablissement_ouvert` n'est vrai que sur un déploiement **neuf** (aucune
+    fiche École en base) : c'est la seule situation où l'inscription publique
+    d'un compte de direction reste possible — `POST /inscription-etablissement`
+    répond 409 ensuite. Le front s'en sert pour ne pas proposer un formulaire
+    qui mènerait à un cul-de-sac (et, à l'inverse, pour le proposer au tout
+    premier démarrage).
+    """
     return {
         "google": settings.google_active,
         "code_email": settings.email_active,
+        "etablissement_ouvert": db.scalar(select(Ecole).limit(1)) is None,
     }
 
 

@@ -211,18 +211,23 @@
     <header class="sm-tete">
       <img class="sm-logo" src="assets/logo.svg" alt="" />
       <h1 class="sm-nom">Créer un compte</h1>
-      <p class="sm-sous">Établissement ou parent — directement dans l'application</p>
+      <p class="sm-sous" id="sousTitre">Parent — directement dans l'application</p>
     </header>
 
     <main class="sm-corps">
       <div class="sm-carte">
+        <!-- L'onglet « Établissement » reste masqué par défaut : il ne sert
+             qu'au TOUT PREMIER démarrage d'un déploiement (aucune fiche
+             École en base). Ensuite l'API refuse (409), car la route
+             permettrait sinon à n'importe qui de se créer un compte
+             Administrateur. Voir GET /auth/options → `etablissement_ouvert`. -->
         <div class="sm-onglets" role="tablist">
-          <button class="sm-onglet is-actif" id="ongletEtab" type="button" role="tab" aria-selected="true">Établissement</button>
-          <button class="sm-onglet" id="ongletParent" type="button" role="tab" aria-selected="false">Parent</button>
+          <button class="sm-onglet" id="ongletEtab" type="button" role="tab" aria-selected="false" hidden>Établissement</button>
+          <button class="sm-onglet is-actif" id="ongletParent" type="button" role="tab" aria-selected="true">Parent</button>
         </div>
 
         <!-- ---------- Compte de direction (établissement) ---------- -->
-        <form id="formEtab" novalidate>
+        <form id="formEtab" novalidate hidden>
           <label class="sm-champ">
             <span>Nom de l'établissement</span>
             <input id="etabEcole" type="text" autocomplete="organization" enterkeyhint="next" placeholder="Ex. Lycée Le Savoir" />
@@ -247,7 +252,7 @@
         </form>
 
         <!-- ---------- Compte Parent ---------- -->
-        <form id="formParent" novalidate hidden>
+        <form id="formParent" novalidate>
           <label class="sm-champ">
             <span>Votre nom complet</span>
             <input id="parentNom" type="text" autocomplete="name" enterkeyhint="next" placeholder="Ex. Kaboré Awa" />
@@ -312,20 +317,53 @@
       var ongletParent = document.getElementById("ongletParent");
       var formEtab = document.getElementById("formEtab");
       var formParent = document.getElementById("formParent");
+      var sousTitre = document.getElementById("sousTitre");
 
-      function afficher(vue) {
-        var etab = vue !== "parent";
+      // L'inscription publique d'un compte de direction (onglet
+      // « Établissement ») n'est ouverte que sur un déploiement neuf : dès
+      // qu'un établissement existe, l'API répond 409 — sans ce verrou
+      // n'importe qui pouvait devenir administrateur de l'école. C'est
+      // GET /auth/options qui l'annonce (`etablissement_ouvert`). Avant la
+      // réponse, et en cas d'échec réseau, l'onglet reste masqué : on ne
+      // propose jamais un formulaire qui finirait en erreur.
+      var etablissementOuvert = false;
+
+      function afficher(vue, sansFocus) {
+        var etab = vue !== "parent" && etablissementOuvert;
         formEtab.hidden = !etab;
         formParent.hidden = etab;
         ongletEtab.className = "sm-onglet" + (etab ? " is-actif" : "");
         ongletParent.className = "sm-onglet" + (etab ? "" : " is-actif");
         ongletEtab.setAttribute("aria-selected", etab ? "true" : "false");
         ongletParent.setAttribute("aria-selected", etab ? "false" : "true");
-        var premier = (etab ? formEtab : formParent).querySelector("input");
-        if (premier) premier.focus();
+        if (!sansFocus) {
+          var premier = (etab ? formEtab : formParent).querySelector("input");
+          if (premier) premier.focus();
+        }
       }
+
+      /* Applique `etablissement_ouvert` reçu du serveur. */
+      function appliquerOptions(ouvert) {
+        etablissementOuvert = ouvert === true;
+        ongletEtab.hidden = !etablissementOuvert;
+        if (sousTitre) {
+          sousTitre.textContent = etablissementOuvert
+            ? "Établissement ou parent — directement dans l'application"
+            : "Parent — directement dans l'application";
+        }
+        afficher(etablissementOuvert ? "etab" : "parent", true);
+      }
+
       ongletEtab.addEventListener("click", function () { afficher("etab"); });
       ongletParent.addEventListener("click", function () { afficher("parent"); });
+
+      if (window.API && window.API.optionsAuth) {
+        window.API.optionsAuth().then(function (o) {
+          appliquerOptions(o && o.etablissement_ouvert);
+        }).catch(function () { appliquerOptions(false); });
+      } else {
+        appliquerOptions(false);
+      }
 
       /* ---------- Validation ---------- */
       function message(el, texte) {
