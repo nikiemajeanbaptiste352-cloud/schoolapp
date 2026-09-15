@@ -658,6 +658,10 @@ body.login-body::before { display: none; }
 .lc-alt a:hover { text-decoration: underline; }
 .lc-alt[hidden] { display: none !important; }
 
+/* Note explicative du bouton Google sur les onglets Établissement / Enseignant */
+.lc-note { text-align: center; font-size: 12.5px; line-height: 1.45; color: #64748b; margin: 10px 0 0; }
+.lc-note[hidden] { display: none !important; }
+
 /* ============================================================
    Pied de page
    ============================================================ */

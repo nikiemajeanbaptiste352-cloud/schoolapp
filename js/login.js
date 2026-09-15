@@ -140,8 +140,17 @@
     }
   };
 
+  // Le bouton Google ouvre TOUJOURS un espace Parent côté serveur (le callback
+  // crée un compte Parent quand l'adresse est inconnue). On le précise sur les
+  // onglets où ce n'est pas le public attendu, pour éviter la surprise.
+  var NOTE_GOOGLE = {
+    etablissement: "Le compte Google ouvre un espace Parent. Pour l'école, utilisez les identifiants de l'établissement.",
+    enseignant: "Le compte Google ouvre un espace Parent. Les identifiants enseignants sont remis par votre école.",
+    parent: ""
+  };
+
   // Applique l'apparence de la carte de connexion selon le profil choisi
-  // (titre, note contextuelle ; Google / code email réservés aux parents).
+  // (titre, note contextuelle ; Google et code email proposés partout).
   function appliquerAffichageProfil() {
     var estEtab = profilActuel === "etablissement";
     var estEnseignant = profilActuel === "enseignant";
@@ -162,10 +171,23 @@
       btnModeParent.setAttribute("aria-selected", estParent ? "true" : "false");
     }
     if (actionEtab) { if (estEtab) actionEtab.removeAttribute("hidden"); else actionEtab.setAttribute("hidden", ""); }
-    if (actionParent) { if (estParent) actionParent.removeAttribute("hidden"); else actionParent.setAttribute("hidden", ""); }
+    // « Créer un compte Parent » n'est jamais masqué : c'est la porte d'entrée
+    // du plus grand nombre et l'onglet ouvert par défaut est « Établissement ».
+    if (actionParent) actionParent.removeAttribute("hidden");
     if (actionEnseignant) { if (estEnseignant) actionEnseignant.removeAttribute("hidden"); else actionEnseignant.setAttribute("hidden", ""); }
-    if (zoneGoogle) zoneGoogle.style.display = (estParent && opts.google) ? "" : "none";
-    if (zoneCode) zoneCode.style.display = (estParent && opts.code_email) ? "" : "none";
+    // Google et le code email sont proposés sur les trois onglets : un parent
+    // qui arrive sur la page doit les voir sans deviner qu'il faut en changer.
+    if (zoneGoogle) zoneGoogle.style.display = opts.google ? "" : "none";
+    if (zoneCode) zoneCode.style.display = opts.code_email ? "" : "none";
+    if (noteGoogle) {
+      if (estParent) {
+        noteGoogle.textContent = "";
+        noteGoogle.setAttribute("hidden", "");
+      } else {
+        noteGoogle.textContent = NOTE_GOOGLE[profilActuel] || "";
+        noteGoogle.removeAttribute("hidden");
+      }
+    }
   }
 
   // Bascule vers le profil demandé puis revient à l'écran de connexion.
@@ -249,6 +271,7 @@
      réellement configurées sur le serveur. */
   var zoneGoogle = document.getElementById("zoneGoogle");
   var btnGoogle = document.getElementById("btnGoogle");
+  var noteGoogle = document.getElementById("noteGoogle");
   var zoneCode = document.getElementById("zoneCode");
   var optionsAuthMemorisees = null;   // {google, code_email} — options reçues du serveur
 
