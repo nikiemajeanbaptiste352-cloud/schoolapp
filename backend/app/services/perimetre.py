@@ -272,6 +272,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "paie",
         "announcements",
         "utilisateurs",
+        "reseau",
         "settings",
     ),
     ROLE_PROF: (
@@ -287,6 +288,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "mes-seances",
         "ma-paie",
         "announcements",
+        "reseau",
         "settings",
     ),
     # Vie scolaire : élèves, classes, emplois du temps et appel des présences ;
@@ -302,6 +304,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "timetable",
         "vie-scolaire",
         "announcements",
+        "reseau",
         "settings",
     ),
     # Élève et parent : uniquement leur propre dossier (le serveur réduit déjà
@@ -314,6 +317,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "timetable",
         "payments",
         "announcements",
+        "reseau",
         "settings",
     ),
     ROLE_PARENT: (
@@ -324,6 +328,7 @@ PAGES_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "timetable",
         "payments",
         "announcements",
+        "reseau",
         "settings",
     ),
 }
@@ -352,15 +357,18 @@ OPERATIONS_PAR_ROLE: dict[str, tuple[str, ...]] = {
         "presences.ecrire",
         "finance.ecrire",
         "paie.ecrire",
+        "reseau.ecrire",
+        "reseau.moderer",
     ),
     ROLE_PROF: (
         "notes.ecrire",
         "presences.ecrire",
         "seances.ecrire",
+        "reseau.ecrire",
     ),
-    ROLE_SURVEILLANT: ("presences.ecrire",),
-    ROLE_ELEVE: (),
-    ROLE_PARENT: (),
+    ROLE_SURVEILLANT: ("presences.ecrire", "reseau.ecrire"),
+    ROLE_ELEVE: ("reseau.ecrire",),
+    ROLE_PARENT: ("reseau.ecrire",),
 }
 
 #: Nature de la vue « élèves » telle que la reçoit le compte. Sert au front

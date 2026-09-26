@@ -37,6 +37,7 @@ from app.routers import (
     pedagogie,
     presences as presences_router,
     referentiel,
+    reseau as reseau_router,
 )
 from app.security import decode_token
 from app.seed import seed_all, seed_bootstrap, seed_users
@@ -191,6 +192,7 @@ for _router in (
     etat_router.router,
     paie_router.router,
     membres_router.router,
+    reseau_router.router,
 ):
     app.include_router(_router)
 

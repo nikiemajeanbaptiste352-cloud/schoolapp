@@ -592,3 +592,201 @@ class FichePaie(Base):
     statut: Mapped[str] = mapped_column(String(12), default="en_attente")
     cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
     payee_le: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ---------------------------------------------------------------
+# Réseau scolaire interne (Phase 12) — **privé à un établissement**
+# ---------------------------------------------------------------
+# Frontière de données (document d'architecture, zone Z2) : tout ce qui est
+# publié ici reste dans l'établissement. Aucune de ces tables n'est lue par
+# une autre école, même quand elles partagent la même base PostgreSQL : la
+# colonne `school_id` est la clé de locataire et toutes les requêtes du routeur
+# la filtrent via `sd.sid_ecole(db)`.
+#
+# Interdits explicites du document, appliqués côté serveur :
+#   - jamais de notes, bulletins, paiements, absences, discipline ou pièce
+#     administrative dans une publication (le réseau sert à la vie scolaire,
+#     pas à la diffusion de données personnelles) ;
+#   - l'identité exposée est limitée à `auteur_nom` / `auteur_role` figés au
+#     moment de l'écriture (instantané), pour ne pas suivre les changements
+#     ultérieurs de rattachement.
+#
+# Types de publications :
+#   "publication" → fil d'actualité de l'établissement (mur)
+#   "discussion"  → forum : un fil de discussion ouvert à commentaires
+#   "ressource"   → partage pointant vers la bibliothèque (table `ressources`)
+TYPES_PUBLICATION = ("publication", "discussion", "ressource")
+TYPES_GROUPE = ("classe", "matiere", "projet", "club")
+
+
+class Groupe(Base):
+    """Groupe de travail interne (classe, matière, projet, club).
+
+    Un groupe `classe` est adossé à une classe de l'établissement : les élèves
+    de cette classe y sont rattachés automatiquement à la première visite.
+    """
+
+    __tablename__ = "groupes"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "classe_id"],
+            ["classes.school_id", "classes.id"],
+        ),
+        ForeignKeyConstraint(
+            ["school_id", "matiere_id"],
+            ["matieres.school_id", "matieres.id"],
+        ),
+        UniqueConstraint("school_id", "nom", name="uq_groupe_nom"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    nom: Mapped[str] = mapped_column(String(80))
+    description: Mapped[str] = mapped_column(Text, default="")
+    type: Mapped[str] = mapped_column(String(20), default="club")
+    classe_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    matiere_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    cree_par: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
+
+
+class MembreGroupe(Base):
+    """Appartenance d'un compte à un groupe (rôle interne au groupe)."""
+
+    __tablename__ = "groupes_membres"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id", "groupe_id", "user_id", name="uq_groupe_membre"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    groupe_id: Mapped[int] = mapped_column(
+        ForeignKey("groupes.id"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    role_membre: Mapped[str] = mapped_column(String(20), default="membre")
+    rejoint_le: Mapped[datetime] = mapped_column(
+        DateTime, default=_maintenant_utc
+    )
+
+
+class Publication(Base):
+    """Message du fil de l'établissement, d'un groupe, ou fil de forum."""
+
+    __tablename__ = "publications"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "groupe_id"],
+            ["groupes.school_id", "groupes.id"],
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1, index=True
+    )
+    # `groupe_id` NULL = fil général de l'établissement.
+    groupe_id: Mapped[int | None] = mapped_column(
+        ForeignKey("groupes.id"), nullable=True, index=True
+    )
+    type: Mapped[str] = mapped_column(String(20), default="publication")
+    titre: Mapped[str] = mapped_column(String(140), default="")
+    contenu: Mapped[str] = mapped_column(Text)
+    auteur_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    auteur_nom: Mapped[str] = mapped_column(String(80), default="")
+    auteur_role: Mapped[str] = mapped_column(String(20), default="")
+    epingle: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Modération : la direction masque un message sans le supprimer (trace).
+    masque: Mapped[bool] = mapped_column(Boolean, default=False)
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
+    maj_le: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CommentairePublication(Base):
+    """Réponse à une publication (fil de discussion / forum)."""
+
+    __tablename__ = "publications_commentaires"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1, index=True
+    )
+    publication_id: Mapped[int] = mapped_column(
+        ForeignKey("publications.id"), nullable=False, index=True
+    )
+    auteur_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    auteur_nom: Mapped[str] = mapped_column(String(80), default="")
+    auteur_role: Mapped[str] = mapped_column(String(20), default="")
+    contenu: Mapped[str] = mapped_column(Text)
+    masque: Mapped[bool] = mapped_column(Boolean, default=False)
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
+
+
+class ReactionPublication(Base):
+    """Réaction d'un compte à une publication (une seule par compte)."""
+
+    __tablename__ = "publications_reactions"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id", "publication_id", "user_id", name="uq_reaction_unique"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1
+    )
+    publication_id: Mapped[int] = mapped_column(
+        ForeignKey("publications.id"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    type: Mapped[str] = mapped_column(String(12), default="jaime")
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)
+
+
+class Ressource(Base):
+    """Ressource partagée dans la bibliothèque de l'établissement.
+
+    Volontairement limitée à un pointeur (`url`) : aucune pièce administrative
+    ni document d'élève n'a vocation à transiter par le réseau scolaire.
+    """
+
+    __tablename__ = "ressources"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["school_id", "matiere_id"],
+            ["matieres.school_id", "matieres.id"],
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    school_id: Mapped[int] = mapped_column(
+        ForeignKey("ecole.id"), nullable=False, default=1, index=True
+    )
+    titre: Mapped[str] = mapped_column(String(140))
+    description: Mapped[str] = mapped_column(Text, default="")
+    type: Mapped[str] = mapped_column(String(20), default="lien")
+    url: Mapped[str] = mapped_column(Text)
+    matiere_id: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    niveau: Mapped[str] = mapped_column(String(20), default="")
+    auteur_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    auteur_nom: Mapped[str] = mapped_column(String(80), default="")
+    cree_le: Mapped[datetime] = mapped_column(DateTime, default=_maintenant_utc)

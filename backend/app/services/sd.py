@@ -28,6 +28,7 @@ from app.models import (
     Eleve,
     Enseignant,
     EnseignantTaux,
+    Groupe,
     Matiere,
     Note,
     Paiement,
@@ -157,6 +158,21 @@ def get_eleve(db: Session, eleve_id: str, school_id: int | None = None) -> Eleve
 
 def get_enseignant(db: Session, enseignant_id: str, school_id: int | None = None) -> Enseignant | None:
     return db.get(Enseignant, (_sid(db, school_id), enseignant_id))
+
+
+def get_groupe(db: Session, groupe_id: int | None, school_id: int | None = None) -> Groupe | None:
+    """Groupe du réseau scolaire interne, **toujours** filtré par école.
+
+    Un identifiant de groupe d'un autre établissement renvoie `None` : la
+    clé de locataire reste `school_id`, comme pour toutes les autres tables.
+    """
+    if groupe_id is None:
+        return None
+    return db.scalar(
+        select(Groupe).where(
+            Groupe.school_id == _sid(db, school_id), Groupe.id == groupe_id
+        )
+    )
 
 
 def matieres_ids_classe(db: Session, classe_id: str) -> list[str]:

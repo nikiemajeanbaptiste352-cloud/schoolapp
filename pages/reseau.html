@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réseau scolaire — SchoolManager</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='90'%3E%F0%9F%8C%90%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/reseau.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+
+<body data-page="reseau" data-auth="true">
+    <div class="app">
+        <aside class="sidebar" id="sidebar"></aside>
+        <div class="main">
+            <header class="topbar" id="topbar"></header>
+            <div class="backdrop" id="backdrop"></div>
+
+            <main class="content" id="content">
+                <div class="page-header">
+                    <div>
+                        <h2>🌐 Réseau scolaire</h2>
+                        <div class="subtitle">Le réseau interne de l'établissement : fil, groupes, forum et bibliothèque.</div>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-ghost" data-open="modalRessource" data-cap="reseau.ecrire">📚 Partager une ressource</button>
+                        <button class="btn btn-primary" data-open="modalGroupe" data-cap="reseau.ecrire">➕ Créer un groupe</button>
+                    </div>
+                </div>
+
+                <!-- Onglets du réseau -------------------------------------- -->
+                <div class="tabs reseau-tabs" id="reseauTabs">
+                    <button class="tab active" type="button" data-vue="fil">🏠 Fil de l'établissement</button>
+                    <button class="tab" type="button" data-vue="forum">💬 Forum</button>
+                    <button class="tab" type="button" data-vue="groupes">👥 Groupes</button>
+                    <button class="tab" type="button" data-vue="bibliotheque">📚 Bibliothèque</button>
+                </div>
+
+                <div class="reseau-grid">
+                    <section class="reseau-principal">
+                        <!-- Zone de composition -->
+                        <div class="card reseau-compose" id="reseauCompose" data-cap="reseau.ecrire">
+                            <div class="rc-ligne">
+                                <span id="rcAvatar"></span>
+                                <textarea class="textarea rc-saisie" id="rcContenu" rows="2"
+                                    placeholder="Partagez une information avec l'établissement…"></textarea>
+                            </div>
+                            <div class="rc-pied">
+                                <select class="select" id="rcGroupe">
+                                    <option value="">🏫 Tout l'établissement</option>
+                                </select>
+                                <select class="select" id="rcType">
+                                    <option value="publication">📣 Publication</option>
+                                    <option value="discussion">💬 Discussion (forum)</option>
+                                    <option value="ressource">📚 Ressource partagée</option>
+                                </select>
+                                <button class="btn btn-primary" type="button" id="btnPublier">Publier</button>
+                            </div>
+                        </div>
+
+                        <!-- Barre d'outils de la vue -->
+                        <div class="reseau-outils" id="reseauOutils">
+                            <input class="input" id="rcRecherche" placeholder="🔎 Rechercher dans le fil…">
+                            <label class="chip-toggle" id="wrapMesPublications">
+                                <input type="checkbox" id="rcMesPublications">
+                                <span>👤 Mes publications</span>
+                            </label>
+                            <button class="btn btn-ghost" type="button" id="btnRafraichir">↻ Rafraîchir</button>
+                        </div>
+
+                        <div id="reseauVue"></div>
+                    </section>
+
+                    <aside class="reseau-cote">
+                        <div class="card reseau-carte">
+                            <div class="rq-titre">📊 Activité</div>
+                            <div id="reseauResume" class="rq-valeurs">
+                                <div class="rq-item"><span class="rq-nombre">–</span><span class="rq-libelle">Publications</span></div>
+                                <div class="rq-item"><span class="rq-nombre">–</span><span class="rq-libelle">Groupes</span></div>
+                                <div class="rq-item"><span class="rq-nombre">–</span><span class="rq-libelle">Ressources</span></div>
+                            </div>
+                        </div>
+
+                        <div class="card reseau-carte">
+                            <div class="rq-titre">👥 Mes groupes</div>
+                            <div id="reseauGroupesCote" class="rg-liste"></div>
+                        </div>
+
+                        <div class="card reseau-carte reseau-regles">
+                            <div class="rq-titre">🛡️ Règles du réseau</div>
+                            <ul>
+                                <li>Réseau <strong>privé</strong> : rien ne sort de l'établissement.</li>
+                                <li>Aucune note, aucun bulletin, aucun paiement, aucune absence n'y circule.</li>
+                                <li>La direction peut masquer ou retirer tout message.</li>
+                            </ul>
+                        </div>
+                    </aside>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modale : créer un groupe -->
+    <div class="modal-overlay" id="modalGroupe">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>➕ Créer un groupe de travail</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field span-2">
+                        <label>Nom du groupe <span class="req">*</span></label>
+                        <input class="input" id="fgNom" placeholder="Ex. Club scientifique">
+                        <div class="field-error" id="errgNom">Le nom est obligatoire.</div>
+                    </div>
+                    <div class="field">
+                        <label>Type</label>
+                        <select class="select" id="fgType">
+                            <option value="club">Club</option>
+                            <option value="projet">Projet</option>
+                            <option value="classe">Classe de l'établissement</option>
+                            <option value="matiere">Matière</option>
+                        </select>
+                    </div>
+                    <div class="field" id="wrapGClasse">
+                        <label>Classe associée</label>
+                        <select class="select" id="fgClasse">
+                            <option value="">— Aucune —</option>
+                        </select>
+                    </div>
+                    <div class="field" id="wrapGMatiere">
+                        <label>Matière associée</label>
+                        <select class="select" id="fgMatiere">
+                            <option value="">— Aucune —</option>
+                        </select>
+                    </div>
+                    <div class="field span-2">
+                        <label>Description</label>
+                        <textarea class="textarea" id="fgDescription" rows="3"
+                            placeholder="À quoi sert ce groupe ?"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnCreerGroupe">🚀 Créer le groupe</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale : partager une ressource -->
+    <div class="modal-overlay" id="modalRessource">
+        <div class="modal">
+            <div class="modal-head">
+                <h3>📚 Partager une ressource</h3>
+                <button class="btn-icon" data-close>✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field span-2">
+                        <label>Titre <span class="req">*</span></label>
+                        <input class="input" id="frTitre" placeholder="Ex. Fiche de révision — Thalès">
+                        <div class="field-error" id="errrTitre">Le titre est obligatoire.</div>
+                    </div>
+                    <div class="field span-2">
+                        <label>Adresse (lien) <span class="req">*</span></label>
+                        <input class="input" id="frUrl" placeholder="https://…">
+                        <div class="field-error" id="errrUrl">Une adresse commençant par http:// ou https:// est requise.</div>
+                    </div>
+                    <div class="field">
+                        <label>Type</label>
+                        <select class="select" id="frType">
+                            <option value="lien">Lien</option>
+                            <option value="document">Document</option>
+                            <option value="video">Vidéo</option>
+                            <option value="exercice">Exercice</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Matière</label>
+                        <select class="select" id="frMatiere">
+                            <option value="">— Aucune —</option>
+                        </select>
+                    </div>
+                    <div class="field span-2">
+                        <label>Description</label>
+                        <textarea class="textarea" id="frDescription" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-primary" id="btnCreerRessource">🚀 Partager</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale de confirmation de suppression -->
+    <div class="modal-overlay" id="modalSuppr">
+        <div class="modal modal-sm">
+            <div class="modal-body" style="padding:28px">
+                <div class="confirm-ico">🗑️</div>
+                <div class="confirm-title" id="supprTitre">Confirmer la suppression ?</div>
+                <div class="confirm-text" id="supprTexte">Cette action est irréversible.</div>
+            </div>
+            <div class="modal-foot">
+                <button class="btn btn-ghost" data-close>Annuler</button>
+                <button class="btn btn-danger-soft" id="btnConfirmerSuppr">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/data.js"></script>
+    <script src="../js/live.js" data-page-js="reseau.js"></script>
+</body>
+
+</html>

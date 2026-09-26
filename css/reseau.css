@@ -1,0 +1,507 @@
+/* ============================================================
+   SchoolManager — Réseau scolaire interne (Phase 12)
+   ------------------------------------------------------------
+   Feuille dédiée : la page du réseau a une mise en page à deux
+   colonnes (fil + panneau latéral) que le design system général
+   ne couvre pas, et cette feuille isole les styles « social »
+   pour ne rien changer aux autres pages.
+   Les jetons (couleurs, rayons, ombres) viennent de css/style.css.
+   ============================================================ */
+
+.reseau-tabs {
+  margin-bottom: 18px;
+}
+
+/* ---------- Grille : fil + colonne latérale ---------- */
+.reseau-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.reseau-principal {
+  min-width: 0;
+}
+
+.reseau-cote {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 84px;
+}
+
+/* ---------- Zone de composition ---------- */
+.reseau-compose {
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.rc-ligne {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rc-saisie {
+  flex: 1;
+  resize: vertical;
+  min-height: 46px;
+}
+
+.rc-pied {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  padding-left: 50px;
+  align-items: center;
+}
+
+.rc-pied .select {
+  width: auto;
+  min-width: 170px;
+}
+
+.rc-pied .btn {
+  margin-left: auto;
+}
+
+/* ---------- Barre d'outils ---------- */
+.reseau-outils {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.reseau-outils .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Carte de publication ---------- */
+.reseau-post {
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.reseau-post.epingle {
+  border-left: 3px solid var(--primary);
+}
+
+.reseau-post.masque {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+.rp-tete {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rp-identite {
+  min-width: 0;
+  flex: 1;
+}
+
+.rp-nom {
+  font-weight: 650;
+  color: var(--text);
+  font-size: 14.5px;
+}
+
+.rp-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.rp-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.rp-titre {
+  font-weight: 650;
+  color: var(--text);
+  font-size: 15.5px;
+  margin: 12px 0 6px;
+}
+
+.rp-contenu {
+  margin-top: 12px;
+  color: var(--text-soft);
+  line-height: 1.62;
+  font-size: 14.5px;
+  word-break: break-word;
+}
+
+.rp-barre {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.rp-bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s var(--ease);
+}
+
+.rp-bouton:hover {
+  background: #eef2f7;
+  color: var(--text);
+}
+
+.rp-bouton.jaime {
+  color: var(--primary);
+  background: var(--primary-050);
+}
+
+.rp-bouton:active {
+  transform: scale(0.96);
+}
+
+.rp-nombre {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Commentaires ---------- */
+.rp-commentaires {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rp-commentaire {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.rp-commentaire-corps {
+  background: #f6f8fc;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-commentaire-nom {
+  font-weight: 620;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.rp-commentaire-texte {
+  font-size: 13.5px;
+  color: var(--text-soft);
+  line-height: 1.55;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.rp-commentaire-temps {
+  font-size: 11.5px;
+  color: var(--text-soft);
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+.rp-commentaire-suppr {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-soft);
+  padding: 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.rp-commentaire-suppr:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.rp-saisie-commentaire {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.rp-saisie-commentaire .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Groupes ---------- */
+.reseau-groupes-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+  gap: 14px;
+}
+
+.rg-carte {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rg-entete {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.rg-ico {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  background: var(--primary-050);
+  flex-shrink: 0;
+}
+
+.rg-nom {
+  font-weight: 650;
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.3;
+}
+
+.rg-desc {
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rg-pied {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.rg-pied .btn {
+  padding: 7px 13px;
+  font-size: 13px;
+}
+
+.rg-effectif {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.rg-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rg-lien {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  font-size: 13.5px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.rg-lien:hover {
+  background: var(--primary-050);
+  color: var(--info-text);
+}
+
+.rg-lien .rg-aide {
+  margin-left: auto;
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+
+/* ---------- Bibliothèque ---------- */
+.res-bloc {
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.res-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  background: #eef2f7;
+  flex-shrink: 0;
+}
+
+.res-corps {
+  min-width: 0;
+  flex: 1;
+}
+
+.res-titre {
+  font-weight: 650;
+  color: var(--text);
+  font-size: 14.5px;
+}
+
+.res-desc {
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.res-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+/* ---------- Panneau d'activité ---------- */
+.reseau-carte {
+  padding: 16px;
+}
+
+.rq-titre {
+  font-weight: 650;
+  color: var(--text);
+  font-size: 13.5px;
+  margin-bottom: 12px;
+}
+
+.rq-valeurs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.rq-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rq-nombre {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rq-libelle {
+  font-size: 11.5px;
+  color: var(--text-soft);
+  line-height: 1.2;
+}
+
+.reseau-regles ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.reseau-regles li {
+  font-size: 12.5px;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+/* ---------- Divers ---------- */
+.reseau-vide {
+  padding: 34px 20px;
+}
+
+.reseau-charge {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 13.5px;
+}
+
+.temps-relatif {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 1080px) {
+  .reseau-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reseau-cote {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .rc-pied {
+    padding-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .rc-pied .select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .rc-pied .btn {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .reseau-outils {
+    flex-wrap: wrap;
+  }
+
+  .reseau-outils .input {
+    flex-basis: 100%;
+  }
+}

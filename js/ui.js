@@ -29,6 +29,7 @@
     { key: "payments", lien: "payments.html", icone: "💰", titre: "Paiements", groupe: "Finance", roles: ["Administrateur", "Élève", "Parent"] },
     { key: "paie", lien: "paie.html", icone: "💶", titre: "Rémunérations", groupe: "Finance", roles: ["Administrateur"] },
     { key: "announcements", lien: "announcements.html", icone: "📢", titre: "Annonces", groupe: "Communication", roles: ROLES_TOUS },
+    { key: "reseau", lien: "reseau.html", icone: "🌐", titre: "Réseau scolaire", groupe: "Communication", roles: ROLES_TOUS },
     { key: "utilisateurs", lien: "utilisateurs.html", icone: "👥", titre: "Utilisateurs", groupe: "Système", roles: ["Administrateur"] },
     { key: "settings", lien: "settings.html", icone: "⚙️", titre: "Paramètres", groupe: "Système", roles: ROLES_TOUS }
   ];
@@ -563,6 +564,13 @@
     },
     utilisateurs: {
       Administrateur: "Comptes, rôles et rattachements à cet établissement."
+    },
+    reseau: {
+      Administrateur: "Le réseau interne de l'établissement : fil, groupes, forum et bibliothèque.",
+      Professeur: "Échangez avec vos classes : fil, groupes de travail et bibliothèque.",
+      Surveillant: "Le réseau interne de l'établissement : fil, groupes et forum.",
+      "Élève": "Le réseau de votre établissement : fil, groupes de travail et ressources.",
+      Parent: "Le réseau de l'établissement : fil, groupes et ressources partagées."
     },
     // Page hors menu : le texte d'origine convient au personnel, on ne le
     // réécrit que pour les profils qui voient un dossier plus étroit que la

@@ -144,6 +144,7 @@
   function get(chemin, opts) { return requete("GET", chemin, undefined, opts); }
   function post(chemin, corps, opts) { return requete("POST", chemin, corps, opts); }
   function put(chemin, corps, opts) { return requete("PUT", chemin, corps, opts); }
+  function patch(chemin, corps, opts) { return requete("PATCH", chemin, corps, opts); }
   function del(chemin, opts) { return requete("DELETE", chemin, undefined, opts); }
 
   function enc(v) { return encodeURIComponent(v); }
@@ -386,6 +387,26 @@
     majStatutFiche: function (id, corps) { return put("/paie/fiches/" + enc(id) + "/statut", corps); },
     // Supprime une fiche EN ATTENTE (jamais une fiche payée).
     supprimerFiche: function (id) { return del("/paie/fiches/" + enc(id)); },
+
+    /* --- Réseau scolaire interne (Phase 12) ---
+       Périmètre entièrement calculé par le serveur : le client n'envoie
+       jamais d'identifiant d'établissement. */
+    reseauFil: function (filtres) { return get("/reseau/fil" + params(filtres)); },
+    reseauResume: function () { return get("/reseau/resume"); },
+    reseauPublier: function (corps) { return post("/reseau/publications", corps); },
+    reseauModifierPublication: function (id, corps) { return patch("/reseau/publications/" + enc(id), corps); },
+    reseauSupprimerPublication: function (id) { return del("/reseau/publications/" + enc(id)); },
+    reseauJaime: function (id) { return post("/reseau/publications/" + enc(id) + "/jaime"); },
+    reseauCommenter: function (id, corps) { return post("/reseau/publications/" + enc(id) + "/commentaires", corps); },
+    reseauSupprimerCommentaire: function (id) { return del("/reseau/commentaires/" + enc(id)); },
+    reseauGroupes: function () { return get("/reseau/groupes"); },
+    reseauCreerGroupe: function (corps) { return post("/reseau/groupes", corps); },
+    reseauRejoindreGroupe: function (id) { return post("/reseau/groupes/" + enc(id) + "/rejoindre"); },
+    reseauQuitterGroupe: function (id) { return del("/reseau/groupes/" + enc(id) + "/quitter"); },
+    reseauSupprimerGroupe: function (id) { return del("/reseau/groupes/" + enc(id)); },
+    reseauRessources: function (filtres) { return get("/reseau/ressources" + params(filtres)); },
+    reseauCreerRessource: function (corps) { return post("/reseau/ressources", corps); },
+    reseauSupprimerRessource: function (id) { return del("/reseau/ressources/" + enc(id)); },
 
     /* --- Tableau de bord --- */
     tableauDeBord: function () { return get("/dashboard"); },

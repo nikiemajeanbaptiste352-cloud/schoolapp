@@ -35,6 +35,11 @@ ROUTES_PRIVEES = [
     "/api/v1/annonces",
     "/api/v1/dashboard",
     "/api/v1/paiements/stats",
+    # Phase 12 — réseau scolaire interne : privé à l'établissement.
+    "/api/v1/reseau/fil",
+    "/api/v1/reseau/resume",
+    "/api/v1/reseau/groupes",
+    "/api/v1/reseau/ressources",
 ]
 
 

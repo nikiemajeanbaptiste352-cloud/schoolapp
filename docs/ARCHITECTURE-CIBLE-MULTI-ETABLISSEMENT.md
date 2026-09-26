@@ -13,8 +13,9 @@
 > **VI. Chaîne complète du parcours** · **VII. Frontières des données** ·
 > **VIII. États et responsables** · **IX. MVP clairement délimité** · **X. Écarts constatés (audit)**.
 >
-> **Statut des paliers au 2026-09-10** : MVP-1 (socle multi-établissements) **fait et en production** ;
-> le reste est planifié ci-dessous (Partie IX).
+> **Statut des paliers au 2026-09-26** : MVP-1 (socle multi-établissements) **fait et en production** ;
+> **MVP-5 — réseau scolaire interne (Phase 12) fait le 2026-09-26** (voir § IX.7) ; MVP-2, MVP-3 et
+> MVP-4 restent planifiés ci-dessous (Partie IX).
 
 ---
 
@@ -238,7 +239,7 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 | Paiements élèves & reçus | ✔✚ | ✖ | ✖ | ✔ (auto) | ✔ (enfants) |
 | Rémunérations & paie | ✔✚ (barèmes, fiches) | ✔ (ma fiche, consultation) | ✖ | ✖ | ✖ |
 | Annonces | ✔✚ | ✔ | ✔ | ✔ | ✔ |
-| Réseau scolaire de l'école | ✔✚ (modération) | ✔ (ses groupes) | ✔ (autorisé) | ✔ | ✔ (selon groupes) |
+| Réseau scolaire de l'école (Phase 12, livré le 2026-09-26) | ✔✚ (modérer : masquer/retirer) | ✔✚ (ses groupes + groupes de matière) | ✔✚ (autorisé) | ✔✚ (ses groupes) | ✔✚ (selon groupes) |
 | Paramètres de l'école | ✔✚ | ✖ | ✖ | ✖ | ✖ |
 
 *Surveillant : rôle nouveau, ajouté sans casser l'existant (cf. Phase 8).
@@ -275,7 +276,7 @@ Légende : ✔ voir · ✚ créer/éditer · ✖ aucune · (auto) limité à soi
 
 | Sujet | Raison |
 |---|---|
-| Réseau scolaire social (groupes/publications/forum/Shorts/bibliothèque) | Rien n'existe aujourd'hui ; à bâtir après l'isolation (Phases 12–13) |
+| Réseau social **inter-établissements** (Shorts, communautés, profil éducatif public) | Le réseau **interne** est livré (Phase 12, § IX.7) ; ce qui reste différé est sa version **publique entre écoles** (Phase 13) : elle suppose des frontières de données stables (§ VII) et une modération |
 | Documents volumineux du dossier (pièces, contrats, bulletins PDF) & galerie d'établissement | Nécessite règles par école + volumétrie ; **les photos de profil restent DANS le MVP** (brique 7) |
 | Multi-devises / multi-cycles d'études paramétrables | Contexte actuel : FCFA, Collège/Lycée ; à généraliser plus tard |
 | Contrats & paie complexe du personnel (primes, retenues, congés) | Le module vacation (taux × heures) est le cas réel actuel ; extensions en Phase 10+ |
@@ -735,6 +736,7 @@ Distinction structurelle importante :
 | Périmètre | privé à **un** établissement | inter-établissements |
 | Phase | 12 | 13 |
 | Isolation | `school_id` strict | vie publique + profil éducatif filtré |
+| État | ✅ **livré le 2026-09-26** (fil, groupes, forum, bibliothèque — § IX.7) | ❌ à faire |
 
 ### VI.13 Transformation du site existant en application mobile
 
@@ -790,7 +792,7 @@ Le rapport du propriétaire remplace l'ordre à 14 phases du § 23 par celui-ci 
 | 9 | Historique scolaire | années, parcours, passage de classe | ❌ à faire |
 | 10 | Enseignants + personnel + paie | dossiers personnel, paie élargie | 🟡 partiel (paie vacation enseignants existe) |
 | 11 | Finances | frais, reçus, soldes, abonnements | 🟡 partiel (versements + stats) |
-| 12 | Réseau scolaire interne | groupes, publications, forum, bibliothèque (privés à l'école) | ❌ à faire |
+| 12 | Réseau scolaire interne | groupes, publications, forum, bibliothèque (privés à l'école) | ✅ fait (2026-09-26) — 16 routes, E2E navigateur, prod vérifiée |
 | 13 | Réseau social éducatif | inter-établissements, profil éducatif filtré | ❌ à faire |
 | 14 | **Adaptation mobile avec Capacitor** (à partir de l'existant) | projet natif, `.aab` signé | ❌ à faire |
 | 15 | Tests complets et préparation de la publication | suite E2E, fiches store | ❌ à faire |
@@ -959,7 +961,7 @@ mais **après**.
 | **MVP-2 — Établissement maître & dossier scolaire** | portail établissement élargi (élèves/parents/utilisateurs), dossier consolidé, **matricule**, **photo**, **inscription annuelle**, **dossier de frais créé à l'admission**, **reçu numéroté**, solde, **documents** | 4–6 | un élève admis apparaît dans les finances **avant** tout paiement ; son reçu est numéroté et annulable | ❌ à faire |
 | **MVP-3 — Pédagogie & vie scolaire** | **périodes** (trimestres réels), workflow de notes et **bulletins figés**, rôle **Surveillant opérant** (absences motivées, incidents, sanctions, observations), **historique** et passage de classe | 7–9 | un bulletin publié ne change plus ; l'historique de l'an dernier est consultable | ❌ à faire |
 | **MVP-4 — Personnel & finances** | dossiers du personnel (au-delà des enseignants), paie élargie, frais de scolarité paramétrables, états financiers | 10–11 | — | 🟡 partiel (paie vacation enseignants opérationnelle) |
-| **MVP-5 — Réseau scolaire interne** | groupes, publications, forum, bibliothèque **privés à l'établissement** | 12 | aucune donnée ne sort de l'école | ❌ à faire |
+| **MVP-5 — Réseau scolaire interne** | groupes, publications, forum, bibliothèque **privés à l'établissement** | 12 | aucune donnée ne sort de l'école | ✅ **fait** (2026-09-26 — § IX.7) |
 
 ### IX.3 Après le MVP (hors périmètre, explicitement différé)
 
@@ -1011,6 +1013,38 @@ est verte, et un **audit court** (fichiers concernés, risques, méthode de test
 
 > La Partie IV reste la référence pour le **contenu** de chaque brique ; la présente partie en fixe
 > l'**ordre** et la **condition de sortie**.
+
+### IX.7 MVP-5 « Réseau scolaire interne » — livré le 2026-09-26 (Phase 12)
+
+Le réseau **interne** de l'établissement est en service : chaque école dispose de son propre espace
+social, **introuvable depuis toute autre école**. Fichiers : `backend/app/routers/reseau.py`,
+`backend/app/models.py`, `backend/app/services/perimetre.py`, `backend/app/services/sd.py`,
+`backend/tests/test_reseau.py`, `pages/reseau.html`, `js/reseau.js`, `js/api.js`, `js/ui.js`,
+`css/reseau.css`.
+
+| Élément livré | Détail |
+| --- | --- |
+| Fil d'actualité & Forum | publication, commentaire, « j'aime », épinglage, masquage, modification et suppression par l'auteur **ou** par la direction |
+| Groupes | types `classe`, `matiere`, `projet`, `club` ; adhésion et départ ; publication dans un groupe ; icône par type |
+| Bibliothèque de ressources | liens, documents, vidéos et exercices partagés (adresse contrôlée) |
+| Modération | masquer / retirer réservés à la **direction** ; l'auteur garde la main sur ses propres publications |
+| Isolation | **toutes** les requêtes portent le `school_id` du rattachement actif (`perimetre`, `sd`) : le groupe, la publication ou la ressource d'une autre école est **introuvable** (404) — jamais seulement caché par l'interface |
+| Permissions | `reseau.ecrire` accordée aux **cinq** rôles (Administrateur, Professeur, Surveillant, Élève, Parent) ; `reseau.moderer` à la **direction seule** ; page `reseau` déclarée dans `PAGES_PAR_ROLE` |
+| Interface | `pages/reseau.html` + `js/reseau.js` + `css/reseau.css` ; entrée de menu et sous-titres adaptés au rôle dans `js/ui.js` |
+
+Règles de structure (garde-fous ajoutés **après** la vérification — sans eux, un groupe mal formé
+échappait à tout le monde, y compris à son créateur) :
+
+1. un groupe **adossé à une classe** doit être de type `classe` (sinon 400) et la classe doit être
+   visible par son créateur ;
+2. un groupe **adossé à une matière** doit être de type `matiere` — réservé au personnel encadrant
+   (403 sinon) — et la matière doit exister dans l'école (404 sinon) ;
+3. la classe **ou** la matière d'un groupe structurel est **obligatoire** ;
+4. le créateur devient `responsable` du groupe et le nom d'un groupe est **unique par école** (409).
+
+Preuves exigées par § IX.5 : suite pytest complète **verte** (tests du réseau, dont l'isolation
+inter-écoles), E2E navigateur (publier → recharger → persistance ; modération direction contre
+auteur), et vérification en production.
 
 ---
 

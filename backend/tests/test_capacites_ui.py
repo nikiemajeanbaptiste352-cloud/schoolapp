@@ -16,6 +16,12 @@ Ce module vérifie :
    dans `js/ui.js`, `js/*.js` et `pages/*.html` existent bien côté serveur.
    C'est ce qui empêche une faute de frappe de désactiver silencieusement
    un garde-fou.
+
+Phase 12 (réseau scolaire interne) a ajouté la page `reseau` pour les cinq
+rôles et deux opérations : `reseau.ecrire` (élèves et parents y publient
+comme le personnel) et `reseau.moderer` (direction uniquement). Aucune
+écriture **de scolarité** n'a été ouverte à cette occasion : la distinction
+est vérifiée explicitement ci-dessous.
 """
 
 from __future__ import annotations
@@ -111,6 +117,9 @@ def test_capacites_administrateur(client, admin_token):
         "notes.ecrire",
         "finance.ecrire",
     } <= set(cap["operations"])
+    # Phase 12 : la direction écrit et modère le réseau.
+    assert {"reseau.ecrire", "reseau.moderer"} <= set(cap["operations"])
+    assert "reseau" in cap["pages"]
 
 
 def test_capacites_professeur(client, prof_token):
@@ -120,25 +129,38 @@ def test_capacites_professeur(client, prof_token):
     # Espace enseignant ouvert, administration et finance fermées.
     assert {"mes-seances", "ma-paie"} <= set(cap["pages"])
     assert not {"utilisateurs", "paie"} & set(cap["pages"])
-    assert set(cap["operations"]) == {"notes.ecrire", "presences.ecrire", "seances.ecrire"}
+    assert set(cap["operations"]) == {
+        "notes.ecrire",
+        "presences.ecrire",
+        "seances.ecrire",
+        # Phase 12 : le réseau interne s'écrit avec les cinq rôles.
+        "reseau.ecrire",
+    }
     # Écritures de gestion interdites.
     assert not {"eleves.ecrire", "membres.ecrire", "finance.ecrire"} & set(cap["operations"])
+    # La modération du réseau reste à la direction.
+    assert "reseau.moderer" not in cap["operations"]
 
 
 def test_capacites_surveillant(client, surveillant_token):
     cap = _etat(client, surveillant_token)["capacites"]
     assert cap["role"] == ROLE_SURVEILLANT
     assert cap["portee"] == PORTEE_TOUS
-    assert cap["operations"] == ["presences.ecrire"]
+    # Vie scolaire + réseau interne ; rien d'autre.
+    assert cap["operations"] == ["presences.ecrire", "reseau.ecrire"]
     # Vie scolaire : ni notes, ni bulletins, ni finance.
     assert not {"grades", "report-cards", "payments"} & set(cap["pages"])
+    assert "reseau" in cap["pages"]
 
 
 def test_capacites_eleve(client, eleve_token):
     cap = _etat(client, eleve_token)["capacites"]
     assert cap["role"] == ROLE_ELEVE
     assert cap["portee"] == PORTEE_PERIMETRE
-    assert cap["operations"] == []
+    # Phase 12 : le seul droit d'écriture d'un élève est le réseau interne
+    # (fil, groupes, ressources) — aucune écriture de scolarité.
+    assert cap["operations"] == ["reseau.ecrire"]
+    assert "reseau" in cap["pages"]
     assert {"students", "grades", "report-cards", "payments"} <= set(cap["pages"])
     # Ni annuaire des enseignants, ni gestion des comptes, ni rémunérations.
     assert not {"teachers", "utilisateurs", "paie", "mes-seances", "ma-paie"} & set(
@@ -147,11 +169,13 @@ def test_capacites_eleve(client, eleve_token):
 
 
 def test_capacites_parent(client, parent_token):
-    """Cœur de la non-régression Phase 2 : un parent n'a aucun droit d'écriture."""
+    """Cœur de la non-régression Phase 2 : un parent n'écrit rien dans la scolarité."""
     cap = _etat(client, parent_token)["capacites"]
     assert cap["role"] == ROLE_PARENT
     assert cap["portee"] == PORTEE_PERIMETRE
-    assert cap["operations"] == []
+    # Phase 12 : seule ouverture d'écriture, le réseau interne.
+    assert cap["operations"] == ["reseau.ecrire"]
+    assert "reseau" in cap["pages"]
     assert {"students", "grades", "report-cards", "payments"} <= set(cap["pages"])
     assert not {"teachers", "utilisateurs", "paie"} & set(cap["pages"])
 
@@ -177,9 +201,33 @@ def test_tables_de_perimetre_stables():
     # Aucune opération inventée : elle appartient à au moins un rôle.
     connues = {op for ops in OPERATIONS_PAR_ROLE.values() for op in ops}
     assert {"eleves.ecrire", "notes.ecrire", "presences.ecrire", "seances.ecrire"} <= connues
-    # Les profils de consultation n'ont aucune écriture.
-    assert OPERATIONS_PAR_ROLE[ROLE_ELEVE] == ()
-    assert OPERATIONS_PAR_ROLE[ROLE_PARENT] == ()
+
+    # Phase 12 — réseau scolaire interne.
+    # 1. La page est ouverte aux cinq rôles : c'est un réseau *scolaire*.
+    for role, pages in PAGES_PAR_ROLE.items():
+        assert "reseau" in pages, f"{role} sans accès au réseau"
+    # 2. Les profils de consultation n'ont aucune écriture **de scolarité** :
+    #    leur unique droit est l'écriture dans le réseau.
+    ecritures_scolaires = {
+        "ecole.ecrire",
+        "eleves.ecrire",
+        "enseignants.ecrire",
+        "classes.ecrire",
+        "matieres.ecrire",
+        "annonces.ecrire",
+        "membres.ecrire",
+        "notes.ecrire",
+        "presences.ecrire",
+        "seances.ecrire",
+        "finance.ecrire",
+        "paie.ecrire",
+    }
+    for role in (ROLE_ELEVE, ROLE_PARENT):
+        assert OPERATIONS_PAR_ROLE[role] == ("reseau.ecrire",)
+        assert not set(OPERATIONS_PAR_ROLE[role]) & ecritures_scolaires
+    # 3. La modération appartient à la direction, et à elle seule.
+    moderateurs = [r for r, ops in OPERATIONS_PAR_ROLE.items() if "reseau.moderer" in ops]
+    assert moderateurs == [ROLE_ADMIN]
 
 
 # ---------------------------------------------------------------------------
