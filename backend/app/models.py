@@ -636,6 +636,12 @@ class Groupe(Base):
             ["school_id", "matiere_id"],
             ["matieres.school_id", "matieres.id"],
         ),
+        # Clé de locataire exposée : `publications` référence le groupe par
+        # `(school_id, id)`. PostgreSQL n'accepte une clé étrangère composite
+        # que si les colonnes visées forment une clé **unique** — `id` seul
+        # étant la clé primaire, cette contrainte est obligatoire (SQLite, lui,
+        # ne l'exige pas : sans elle, `create_all` échoue en production).
+        UniqueConstraint("school_id", "id", name="uq_groupe_tenant"),
         UniqueConstraint("school_id", "nom", name="uq_groupe_nom"),
     )
 
