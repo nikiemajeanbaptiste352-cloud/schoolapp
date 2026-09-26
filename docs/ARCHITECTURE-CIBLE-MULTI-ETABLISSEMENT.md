@@ -792,7 +792,7 @@ Le rapport du propriétaire remplace l'ordre à 14 phases du § 23 par celui-ci 
 | 9 | Historique scolaire | années, parcours, passage de classe | ❌ à faire |
 | 10 | Enseignants + personnel + paie | dossiers personnel, paie élargie | 🟡 partiel (paie vacation enseignants existe) |
 | 11 | Finances | frais, reçus, soldes, abonnements | 🟡 partiel (versements + stats) |
-| 12 | Réseau scolaire interne | groupes, publications, forum, bibliothèque (privés à l'école) | ✅ fait (2026-09-26) — 16 routes, E2E navigateur, prod vérifiée |
+| 12 | Réseau scolaire interne | groupes, publications, forum, bibliothèque (privés à l'école) | ✅ fait (2026-09-26) — 16 routes, E2E navigateur, prod vérifiée (67 chemins) — § IX.7 |
 | 13 | Réseau social éducatif | inter-établissements, profil éducatif filtré | ❌ à faire |
 | 14 | **Adaptation mobile avec Capacitor** (à partir de l'existant) | projet natif, `.aab` signé | ❌ à faire |
 | 15 | Tests complets et préparation de la publication | suite E2E, fiches store | ❌ à faire |
@@ -1042,9 +1042,48 @@ Règles de structure (garde-fous ajoutés **après** la vérification — sans e
 3. la classe **ou** la matière d'un groupe structurel est **obligatoire** ;
 4. le créateur devient `responsable` du groupe et le nom d'un groupe est **unique par école** (409).
 
-Preuves exigées par § IX.5 : suite pytest complète **verte** (tests du réseau, dont l'isolation
-inter-écoles), E2E navigateur (publier → recharger → persistance ; modération direction contre
-auteur), et vérification en production.
+Et une **cinquième règle, d'ordre général**, découverte en production (elle vaut pour toutes les
+phases suivantes) :
+
+5. toute **clé étrangère composite** doit viser une clé **primaire ou unique** composite. La table
+   `groupes` déclarait `id` **seul** en clé primaire tandis que `publications` la visait par
+   `(school_id, id)` : **SQLite tolère, PostgreSQL refuse** (erreur 42830). La règle est satisfaite
+   par construction sur les tables du domaine (PK `(school_id, id)`), mais `groupes` a dû recevoir la
+   contrainte `uq_groupe_tenant`, et `backend/tests/test_schema_integrite.py` rejoue désormais cette
+   exigence de PostgreSQL **sur les métadonnées SQLAlchemy** — donc sans serveur PostgreSQL — avec
+   une **contre-épreuve** vérifiant que le contrôle détecte bien un schéma fautif.
+
+Preuves exigées par § IX.5 :
+
+- suite pytest complète **verte** : **198 tests**, code de sortie **0** ;
+- E2E navigateur : publier → recharger → **persistance**, « j'aime », commentaire, épinglage,
+  masquage, forum, bibliothèque (adresse refusée si invalide), création / adhésion / départ de
+  groupe, publication dans un groupe, recherche, « mes publications », et **modération direction
+  contre auteur** (vues Administrateur et Élève) ; côté Élève, le sélecteur de type de groupe ne
+  propose ni `matiere` ni rattachement libre ;
+- production (`schoolapp-flame-six.vercel.app`, relevé du 2026-09-26) : `/openapi.json` **200, 67
+  chemins** (contre 54 avant la phase ⇒ **13 nouveaux gabarits** `/api/v1/reseau/…`), `/` **200**
+  (37 650 o), `/api/v1/health` **200**, `/api/v1/auth/options` **200**, `/pages/reseau.html`,
+  `/js/reseau.js`, `/js/ui.js`, `/js/api.js` et `/css/reseau.css` **identiques octet pour octet** au
+  dépôt, et `GET /api/v1/reseau/fil` **sans jeton = 401** (la route existe et est bien protégée) ;
+  `pages/dashboard.html`, `pages/paie.html`, `pages/vie-scolaire.html` et `telecharger/` répondent
+  toujours 200, `index.html`, `js/login.js`, `js/live.js` et `js/dashboard.js` sont inchangés ⇒
+  **aucune fonctionnalité existante supprimée** ;
+- le parcours **authentifié** de bout en bout a été validé **localement** (navigateur sur uvicorn,
+  base jetable créée avec `SEED_DEMO=1`, comptes de démonstration) : l'agent ne détient **aucun
+  compte réel** de l'école de production, et y écrire des données fictives serait contraire à
+  § IX.4.4.
+
+> **Journal d'incident — 2026-09-26 (clé étrangère composite).** Le premier déploiement de la phase
+> a rendu **toute** la production indisponible : `/`, `/api/v1/health` et `/openapi.json` répondaient
+> `500 FUNCTION_INVOCATION_FAILED`. Or `create_all` s'exécute dans le **cycle de démarrage** de
+> l'application (`lifespan` de `backend/app/main.py`) : l'erreur PostgreSQL 42830 — « il n'existe
+> aucune contrainte unique correspondant aux clés référencées » — empêchait l'application de
+> démarrer, **fichiers statiques compris**. Le défaut n'était **pas** reproductible en local, SQLite
+> n'imposant pas cette exigence : suite pytest et E2E navigateur étaient verts pendant que la
+> production était morte. Corrigé dans le cycle (contrainte `uq_groupe_tenant` + test de garde),
+> puis vérifié comme ci-dessus. À retenir : **une page statique cassée n'exclut pas une cause base de
+> données** — c'est le démarrage qu'il faut suspecter d'abord.
 
 ---
 
