@@ -17,90 +17,83 @@
 
         <!-- Partie gauche : présentation -->
         <div class="login-left">
-            <!-- ================= Landing : navigation ================= -->
-            <header class="lp-hero" id="haut">
-                <nav class="lp-nav">
-                    <a class="lp-nav-brand" href="#haut">
-                        <img src="assets/logo.svg" alt="Logo SchoolManager">
-                        <span>
-                            <b>SchoolManager</b>
-                            <small>Gestion scolaire</small>
-                        </span>
-                    </a>
-                    <div class="lp-nav-links" id="lpNavLinks">
-                        <a href="#fonctionnalites">Modules</a>
-                        <a href="#espaces">Espaces</a>
-                        <a href="#demarrage">Démarrage</a>
-                        <a href="#faq">FAQ</a>
-                        <a class="lp-btn lp-btn-gold lp-nav-cta lp-nav-cta-mob" href="#connexion">Espace connexion →</a>
-                    </div>
-                    <a class="lp-btn lp-btn-gold lp-nav-cta lp-nav-cta-desk" href="#connexion">Espace connexion →</a>
-                    <button type="button" class="lp-burger" id="lpBurger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="lpNavLinks">
-                        <span></span><span></span><span></span>
-                    </button>
-                </nav>
+            <!-- ================= Navigation =================
+                 La barre est volontairement un frère du héro (et non un enfant) :
+                 seul un élément placé hors du héro — qui masque son débordement —
+                 peut rester collé en haut de page pendant tout le défilement.
+                 Le héro remonte sous elle grâce à une marge négative. -->
+            <nav class="lp-nav" id="lpNav">
+                <a class="lp-nav-brand" href="#haut">
+                    <img src="assets/logo.svg" alt="Logo SchoolManager">
+                    <span>
+                        <b>SchoolManager</b>
+                        <small>Gestion scolaire</small>
+                    </span>
+                </a>
+                <div class="lp-nav-links" id="lpNavLinks">
+                    <a href="#fonctionnalites">Modules</a>
+                    <a href="#espaces">Espaces</a>
+                    <a href="#demarrage">Démarrage</a>
+                    <a href="#faq">FAQ</a>
+                    <a class="lp-btn lp-btn-gold lp-nav-cta lp-nav-cta-mob" href="#connexion">Espace connexion →</a>
+                </div>
+                <a class="lp-btn lp-btn-gold lp-nav-cta lp-nav-cta-desk" href="#connexion">Espace connexion →</a>
+                <button type="button" class="lp-burger" id="lpBurger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="lpNavLinks">
+                    <span></span><span></span><span></span>
+                </button>
+            </nav>
 
-                <div class="lp-hero-cols">
-                    <div class="lp-hero-txt">
-                        <span class="lp-chip lp-chip-gold">🎓 Conçu pour l'école en Afrique</span>
-                        <h1>L'excellence scolaire africaine, <span class="accent">pilotée simplement.</span></h1>
-                        <p class="lp-lead">Élèves, enseignants, notes, bulletins, paiements et emplois du temps : SchoolManager réunit toute la vie de votre établissement dans un outil clair, rapide et accessible sur tous les appareils.</p>
-                        <ul class="lp-points">
-                            <li>🎒 Cycles Collège &amp; Lycée, classes, professeurs principaux</li>
-                            <li>🧮 Moyennes automatiques, rangs, appréciations &amp; bulletins imprimables</li>
-                            <li>💰 Suivi des frais de scolarité en FCFA, dossiers &amp; versements</li>
-                            <li>📢 Annonces &amp; espace Parent sécurisé (connexion par code)</li>
-                        </ul>
-                        <div class="lp-cta">
-                            <a class="lp-btn lp-btn-gold" href="#connexion">Espace connexion →</a>
-                            <a class="lp-btn lp-btn-ghost" href="#fonctionnalites">Découvrir les modules</a>
+            <!-- ================= Héro plein écran : photo en fond ================= -->
+            <header class="lp-hero" id="haut">
+                <!-- Photo : Bright Kwame Ayisi (Ghana) — Wikimedia Commons, CC0 1.0
+                     https://commons.wikimedia.org/wiki/File:A_student_asking_a_question_in_a_classroom_04.jpg -->
+                <img class="lp-hero-fond" src="assets/hero-photo.jpg" alt="" aria-hidden="true" width="1280" height="871" fetchpriority="high">
+                <span class="lp-hero-voile" aria-hidden="true"></span>
+
+                <div class="lp-hero-corps">
+                    <span class="lp-chip lp-chip-gold">🎓 Conçu pour l'école en Afrique</span>
+                    <h1>L'excellence scolaire africaine, <span class="accent">pilotée simplement.</span></h1>
+                    <p class="lp-lead">Élèves, enseignants, notes, bulletins, paiements et emplois du temps : SchoolManager réunit toute la vie de votre établissement dans un outil clair, rapide, accessible sur tous les écrans — et pensé pour le terrain africain.</p>
+                    <ul class="lp-points">
+                        <li>🎒 Élèves, classes &amp; cycles</li>
+                        <li>🧮 Notes, rangs &amp; bulletins</li>
+                        <li>💰 Frais de scolarité en FCFA</li>
+                        <li>📢 Annonces &amp; espace Parent</li>
+                    </ul>
+                    <div class="lp-cta">
+                        <a class="lp-btn lp-btn-gold" href="#connexion">Espace connexion →</a>
+                        <a class="lp-btn lp-btn-ghost" href="#fonctionnalites">Découvrir les modules</a>
+                    </div>
+                    <a class="lp-defile" href="#fonctionnalites">
+                        <span>Faire défiler</span>
+                        <span class="lp-defile-fleche" aria-hidden="true">↓</span>
+                    </a>
+                </div>
+
+                <!-- ================= Chiffres clés, posés sur le bas du héro ================= -->
+                <section class="lp-confiance" aria-label="Les points forts de SchoolManager">
+                    <div class="lp-confiance-in">
+                        <div class="lp-conf-item">
+                            <b>4 espaces</b>
+                            <span>Direction, enseignants, parents et élèves : chacun son accès.</span>
+                        </div>
+                        <div class="lp-conf-item">
+                            <b>Bulletins en 1 clic</b>
+                            <span>Moyennes, rangs et appréciations calculés automatiquement.</span>
+                        </div>
+                        <div class="lp-conf-item">
+                            <b>Suivi en FCFA</b>
+                            <span>Frais de scolarité, dossiers et versements sous contrôle.</span>
+                        </div>
+                        <div class="lp-conf-item">
+                            <b>Sur tous les écrans</b>
+                            <span>Téléphone, tablette ou ordinateur : aucune installation.</span>
                         </div>
                     </div>
-
-                    <div class="lp-visuel">
-                        <div class="lp-soleil" aria-hidden="true"></div>
-                        <!-- Photo : Bright Kwame Ayisi (Ghana) — Wikimedia Commons, CC0 1.0
-                             https://commons.wikimedia.org/wiki/File:A_student_asking_a_question_in_a_classroom_04.jpg -->
-                        <figure class="lp-photo">
-                            <img src="assets/hero-photo.jpg" alt="Élèves en classe, une main levée pour répondre" width="1280" height="871" fetchpriority="high">
-                            <figcaption class="lp-photo-caption">
-                                <span class="lp-photo-caption-ic" aria-hidden="true">🎓</span>
-                                <span>
-                                    <b>Vos élèves, au cœur de l'école</b>
-                                    <small>Notes, bulletins, présences et paiements : toute la vie de la classe, en un seul outil.</small>
-                                </span>
-                            </figcaption>
-                            <div class="lp-flotte lp-flotte-1"><span class="ico">✅</span> Notes enregistrées</div>
-                            <div class="lp-flotte lp-flotte-2"><span class="ico">📢</span> Annonce publiée aux parents</div>
-                            <div class="lp-flotte lp-flotte-3"><span class="ico">💳</span> Paiement FCFA reçu</div>
-                        </figure>
-                    </div>
-                </div>
+                </section>
 
                 <div class="lp-kente" aria-hidden="true"></div>
             </header>
-
-            <!-- ================= Chiffres clés ================= -->
-            <section class="lp-confiance" aria-label="Les points forts de SchoolManager">
-                <div class="lp-confiance-in">
-                    <div class="lp-conf-item">
-                        <b>4 espaces</b>
-                        <span>Direction, enseignants, parents et élèves : chacun son accès.</span>
-                    </div>
-                    <div class="lp-conf-item">
-                        <b>Bulletins en 1 clic</b>
-                        <span>Moyennes, rangs et appréciations calculés automatiquement.</span>
-                    </div>
-                    <div class="lp-conf-item">
-                        <b>Suivi en FCFA</b>
-                        <span>Frais de scolarité, dossiers et versements sous contrôle.</span>
-                    </div>
-                    <div class="lp-conf-item">
-                        <b>Sur tous les écrans</b>
-                        <span>Téléphone, tablette ou ordinateur : aucune installation.</span>
-                    </div>
-                </div>
-            </section>
 
             <main class="lp-main">
                 <!-- ================= Modules ================= -->

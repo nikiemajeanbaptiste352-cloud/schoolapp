@@ -14,7 +14,7 @@
   var MOUVEMENT_REDUIT = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   var SEL_APPARITION =
-    ".lp-chip, .lp-hero h1, .lp-lead, .lp-points, .lp-cta, .lp-visuel, .lp-kente, " +
+    ".lp-chip, .lp-hero h1, .lp-lead, .lp-points, .lp-cta, .lp-defile, .lp-kente, " +
     ".lp-conf-item, .lp-sec-titre, .lp-carte, .lp-role, .lp-etape, .lp-atouts li, " +
     ".lp-faq-item, .lp-cta-band-in, .lp-auth-head, .login-card";
 
@@ -167,6 +167,25 @@
     window.addEventListener("resize", function () {
       if (!estMobile()) fermer();
     });
+
+    // Barre de navigation : translucide en haut de page (elle laisse voir la
+    // photo du héro), opaque dès que la page défile pour rester lisible
+    // au-dessus des sections claires.
+    var barre = document.getElementById("lpNav") ||
+      (burger.closest ? burger.closest(".lp-nav") : null);
+    if (barre) {
+      var arriveEnHaut = true;
+      var majBarre = function () {
+        var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+        if (y > 12) {
+          if (arriveEnHaut) { barre.classList.add("is-colle"); arriveEnHaut = false; }
+        } else if (!arriveEnHaut) {
+          barre.classList.remove("is-colle"); arriveEnHaut = true;
+        }
+      };
+      window.addEventListener("scroll", majBarre, false);
+      majBarre();
+    }
 
     // Lien de la section en cours mis en évidence pendant le défilement.
     var liens = panneau.querySelectorAll('a[href^="#"]');
